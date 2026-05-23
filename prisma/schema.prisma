@@ -1,0 +1,1312 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User and Authentication Models
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String? // Nullable for OAuth users
+  name          String
+  role          UserRole  @default(FRONT_DESK)
+  image         String?
+  isActive      Boolean   @default(true)
+  emailVerified DateTime?
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relationships
+  practitionerId String?
+  practitioner   Practitioner? @relation(fields: [practitionerId], references: [id])
+  patientId      String?
+  patient        Patient?      @relation(fields: [patientId], references: [id])
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  // Audit
+  createdById String?
+  updatedById String?
+
+  @@index([email])
+  @@index([role])
+  @@index([practitionerId])
+  @@index([patientId])
+}
+
+enum UserRole {
+  ADMIN
+  PHYSICIAN
+  NURSE
+  MEDICAL_ASSISTANT
+  FRONT_DESK
+  PATIENT
+}
+
+// Organization/Practice Model
+model Organization {
+  id         String           @id @default(cuid())
+  identifier String           @unique // NPI or internal ID
+  name       String
+  alias      String?
+  type       OrganizationType @default(PROVIDER)
+  active     Boolean          @default(true)
+
+  // Contact
+  phone   String?
+  email   String?
+  fax     String?
+  website String?
+
+  // Address
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  postalCode   String?
+  country      String  @default("US")
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  users         User[]
+  practitioners Practitioner[]
+  patients      Patient[]
+
+  @@index([identifier])
+  @@index([name])
+}
+
+enum OrganizationType {
+  PROVIDER
+  PAYER
+  GOVERNMENT
+  LABORATORY
+  PHARMACY
+  OTHER
+}
+
+// Practitioner/Provider Model
+model Practitioner {
+  id         String @id @default(cuid())
+  identifier String @unique // NPI or internal ID
+
+  // Name
+  firstName  String
+  lastName   String
+  middleName String?
+  prefix     String?
+  suffix     String?
+
+  // Professional
+  specialty     String?
+  credentials   String? // MD, DO, NP, PA, RN, etc.
+  licenseNumber String?
+  licenseState  String?
+
+  // Contact
+  email String?
+  phone String?
+
+  // Status
+  active Boolean @default(true)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  users          User[]
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  patients       Patient[]     @relation("PrimaryPhysician")
+  encounters     Encounter[]
+
+  @@index([identifier])
+  @@index([lastName])
+  @@index([organizationId])
+}
+
+// Patient Model - FHIR R4 Aligned
+model Patient {
+  id  String @id @default(cuid())
+  mrn String @unique // Medical Record Number
+
+  // FHIR Identifiers
+  ssn            String? @unique
+  driversLicense String?
+  passportNumber String?
+
+  // Name
+  firstName     String
+  lastName      String
+  middleName    String?
+  prefix        String?
+  suffix        String?
+  preferredName String?
+  previousName  String?
+
+  // Demographics
+  gender          Gender    @default(UNKNOWN)
+  birthSex        BirthSex?
+  dateOfBirth     DateTime
+  dateOfDeath     DateTime?
+  deceasedBoolean Boolean   @default(false)
+
+  // Administrative
+  maritalStatus     MaritalStatus?
+  race              Race?
+  ethnicity         Ethnicity?
+  preferredLanguage String         @default("en")
+
+  // Communication preferences
+  communicationPreference CommunicationPreference @default(EMAIL)
+
+  // Status
+  status PatientStatus @default(ACTIVE)
+
+  // Photo
+  photoUrl String?
+
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  // Relationships
+  addresses         PatientAddress[]
+  contacts          PatientContact[]
+  telecoms          PatientTelecom[]
+  emergencyContacts EmergencyContact[]
+  insurancePolicies InsurancePolicy[]
+
+  // Primary care
+  primaryPhysicianId String?
+  primaryPhysician   Practitioner? @relation("PrimaryPhysician", fields: [primaryPhysicianId], references: [id])
+
+  // Organization
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  // Portal access
+  portalUser User[]
+
+  // Clinical
+  encounters   Encounter[]
+  observations Observation[]
+  conditions   Condition[]
+  allergies    AllergyIntolerance[]
+  medications  MedicationRequest[]
+  documents    DocumentReference[]
+  prescriptions Prescription[]
+
+  @@index([mrn])
+  @@index([lastName])
+  @@index([firstName])
+  @@index([dateOfBirth])
+  @@index([gender])
+  @@index([status])
+  @@index([primaryPhysicianId])
+  @@index([organizationId])
+  @@index([ssn])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNKNOWN
+}
+
+enum BirthSex {
+  M
+  F
+  OTH
+  UNK
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+  SEPARATED
+  DOMESTIC_PARTNER
+  UNKNOWN
+}
+
+enum Race {
+  WHITE
+  BLACK_OR_AFRICAN_AMERICAN
+  ASIAN
+  AMERICAN_INDIAN_OR_ALASKA_NATIVE
+  NATIVE_HAWAIIAN_OR_PACIFIC_ISLANDER
+  OTHER
+  UNKNOWN
+  DECLINED
+}
+
+enum Ethnicity {
+  HISPANIC_OR_LATINO
+  NOT_HISPANIC_OR_LATINO
+  UNKNOWN
+  DECLINED
+}
+
+enum PatientStatus {
+  ACTIVE
+  INACTIVE
+  DECEASED
+}
+
+enum CommunicationPreference {
+  EMAIL
+  PHONE
+  SMS
+  MAIL
+}
+
+// Patient Address
+model PatientAddress {
+  id        String  @id @default(cuid())
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  use  AddressUse  @default(HOME)
+  type AddressType @default(BOTH)
+
+  line1      String
+  line2      String?
+  city       String
+  district   String? // County/Parish
+  state      String
+  postalCode String
+  country    String  @default("US")
+
+  periodStart DateTime?
+  periodEnd   DateTime?
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+}
+
+enum AddressUse {
+  HOME
+  WORK
+  TEMP
+  OLD
+  BILLING
+}
+
+enum AddressType {
+  POSTAL
+  PHYSICAL
+  BOTH
+}
+
+// Patient Contact (Emergency Contacts, Guarantors)
+model PatientContact {
+  id        String  @id @default(cuid())
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  relationship ContactRelationship @default(OTHER)
+
+  // Name
+  firstName String
+  lastName  String
+
+  // Contact
+  phone String
+  email String?
+
+  // Address
+  addressLine1 String?
+  city         String?
+  state        String?
+  postalCode   String?
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+}
+
+enum ContactRelationship {
+  EMERGENCY_CONTACT
+  GUARANTOR
+  PARENT
+  SPOUSE
+  CHILD
+  SIBLING
+  OTHER
+}
+
+// Emergency Contact (separate model for quick access)
+model EmergencyContact {
+  id        String  @id @default(cuid())
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  name         String
+  relationship String
+  phone        String
+  email        String?
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+}
+
+// Patient Telecom (Phone, Email, Fax)
+model PatientTelecom {
+  id        String  @id @default(cuid())
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  system TelecomSystem @default(PHONE)
+  value  String
+  use    TelecomUse    @default(HOME)
+  rank   Int           @default(1)
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+}
+
+enum TelecomSystem {
+  PHONE
+  FAX
+  EMAIL
+  PAGER
+  URL
+  SMS
+  OTHER
+}
+
+enum TelecomUse {
+  HOME
+  WORK
+  TEMP
+  OLD
+  MOBILE
+}
+
+// Insurance Information
+model InsurancePolicy {
+  id        String  @id @default(cuid())
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  // Payer info
+  payerName String
+  payerId   String? // Payer ID
+
+  // Policy info
+  policyNumber String
+  groupNumber  String?
+  planName     String?
+  planType     String? // HMO, PPO, etc.
+
+  // Subscriber info
+  subscriberName         String
+  subscriberRelationship String    @default("Self")
+  subscriberDOB          DateTime?
+  subscriberSSN          String?
+
+  // Coverage dates
+  coverageStartDate DateTime?
+  coverageEndDate   DateTime?
+
+  // Status
+  isActive  Boolean @default(true)
+  isPrimary Boolean @default(false)
+
+  // Copay/Deductible
+  copayAmount      Decimal? @db.Decimal(10, 2)
+  deductibleAmount Decimal? @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([payerName])
+}
+
+// Encounter/Visit Model
+model Encounter {
+  id         String @id @default(cuid())
+  identifier String @unique // Visit number
+
+  status EncounterStatus @default(PLANNED)
+  class  EncounterClass  @default(AMBULATORY)
+  type   String? // Type of visit
+
+  // Participants
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  practitionerId String?
+  practitioner   Practitioner? @relation(fields: [practitionerId], references: [id])
+
+  // Timing
+  periodStart DateTime
+  periodEnd   DateTime?
+
+  // Location
+  location String?
+  room     String?
+
+  // Reason
+  reasonCode    String?
+  reasonDisplay String?
+
+  // Priority
+  priority EncounterPriority @default(ROUTINE)
+
+  // Notes
+  notes String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  observations Observation[]
+
+  @@index([patientId])
+  @@index([practitionerId])
+  @@index([status])
+  @@index([periodStart])
+}
+
+enum EncounterStatus {
+  PLANNED
+  ARRIVED
+  TRIAGED
+  IN_PROGRESS
+  ONLEAVE
+  FINISHED
+  CANCELLED
+  ENTERED_IN_ERROR
+  UNKNOWN
+}
+
+enum EncounterClass {
+  INPATIENT
+  OUTPATIENT
+  AMBULATORY
+  EMERGENCY
+  HOME
+  VIRTUAL
+}
+
+enum EncounterPriority {
+  ROUTINE
+  URGENT
+  EMERGENCY
+}
+
+// Observation/Vitals Model
+model Observation {
+  id String @id @default(cuid())
+
+  status      ObservationStatus @default(FINAL)
+  category    String? // vital-signs, laboratory, etc.
+  code        String // LOINC code
+  codeDisplay String // Display name
+
+  // Subject
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  encounterId String?
+  encounter   Encounter? @relation(fields: [encounterId], references: [id])
+
+  // Timing
+  effectiveDateTime DateTime @default(now())
+  issued            DateTime @default(now())
+
+  // Value
+  valueString   String?
+  valueQuantity Decimal? @db.Decimal(10, 4)
+  valueUnit     String?
+  valueCode     String?
+
+  // Reference ranges
+  referenceRangeLow  Decimal? @db.Decimal(10, 4)
+  referenceRangeHigh Decimal? @db.Decimal(10, 4)
+
+  // Interpretation
+  interpretation String? // Normal, High, Low, etc.
+
+  // Notes
+  note String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([encounterId])
+  @@index([code])
+  @@index([effectiveDateTime])
+}
+
+enum ObservationStatus {
+  REGISTERED
+  PRELIMINARY
+  FINAL
+  AMENDED
+  CORRECTED
+  CANCELLED
+  ENTERED_IN_ERROR
+  UNKNOWN
+}
+
+// Condition/Problem List Model
+model Condition {
+  id String @id @default(cuid())
+
+  clinicalStatus     ClinicalStatus     @default(ACTIVE)
+  verificationStatus VerificationStatus @default(CONFIRMED)
+
+  category String? // problem-list-item, encounter-diagnosis
+  severity String?
+
+  code        String // ICD-10 or SNOMED
+  codeDisplay String
+  bodySite    String?
+
+  // Subject
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  encounterId String?
+
+  // Timing
+  onsetDate     DateTime?
+  abatementDate DateTime?
+  recordedDate  DateTime  @default(now())
+
+  // Recorder
+  recordedById String?
+
+  // Notes
+  note String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([code])
+  @@index([clinicalStatus])
+}
+
+enum ClinicalStatus {
+  ACTIVE
+  RECURRENCE
+  RELAPSE
+  INACTIVE
+  REMISSION
+  RESOLVED
+}
+
+enum VerificationStatus {
+  UNCONFIRMED
+  PROVISIONAL
+  DIFFERENTIAL
+  CONFIRMED
+  REFUTED
+  ENTERED_IN_ERROR
+}
+
+// Allergy Intolerance Model
+model AllergyIntolerance {
+  id String @id @default(cuid())
+
+  clinicalStatus     AllergyClinicalStatus     @default(ACTIVE)
+  verificationStatus AllergyVerificationStatus @default(CONFIRMED)
+  type               AllergyType               @default(ALLERGY)
+  category           AllergyCategory[]
+  criticality        Criticality               @default(LOW)
+
+  code        String // RxNorm or other code
+  codeDisplay String
+
+  // Subject
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  // Onset
+  onsetDateTime DateTime?
+
+  // Reaction
+  reactionManifestation String? // Hives, Anaphylaxis, etc.
+  reactionSeverity      ReactionSeverity?
+
+  // Notes
+  note String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+}
+
+enum AllergyClinicalStatus {
+  ACTIVE
+  INACTIVE
+  RESOLVED
+}
+
+enum AllergyVerificationStatus {
+  UNCONFIRMED
+  CONFIRMED
+  REFUTED
+  ENTERED_IN_ERROR
+}
+
+enum AllergyType {
+  ALLERGY
+  INTOLERANCE
+}
+
+enum AllergyCategory {
+  FOOD
+  MEDICATION
+  ENVIRONMENT
+  BIOLOGIC
+}
+
+enum Criticality {
+  LOW
+  HIGH
+  UNABLE_TO_ASSESS
+}
+
+enum ReactionSeverity {
+  MILD
+  MODERATE
+  SEVERE
+}
+
+// Medication Request/Prescription Model
+model MedicationRequest {
+  id String @id @default(cuid())
+
+  status MedicationStatus @default(ACTIVE)
+  intent MedicationIntent @default(ORDER)
+
+  medicationCode    String // RxNorm
+  medicationDisplay String
+
+  // Subject
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  encounterId String?
+
+  // Prescriber
+  requesterId String?
+
+  // Dosage
+  dosageInstruction String?
+  quantity          String?
+  quantityUnit      String?
+  duration          String?
+
+  // Timing
+  authoredOn          DateTime  @default(now())
+  validityPeriodStart DateTime?
+  validityPeriodEnd   DateTime?
+
+  // Dispensing
+  numberOfRepeatsAllowed Int?
+
+  // Notes
+  note String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([status])
+}
+
+enum MedicationStatus {
+  ACTIVE
+  ON_HOLD
+  CANCELLED
+  COMPLETED
+  ENTERED_IN_ERROR
+  STOPPED
+  DRAFT
+  UNKNOWN
+}
+
+enum MedicationIntent {
+  PROPOSAL
+  PLAN
+  ORDER
+  INSTANCE_ORDER
+}
+
+// Document Reference Model
+model DocumentReference {
+  id String @id @default(cuid())
+
+  status    DocumentStatus     @default(CURRENT)
+  docStatus DocumentDocStatus?
+
+  type        String // LOINC document type
+  typeDisplay String
+  category    String? // Clinical note, Lab report, etc.
+
+  // Subject
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  encounterId String?
+
+  // Author
+  authorId String?
+
+  // Content
+  contentType String  @default("application/pdf")
+  url         String // File path or URL
+  size        Int?
+  title       String?
+
+  // Context
+  periodStart DateTime?
+  periodEnd   DateTime?
+
+  // Security
+  securityLabel String? // Confidentiality level
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum DocumentStatus {
+  CURRENT
+  SUPERSEDED
+  ENTERED_IN_ERROR
+}
+
+enum DocumentDocStatus {
+  PRELIMINARY
+  FINAL
+  AMENDED
+  ENTERED_IN_ERROR
+}
+
+// Audit Log for HIPAA compliance
+model AuditEvent {
+  id String @id @default(cuid())
+
+  type   String // read, create, update, delete, login, logout
+  action String // specific action performed
+
+  // Who
+  userId   String?
+  userName String?
+  userRole String?
+
+  // What
+  resourceType String // Patient, Encounter, etc.
+  resourceId   String?
+
+  // When
+  occurredAt DateTime @default(now())
+
+  // Where
+  ipAddress String?
+  userAgent String?
+
+  // Outcome
+  outcome            String  @default("success") // success, failure
+  outcomeDescription String?
+
+  // Query parameters (for search operations)
+  query String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([resourceType])
+  @@index([resourceId])
+  @@index([occurredAt])
+  @@index([type])
+}
+
+
+// ─── Clinical Data Models ──────────────────────────────────────────────────
+model ClinicalDiagnosis {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  icd10       String
+  system      String
+  severity    String
+  prevalence  String
+  notes       String?  @db.Text
+
+  symptoms    String[]
+  redFlags    String[]
+
+  medications ClinicalMedication[]
+  labTests    ClinicalLabTest[]
+  imaging     ClinicalImaging[]
+  referrals   ClinicalReferral[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([system])
+  @@index([severity])
+}
+
+model ClinicalMedication {
+  id            String             @id @default(cuid())
+  drug          String
+  dose          String
+  route         String
+  frequency     String
+  duration      String
+  notes         String?
+  diagnosisId   String
+  diagnosis     ClinicalDiagnosis  @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+}
+
+model ClinicalLabTest {
+  id            String             @id @default(cuid())
+  name          String
+  code          String
+  urgency       String
+  reason        String
+  diagnosisId   String
+  diagnosis     ClinicalDiagnosis  @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+}
+
+model ClinicalImaging {
+  id            String             @id @default(cuid())
+  type          String
+  region        String
+  urgency       String
+  reason        String
+  diagnosisId   String
+  diagnosis     ClinicalDiagnosis  @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+}
+
+model ClinicalReferral {
+  id            String             @id @default(cuid())
+  specialty     String
+  urgency       String
+  reason        String
+  diagnosisId   String
+  diagnosis     ClinicalDiagnosis  @relation(fields: [diagnosisId], references: [id], onDelete: Cascade)
+}
+
+// ─── Med-Gemini Prescription System Models ─────────────────────────────────
+
+// Drug/Medication Catalog with Inventory
+model DrugCatalog {
+  id                String   @id @default(cuid())
+  rxcui             String   @unique // RxNorm Concept Unique Identifier
+  ndc               String?  // National Drug Code
+  
+  // Names
+  genericName       String
+  brandNames        String[] // Array of brand names
+  
+  // Form & Strength
+  strength          String   // e.g., "500mg", "10mg/5ml"
+  dosageForm        String   // tablet, capsule, injection, etc.
+  route             String   // oral, IV, topical, etc.
+  
+  // Classification
+  therapeuticClass  String   // e.g., "Biguanide / Antidiabetic"
+  pharmacologicClass String? // e.g., "Alpha-Glucosidase Inhibitor"
+  deaSchedule       String?  // I, II, III, IV, V or null
+  
+  // Clinical Info
+  indications       String[] // Approved uses
+  contraindications String[] // When NOT to use
+  sideEffects       String[] // Common side effects
+  blackBoxWarning   String?  // FDA black box warning text
+  
+  // Dosing Guidelines
+  maxDailyDose      String?  // e.g., "2550mg/day"
+  renalDosing       Json?    // { "eGFR >= 45": "no adjustment", "eGFR < 30": "contraindicated" }
+  hepaticDosing     Json?    // Hepatic adjustment guidelines
+  pediatricDosing   Json?    // Pediatric dosing
+  geriatricNotes    String?  // Special considerations for elderly
+  
+  // Monitoring
+  monitoringParams  String[] // What to monitor (e.g., "eGFR", "LFTs")
+  
+  // Inventory
+  stockQuantity     Int      @default(0)
+  reorderLevel      Int      @default(50)
+  unitPrice         Decimal  @db.Decimal(10, 2)
+  
+  // Formulary
+  formularyStatus   FormularyStatus @default(FORMULARY)
+  priorAuthRequired Boolean  @default(false)
+  
+  // Guideline Reference
+  guidelineRef      String?  // e.g., "ADA 2024: First-line for T2DM"
+  
+  // Status
+  isActive          Boolean  @default(true)
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  interactionsA     DrugInteraction[] @relation("DrugA")
+  interactionsB     DrugInteraction[] @relation("DrugB")
+  prescriptionItems PrescriptionItem[]
+  refillRequests    RefillRequest[]
+  
+  @@index([genericName])
+  @@index([therapeuticClass])
+  @@index([formularyStatus])
+}
+
+enum FormularyStatus {
+  FORMULARY
+  NON_FORMULARY
+  RESTRICTED
+  SPECIALTY
+}
+
+// Drug-Drug Interactions
+model DrugInteraction {
+  id              String   @id @default(cuid())
+  
+  // Drugs involved
+  drugAId         String
+  drugA           DrugCatalog @relation("DrugA", fields: [drugAId], references: [id])
+  drugAName       String   // Denormalized for quick access
+  
+  drugBId         String
+  drugB           DrugCatalog @relation("DrugB", fields: [drugBId], references: [id])
+  drugBName       String   // Denormalized for quick access
+  
+  // Interaction details
+  severity        InteractionSeverity
+  mechanism       String   // How the interaction occurs
+  clinicalEffect  String   // What happens clinically
+  recommendation  String   // What to do
+  monitoringReq   String?  // Required monitoring
+  
+  // Evidence
+  evidenceLevel   EvidenceLevel @default(MODERATE)
+  references      String[] // Literature references
+  
+  // Status
+  isActive        Boolean  @default(true)
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([drugAId, drugBId])
+  @@index([severity])
+}
+
+enum InteractionSeverity {
+  MAJOR
+  MODERATE
+  MINOR
+  UNKNOWN
+}
+
+enum EvidenceLevel {
+  HIGH
+  MODERATE
+  LOW
+  THEORETICAL
+}
+
+// AI-Generated Prescriptions
+model Prescription {
+  id               String   @id @default(cuid())
+  rxNumber         String   @unique // Auto-generated Rx number
+  
+  // Patient & Provider
+  patientId        String
+  patient          Patient  @relation(fields: [patientId], references: [id])
+  prescriberId     String?
+  prescriberName   String
+  
+  // Clinical Context
+  diagnosis        String   // Primary diagnosis
+  icdCode          String?  // ICD-10 code
+  symptoms         String[] // Reported symptoms
+  
+  // AI Context
+  conversationCtx  String?  @db.Text // Voice transcript
+  aiConfidence     Float?   // AI suggestion confidence %
+  aiModel          String?  // Med-Gemini version
+  aiWarnings       String[] // AI-generated warnings
+  
+  // Safety Checks
+  interactionsFlag Boolean  @default(false)
+  allergyFlag      Boolean  @default(false)
+  renalAdjustment  Boolean  @default(false)
+  hepaticAdjustment Boolean @default(false)
+  overrideReason   String?  // If safety alert was overridden
+  
+  // Status
+  status           PrescriptionStatus @default(DRAFT)
+  signedAt         DateTime?
+  sentToPharmacy   DateTime?
+  pharmacyName     String?
+  pharmacyNpi      String?
+  
+  // General Instructions
+  instructions     String?
+  
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  items            PrescriptionItem[]
+  
+  @@index([patientId])
+  @@index([prescriberId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum PrescriptionStatus {
+  DRAFT
+  PENDING_REVIEW
+  SIGNED
+  SENT_TO_PHARMACY
+  PARTIALLY_FILLED
+  FILLED
+  CANCELLED
+  EXPIRED
+}
+
+// Prescription Line Items
+model PrescriptionItem {
+  id               String   @id @default(cuid())
+  
+  // Parent Prescription
+  prescriptionId   String
+  prescription     Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  
+  // Medication
+  drugId           String?
+  drug             DrugCatalog? @relation(fields: [drugId], references: [id])
+  medicationName   String   // Denormalized
+  medicationCode   String?  // RxNorm code
+  
+  // Dosing
+  dose             String   // e.g., "500mg", "1 tablet"
+  frequency        String   // e.g., "twice daily", "every 8 hours"
+  route            String   // e.g., "oral", "IV"
+  duration         String   // e.g., "30 days", "ongoing"
+  
+  // Quantity
+  quantity         Int
+  quantityUnit     String   @default("tablets")
+  daysSupply       Int?
+  refillsAllowed   Int      @default(0)
+  
+  // Dose Adjustments
+  originalDose     String?  // If dose was adjusted
+  adjustmentReason String?  // e.g., "renal impairment"
+  
+  // Instructions
+  sig              String?  // Full sig line
+  patientInstructions String? // Patient-friendly instructions
+  
+  // DAW
+  dispenseAsWritten Boolean @default(false)
+  
+  createdAt        DateTime @default(now())
+  
+  @@index([prescriptionId])
+  @@index([drugId])
+}
+
+// Refill Request Queue
+model RefillRequest {
+  id               String   @id @default(cuid())
+  
+  // Patient
+  patientId        String
+  patientName      String   // Denormalized
+  
+  // Medication
+  drugId           String?
+  drug             DrugCatalog? @relation(fields: [drugId], references: [id])
+  medicationName   String
+  dose             String
+  
+  // Original Prescription
+  originalRxNumber String?
+  lastFilledDate   DateTime?
+  daysSupply       Int?
+  refillsRemaining Int      @default(0)
+  
+  // Pharmacy
+  pharmacyName     String
+  pharmacyPhone    String?
+  pharmacyFax      String?
+  
+  // Request Details
+  requestedAt      DateTime @default(now())
+  requestSource    RefillSource @default(PATIENT)
+  urgency          String?  // routine, urgent
+  patientNotes     String?
+  
+  // Review
+  status           RefillStatus @default(PENDING)
+  reviewedAt       DateTime?
+  reviewedBy       String?
+  reviewerNotes    String?
+  denialReason     String?
+  
+  // Pharmacy Transmission
+  sentAt           DateTime?
+  transmissionMethod String? // escript, fax, phone
+  confirmationNumber String?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@index([patientId])
+  @@index([status])
+  @@index([requestedAt])
+}
+
+enum RefillSource {
+  PATIENT
+  PHARMACY
+  CAREGIVER
+  AUTO_REFILL
+}
+
+enum RefillStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  DENIED
+  SENT_TO_PHARMACY
+  COMPLETED
+  CANCELLED
+}
+
+// Patient Lab Results (for dose adjustments)
+model LabResult {
+  id               String   @id @default(cuid())
+  
+  // Patient
+  patientId        String
+  
+  // Lab Info
+  labName          String   // e.g., "Basic Metabolic Panel"
+  loincCode        String?  // LOINC code
+  
+  // Result
+  testName         String   // e.g., "eGFR", "Creatinine", "A1c"
+  value            Float
+  unit             String   // e.g., "mL/min/1.73m2", "mg/dL"
+  referenceRange   String?  // e.g., "60-120"
+  interpretation   String?  // Normal, High, Low, Critical
+  
+  // Context
+  collectedAt      DateTime
+  reportedAt       DateTime @default(now())
+  performingLab    String?
+  orderingProvider String?
+  
+  // Flags
+  isCritical       Boolean  @default(false)
+  isAbnormal       Boolean  @default(false)
+  
+  // Notes
+  notes            String?
+  
+  createdAt        DateTime @default(now())
+  
+  @@index([patientId])
+  @@index([testName])
+  @@index([collectedAt])
+}
+
+// Prescription Analytics for PowerBI
+model PrescriptionAnalytics {
+  id               String   @id @default(cuid())
+  
+  // Identifiers
+  prescriptionId   String?
+  patientId        String
+  providerId       String?
+  
+  // Event
+  eventType        String   // rx_created, rx_signed, ai_suggestion, interaction_alert, override
+  eventData        Json?    // Additional event-specific data
+  
+  // AI Metrics
+  aiModel          String?
+  aiConfidence     Float?
+  suggestionAccepted Boolean?
+  processingTimeMs Int?
+  
+  // Safety Metrics
+  interactionCount Int      @default(0)
+  majorInteractions Int     @default(0)
+  alertsTriggered  Int      @default(0)
+  alertsOverridden Int      @default(0)
+  
+  // Timestamp
+  occurredAt       DateTime @default(now())
+  
+  @@index([patientId])
+  @@index([providerId])
+  @@index([eventType])
+  @@index([occurredAt])
+}
