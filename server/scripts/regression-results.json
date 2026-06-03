@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-05-31T18:34:35.971Z",
+  "summary": {
+    "passed": 84,
+    "failed": 0,
+    "skipped": 0,
+    "total": 84,
+    "passRate": 100
+  },
+  "failures": [],
+  "gaps": [],
+  "cachedIds": {
+    "orderId": "b90c8406-f9fb-4928-acc6-bac9c1b3cc5d",
+    "invoiceId": "1eb55b04-794b-4588-9d0c-28698d33fff7",
+    "partyId": "eab18bee-10e2-4113-ac29-57d3269d4bb5",
+    "productId": "669e546b-fa09-4f47-91d6-ddd19671f0d5",
+    "batchId": null,
+    "employeeId": "92d8ba25-5a31-47bc-be44-980bdb0bad7e",
+    "accountId": "7f08969d-5e05-4329-a02e-e0759ccd3e5f",
+    "journalId": null,
+    "purchaseId": null,
+    "crmLeadId": "3df4207e-777e-415c-830d-c94ce1ef6cd3",
+    "complianceId": null
+  }
+}

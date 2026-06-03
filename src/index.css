@@ -1,0 +1,108 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+html {
+  font-size: 14px; /* Reduced from default 16px for better density */
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: #F5F5F5;
+  color: #111111;
+  overflow-x: hidden;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --color-primary: #111111;
+  --color-secondary: #888888;
+  --color-accent: #4CAF72;
+  --color-background: #F5F5F5;
+  --color-text: #111111;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+}
+
+/* ── Animations ── */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25%       { transform: translateX(-5px); }
+  75%       { transform: translateX(5px); }
+}
+
+@keyframes float {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-5px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.animate-fadeIn       { animation: fadeIn       0.3s ease-out; }
+.animate-shake        { animation: shake        0.5s ease-in-out; }
+.animate-float        { animation: float        4s ease-in-out infinite; }
+.animate-slideInRight { animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-slideInUp    { animation: slideInUp    0.25s ease-out; }
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar       { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f5f5f5; }
+::-webkit-scrollbar-thumb { background: #E0E0E0; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #888888; }
+
+/* ── Flat panel overrides ── */
+.glass-panel {
+  background: #FFFFFF;
+  border: 0.5px solid #E0E0E0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.glass-dark {
+  background: #111111;
+  border: 0.5px solid #333333;
+}
+
+/* ── Responsive utilities ── */
+@media (max-width: 768px) {
+  .mobile-hidden { display: none; }
+}
+
+/* ── Print styles ── */
+@media print {
+  .no-print { display: none !important; }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}

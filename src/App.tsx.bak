@@ -1,0 +1,13 @@
+import React from 'react';
+
+const App: React.FC = () => {
+  return (
+    <div style={{ padding: '100px', textAlign: 'center' }}>
+      <h1 style={{ color: '#16a34a' }}>React App Loaded Successfully!</h1>
+      <p>If you see this, the core React setup and Vite server are working.</p>
+      <p>The issue is likely within the original App.tsx or its dependencies.</p>
+    </div>
+  );
+};
+
+export default App;

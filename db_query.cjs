@@ -1,0 +1,41 @@
+const { Pool } = require('./server/node_modules/pg');
+const fs = require('fs');
+const path = require('path');
+
+const envPath = path.join(__dirname, 'server', '.env');
+const envContent = fs.readFileSync(envPath, 'utf8');
+const env = {};
+envContent.split('\n').forEach(line => {
+  const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+  if (match) {
+    let value = match[2] || '';
+    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+    env[match[1]] = value.trim();
+  }
+});
+
+const pool = new Pool({
+  user: env.DB_USER,
+  host: env.DB_HOST,
+  database: env.DB_NAME,
+  password: env.DB_PASSWORD,
+  port: env.DB_PORT,
+});
+
+async function runQuery() {
+  const sql = process.argv[2];
+  if (!sql) {
+    console.error('No SQL query provided');
+    process.exit(1);
+  }
+  try {
+    const res = await pool.query(sql);
+    console.log(JSON.stringify(res.rows, null, 2));
+    await pool.end();
+  } catch (err) {
+    console.error('Error:', err);
+    process.exit(1);
+  }
+}
+
+runQuery();
