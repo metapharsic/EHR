@@ -1,15 +1,41 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- 1. Users & Roles
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(50) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL, -- In real app, store hashed passwords
+    password_hash VARCHAR(255) NOT NULL,
+    email VARCHAR(100) UNIQUE,
     name VARCHAR(100) NOT NULL,
     role VARCHAR(50) NOT NULL, -- ADMIN, PHARMACIST, etc.
+    phone VARCHAR(15),
+    two_factor_enabled BOOLEAN DEFAULT FALSE,
+    totp_secret VARCHAR(255),
+    is_active BOOLEAN DEFAULT TRUE,
+    last_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Audit log table
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    action VARCHAR(100) NOT NULL,
+    module VARCHAR(50),
+    table_name VARCHAR(50),
+    record_id VARCHAR(255),
+    changes JSONB,
+    status VARCHAR(20), -- SUCCESS, FAILED
+    error_message TEXT,
+    ip_address VARCHAR(45),
+    user_agent VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 
 -- 2. Products Master
 CREATE TABLE products (
@@ -133,8 +159,33 @@ CREATE TABLE purchase_items (
     amount NUMERIC(12, 2) NOT NULL
 );
 
+-- 8a. Purchase Orders (Planning & Procurement)
+CREATE TABLE IF NOT EXISTS purchase_orders (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    supplier_id UUID REFERENCES parties(id),
+    po_number VARCHAR(50) UNIQUE NOT NULL,
+    date DATE NOT NULL,
+    expected_delivery DATE,
+    total_amount NUMERIC(12, 2) DEFAULT 0,
+    status VARCHAR(20) DEFAULT 'Draft', -- Draft, Sent, Received, Cancelled
+    remarks TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 8b. Purchase Order Items
+CREATE TABLE IF NOT EXISTS purchase_order_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    purchase_order_id UUID REFERENCES purchase_orders(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES products(id),
+    quantity INTEGER NOT NULL,
+    received_qty INTEGER DEFAULT 0,
+    unit_price NUMERIC(10, 2) NOT NULL,
+    total_amount NUMERIC(12, 2) NOT NULL
+);
+
 -- 9. Expenses
 CREATE TABLE expenses (
+...
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     category VARCHAR(50) NOT NULL, -- Rent, Salary, etc.
     description TEXT,

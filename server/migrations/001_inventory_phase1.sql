@@ -56,14 +56,15 @@ CREATE TABLE IF NOT EXISTS stock_ledger_entries (
     movement_date DATE NOT NULL,
     narration TEXT,
     created_by UUID REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Indexes for performance
-    INDEX idx_stock_ledger_product_batch (product_id, batch_id),
-    INDEX idx_stock_ledger_godown_date (godown_id, movement_date),
-    INDEX idx_stock_ledger_movement_date (movement_date),
-    INDEX idx_stock_ledger_reference (reference_type, reference_number)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Indexes for performance
+CREATE INDEX idx_stock_ledger_product_batch ON stock_ledger_entries(product_id, batch_id);
+CREATE INDEX idx_stock_ledger_godown_date ON stock_ledger_entries(godown_id, movement_date);
+CREATE INDEX idx_stock_ledger_movement_date ON stock_ledger_entries(movement_date);
+CREATE INDEX idx_stock_ledger_reference ON stock_ledger_entries(reference_type, reference_number);
+
 
 -- ============================================
 

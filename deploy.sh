@@ -14,6 +14,7 @@ cd server && npm install && cd ..
 
 # 2. Build Frontend
 echo "🏗️ Building frontend..."
+chmod +x node_modules/.bin/vite
 npm run build
 
 # 3. Environment Check
@@ -31,7 +32,7 @@ if command -v pm2 &> /dev/null
 then
     echo "🔄 Restarting application with PM2..."
     pm2 delete metapharsic-erp 2>/dev/null || true
-    pm2 start pm2.config.js
+    pm2 start pm2.config.cjs
     pm2 save
 else
     echo "⚠️  PM2 not found. Starting server with Node..."

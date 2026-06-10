@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS grn_items (
 -- 3. Supplier Invoices - Part of 3-Way Matching
 CREATE TABLE IF NOT EXISTS supplier_invoices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    supplier_id UUID REFERENCES suppliers(id),
+    supplier_id UUID REFERENCES parties(id),
     invoice_number VARCHAR(100) NOT NULL,
     invoice_date DATE NOT NULL,
     due_date DATE,
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS three_way_matches (
 -- 5. Vendor Performance Ratings
 CREATE TABLE IF NOT EXISTS vendor_ratings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    supplier_id UUID REFERENCES suppliers(id) UNIQUE,
+    supplier_id UUID REFERENCES parties(id) UNIQUE,
     quality_score NUMERIC(3, 2) DEFAULT 5.0, -- 1.0 to 5.0
     delivery_score NUMERIC(3, 2) DEFAULT 5.0,
     price_score NUMERIC(3, 2) DEFAULT 5.0,

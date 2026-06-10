@@ -47,11 +47,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     error_message TEXT,
     ip_address VARCHAR(45),
     user_agent VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX (user_id, created_at),
-    INDEX (action),
-    INDEX (created_at)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_audit_logs_user_id_v2 ON audit_logs(user_id, created_at);
+CREATE INDEX idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX idx_audit_logs_created_at_v2 ON audit_logs(created_at);
 
 -- API keys table (for service-to-service auth)
 CREATE TABLE IF NOT EXISTS api_keys (
