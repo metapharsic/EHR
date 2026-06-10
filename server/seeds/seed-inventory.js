@@ -69,7 +69,7 @@ const seedInventoryData = async () => {
 
     for (const b of batchesData) {
       await db.query(
-        `INSERT INTO batches (id, product_id, batch_number, expiry_date, quantity, mrp, purchase_rate, selling_rate)
+        `INSERT INTO batches (id, product_id, batch_number, expiry_date, stock, mrp, purchase_rate, selling_rate)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [uuidv4(), productIds[b.product], b.batch, b.expiry, b.stock, b.mrp, b.purchase, b.selling]
       );

@@ -40,6 +40,7 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 -- 2. Products Master
 CREATE TABLE products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(50) UNIQUE,
     name VARCHAR(255) NOT NULL,
     generic_name VARCHAR(255) NOT NULL,
     manufacturer VARCHAR(255) NOT NULL,
@@ -214,6 +215,7 @@ CREATE TABLE IF NOT EXISTS chart_of_accounts (
     account_type VARCHAR(50) NOT NULL, -- Asset, Liability, Equity, Income, Expense
     account_group VARCHAR(100), -- Current Assets, Fixed Assets, etc.
     opening_balance NUMERIC(15, 2) DEFAULT 0,
+    current_balance NUMERIC(15, 2) DEFAULT 0,
     description TEXT,
     status VARCHAR(50) DEFAULT 'Active', -- Active, Inactive
     gst_applicable BOOLEAN DEFAULT FALSE,
