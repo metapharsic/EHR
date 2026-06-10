@@ -1,113 +1,97 @@
-# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v6.0
-# MAXIMUM AUTOMATION | ZERO ORPHANED WORKFLOWS | PRODUCTION-FIRST DATA
+# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v7.0
+# MAXIMUM AUTOMATION | PRODUCTION-GRADE LOGIC | AGENTIC AI STANDARDS
 # Last updated: 2026-06-11
 
-You are an expert full-stack developer managing two interconnected pharmaceutical enterprise systems.
+You are an expert full-stack developer managing a pharmaceutical enterprise ecosystem.
 
 ---
 
-## 1. Technical Stack & Environment (STRICT)
+## 1. Logic & Architectural Patterns
 
-### ERP System (`C:\ERP_3152026\`)
-- **Frontend**: React 19 + Vite/TS, Tailwind CSS v4, Zustand, Lucide Icons.
-- **Backend**: Node.js + Express (CommonJS). **Note**: `"type": "module"` is NOT set in root `package.json`.
-- **Database**: PostgreSQL (`metapharsic_erp`). User: `erp_user` / `Metapharsic@ERP2026!`.
-- **Auth**: JWT-based. `admin` / `Admin@1234` is the master bypass for troubleshooting.
-- **Deployment**:
-  - **VPS IP**: `187.127.169.217` (root access).
-  - **Domain**: `erp.metapharsic.cloud` (Proxied via Nginx to local port **3002**).
-  - **PM2**: Managed via `pm2.config.cjs`. Always use `.cjs` due to ESM/CJS mix in the workspace.
-  - **Sync**: Local-first development. Deploy via GitHub `master` branch + `git pull` on VPS.
+### A. Transactional Integrity (ACID)
+- **Finance/Inventory**: All multi-table mutations (e.g., Invoice -> Ledger + Stock) MUST use `BEGIN`, `COMMIT`, and `ROLLBACK`.
+- **Side Effects**: Use `setImmediate(() => { ... })` for non-critical side effects (e.g., logging, non-blocking sync) to ensure primary response speed.
 
-### MR Tracker (`/u01/apps/Metapharsic_MrTracker/`)
-- **Frontend**: React + Vite/TS, Tailwind CSS, Framer Motion.
-- **Backend**: Node.js + Express (ESM). **Note**: `"type": "module"` IS set here.
-- **Database**: PostgreSQL (`metaphysic_crm`). User: `metaphysic_user`.
-- **Hybrid Path**: Implements "DB-first, Memory-fallback" logic. If DB fails, use `src/database/seed_data.ts`.
+### B. Business Logic Semantics
+- **Date Handling**: NEVER use module-level constants for relative dates. Compute `new Date()` inside the request handler (§5A standard).
+- **Deterministic Metrics**: ROI, Efficiency Scores, and AI Scores MUST be deterministic. Formula: `score = weighted_sum(inputs)`. Never use `Math.random()` for business KPIs.
+- **FSN Velocity**: Stock velocity = `units_sold / 90` (90-day window).
 
 ---
 
-## 2. Core Architectural Mandates
+## 2. Database & Schema Mandates
 
-1. **Local-First Workflow**: All edits happen locally first. Deploy to VPS only after local verification.
-2. **Schema Infallibility**: All DB changes MUST be reflected in `server/schema.sql` (Master) AND idempotent migration files (`server/migrations/*.sql`).
-3. **Cross-App Sync**:
-   - ERP `medical_representatives` → authoritative source for MR Master.
-   - MR Tracker `visit_schedules` → authoritative source for field activity.
-   - ERP `pcd_transactions` → authoritative source for financial achievement.
-4. **AI Integration**: Google Gemini `gemini-1.5-flash`. Always provide heuristic fallbacks for offline/no-key modes.
+### A. The Master Schema (server/schema.sql)
+- **Authority**: `server/schema.sql` is the absolute source of truth. All deviations are bugs.
+- **Constraints**: Use `CHECK` constraints for statuses (e.g., `status IN ('Pending', 'Approved', 'Cancelled')`).
+- **Auditability**: Use `JSONB` for `changes` in `audit_logs` to capture full delta snapshots.
 
----
+### B. Accounting Invariants (STRICT)
+- **Dr/Cr Signage**: 
+  - Debit-normal accounts (Asset, Expense): `Balance = Dr - Cr`.
+  - Credit-normal accounts (Liability, Income, Equity): `Balance = Cr - Dr` (Stored as negative if using a unified sum column).
+- **Initialization**: `current_balance` MUST be calculated from `opening_balance` at the moment of account creation.
 
-## 3. Database Master Schema & Invariants
-
-### A. Critical Table Naming (STRICT)
-- **CRM**: Tables are `leads` and `lead_activities`. Backward-compatibility views `crm_leads` and `crm_activities` exist for older scripts.
-- **OMS**: Tables are `orders`, `order_items`, `order_status_history`, `reserved_stock`, `order_returns`.
-- **Finance**: Tables are `chart_of_accounts`, `journal_vouchers`, `journal_voucher_entries`, `general_ledger`.
-- **Inventory**: Tables are `products`, `batches`, `godowns`, `stock_ledger_entries`.
-
-### B. Mandatory Columns (Commonly Missed)
-- **`users`**: `risk_score`, `last_device_fingerprint`, `company_id`, `reset_token`, `reset_token_expires`.
-- **`products`**: `is_active`, `maintain_batches`, `track_expiry`, `current_stock`, `opening_stock`, `selling_rate`, `mrp`.
-- **`parties`**: `company_id`, `current_balance`, `type` (Debtor/Creditor).
-- **`chart_of_accounts`**: `company_id`, `is_bank_or_cash`, `tds_applicable`.
-
-### C. Accounting Invariants
-1. **Balance Logic**:
-   - `current_balance = opening_balance` for Debit-normal (Asset/Expense).
-   - `current_balance = -opening_balance` for Credit-normal (Liability/Income/Equity).
-2. **Double Entry**: Every `journal_vouchers` must have matching total DR/CR in `journal_voucher_entries`.
-3. **Uniqueness**: `account_code` and `order_number` must be unique and auto-generated by the backend.
+### C. Resilience (Hybrid Path)
+- **Memory Fallback**: If a database query returns 0 rows but seed data exists in `seed_data.ts`, fall back to the in-memory array to prevent "Empty State" UI flicker.
 
 ---
 
-## 4. Security & Authentication Rules
+## 3. Agentic AI & Data Privacy
 
-1. **Admin Credentials**: Default production admin is `admin` / `Admin@1234`. Account must be `is_active = TRUE`.
-2. **JWT Middleware**: `verifyTokenMiddleware` must be applied to all `/api/*` routes except `/api/auth/login` and `/api/auth/register`.
-3. **Password Policy**: Minimum 8 characters, 1 uppercase, 1 special char. Enforced in `authController.js`.
-4. **Sensitive Data**: Never return `password_hash`, `totp_secret`, or `reset_token` in API responses.
+### A. AI Integration (Gemini 1.5 Flash)
+- **Context Filtering**: NEVER send PII (Aadhaar, PAN, Bank Details) or Secrets (API Keys, JWT Secrets) to the AI. Scrub data using `utils/scrubber.js` before payload creation.
+- **Sentiment Logic**: `sentiment_score` is a bounded integer `[0-100]`. Heuristics: `Hot/Positive > 70`, `Warm/Neutral > 40`, `Cold/Negative < 40`.
 
----
-
-## 5. UI/UX & Interaction Standards
-
-### A. Dropdowns & Selects
-- Show `(Loading...)` or spinner while fetching.
-- Use `<option value="">` as a non-selectable prompt.
-- If API returns 0 items → show "No [Entity] available".
-
-### B. Form Submission
-- **Loading State**: Buttons must show `Saving...` + spinner during transit.
-- **Strict Disable**: Disable button if `isLoading === true` OR form has validation errors.
-- **Success/Error**: Always use `addNotification()` context to provide feedback.
-
-### C. Dashboard Components
-- Use `Promise.allSettled` for parallel fetches (never `Promise.all`).
-- Dashboard widgets must be guarded by `visibleWidgets` settings.
-- Skeleton loaders preferred over full-page spinners.
+### B. Heuristic Fallbacks
+- If `GEMINI_API_KEY` is missing, use the `HeuristicAnalyst` class which provides rule-based insights instead of LLM-generated ones.
 
 ---
 
-## 6. Testing & Verification Lifecycle (MANDATORY)
+## 4. UI/UX & Interaction Standards
 
-Every feature MUST pass through the 4-Tier Testing Model:
+### A. Visual Polish (Tailwind v4)
+- **Aesthetics**: Use `backdrop-blur` and `bg-white/80` for a modern glassmorphism feel.
+- **Consistency**: Use Lucide icons consistently. `Save` = diskette, `Delete` = trash2, `View` = eye.
 
-1. **Tier 1 (Unit)**: Logic in `utils/` or `services/`. (Vitest)
-2. **Tier 2 (Integration)**: Backend API endpoints with mocked JWT. (Vitest + Supertest)
-3. **Tier 3 (Component)**: React component UI states. (Vitest + RTL)
-4. **Tier 4 (E2E)**: Browser automation of full workflows. (Playwright)
+### B. State & Persistence
+- **Zustand**: Use `persist` middleware for settings and session-scoped filters.
+- **Loading Hierarchy**: 
+  - Small widgets: Spinner.
+  - Data tables: Skeleton loaders.
+  - Page transitions: Top-bar progress line.
 
-**Deployment Validation**: After every VPS deploy, run:
-`node server/seeds/seed-master-comprehensive.js` followed by `node server/seeds/seed-transactions.js` to ensure schema integrity.
+### C. Form Invariants
+- **Double-Submit**: All buttons MUST show `isLoading` state and become `disabled` immediately upon click.
+- **Validation**: Inline errors MUST appear in real-time (`onBlur`). Required fields MUST be marked with a red asterisk `*`.
 
 ---
 
-## 7. Recently Fixed (Avoid Regressions)
+## 5. Comprehensive Testing Lifecycle
 
-- **Auth (2026-06-11)**: Fixed login failure by adding missing `risk_score` and security columns to `users`.
-- **CRM (2026-06-11)**: Restored `crm_contacts` and `crm_opportunities` tables. Fixed column mismatch in `seed-transactions.js`.
-- **Inventory (2026-06-11)**: Added pricing columns (`selling_rate`, `mrp`) to `products` to support OMS seeding.
-- **Port Locking**: Nginx on VPS is hard-coded to proxy to port **3002**. PM2 must always start ERP on this port.
-- **Date Handling**: Never use server-start-time dates. Always compute `new Date()` inside the request handler.
+### A. The "Reproduction First" Rule
+- **Bug Fixing**: You MUST write a failing test (Unit or Integration) that reproduces the reported bug before applying the fix. The fix is only verified when that test passes.
+
+### B. Multi-Tier Verification
+1. **Tier 1 (Logic)**: Pure functions in `utils/`.
+2. **Tier 2 (API)**: Supertest integration tests checking JSON schema and status codes.
+3. **Tier 3 (UI)**: Vitest + RTL checking for "No Data" and "Error" states.
+4. **Tier 4 (E2E)**: Playwright "Happy Path" including login and one full transaction.
+
+### C. Baseline Verification (Phase 0)
+- Run `e2e/phase0.db.baseline.sql` to verify table presence and column health before executing complex E2E suites.
+
+---
+
+## 6. Deployment & Environment
+
+- **VPS Port**: ERP server is locked to port **3002**.
+- **PM2**: Use `pm2.config.cjs`. Restart with `pm2 restart metapharsic-erp`.
+- **Sync**: GitHub `master` branch is the deployment trigger.
+
+---
+
+## 7. Regressions Guard (Historical Context)
+- **Fixed (2026-06-11)**: Schema alignment for `users` (missing `risk_score`), `products` (pricing columns), and `parties` (company_id).
+- **Fixed (2026-06-11)**: Reset admin credentials to `admin` / `Admin@1234`.
+- **Fixed (2026-06-11)**: CRM `leads` vs `crm_leads` view resolution.
