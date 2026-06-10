@@ -1,121 +1,99 @@
-# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v9.0
-# MAXIMUM AUTOMATION | PRODUCTION-GRADE LOGIC | AGENTIC AI STANDARDS
+# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v10.0
+# MAXIMUM AUTOMATION | ENTERPRISE-GRADE PRECISION | AGENTIC AI STANDARDS
 # Last updated: 2026-06-11
 
-You are an expert full-stack developer managing the Metapharsic pharmaceutical enterprise ecosystem.
+You are a lead full-stack engineer managing the Metapharsic pharmaceutical enterprise ecosystem.
 
 ---
 
-## 1. Core Architectural & Logic Mandates
+## 1. Core Architectural & Functional Mandates
 
 ### A. Transactional Integrity (ACID)
-- **Finance/Inventory**: All multi-table mutations (e.g., Invoice -> Ledger + Stock) MUST use `BEGIN`, `COMMIT`, and `ROLLBACK`.
-- **Side Effects**: Use `setImmediate(() => { ... })` for non-critical side effects (e.g., logging, non-blocking sync) to ensure primary response speed.
+- **Financial/Inventory Safety**: ALL multi-table mutations MUST use `BEGIN/COMMIT/ROLLBACK`.
+- **Side Effects**: Use `setImmediate()` or a Job Queue for non-blocking side effects (Logging, Webhooks, Notifications).
+- **Idempotency**: All `POST` operations that create critical records must include a client-generated `id` or use unique composite keys to prevent double-creation.
 
-### B. Business Logic Semantics
-- **Date Handling**: NEVER use module-level constants for relative dates. Compute `new Date()` inside the request handler.
-- **Deterministic Metrics**: ROI, Efficiency Scores, and AI Scores MUST be deterministic. Formula: `score = weighted_sum(inputs)`. Never use `Math.random()` for business KPIs.
-- **FSN Velocity**: Stock velocity = `units_sold / 90` (90-day window). FSN thresholds: Fast > 0.1 u/day, Slow > 0, Non-Moving = 0.
-
-### C. MR Tracker Hybrid Execution
-- **Path**: DB-first, Memory-fallback. If DB queries return 0 rows but seed data exists in `seed_data.ts`, fall back to the in-memory array to prevent "Empty State" UI flicker.
-- **Sync**: ERP Dashboard uses `/api/pcd/mrs/stats` (financials) while MR Tracker handles activity metrics.
+### B. Business Logic & Date Handling
+- **Request-Time Dates**: ALWAYS compute `new Date()` inside the request handler. NEVER use module-level constants.
+- **FSN Inventory**: Velocity = `units_sold_90_days / 90`. Categorize as: Fast (>0.1), Slow (>0), Non-Moving (0).
+- **Deterministic KPIs**: ROI and Efficiency scores must use weighted linear formulas. No `Math.random()`.
 
 ---
 
-## 2. Database & Schema Invariants
+## 2. Module-Specific Implementation Standards
 
-### A. The Master Schema (server/schema.sql)
-- **Authority**: `server/schema.sql` is the absolute source of truth. All deviations are bugs.
-- **Idempotency**: All migration scripts MUST use `IF NOT EXISTS` for tables, columns, and indexes.
+### 🛡️ PCD (Franchise & Field Force)
+- **Authoritative Data**: MR Master lives in ERP `medical_representatives`. Visit activity lives in MR Tracker `visit_schedules`.
+- **Geospatial**: `pcd_geospatial_insights` MUST be updated when MR visits are marked 'Completed' via MR Tracker.
+- **Schemes**: Quarterly bonus logic must evaluate `pcd_schemes` against `total_shipped_value` in the `orders` table.
 
-### B. Critical Table Naming & Structures
-- **CRM**: Authoritative tables are `leads` and `lead_activities`. Views `crm_leads` and `crm_activities` provide backward compatibility.
-- **OMS**: Authoritative tables are `orders`, `order_items`, `order_status_history`, `reserved_stock`, `order_returns`.
-- **Finance**: Authoritative tables are `chart_of_accounts`, `journal_vouchers`, `journal_voucher_entries`, `general_ledger`.
+### 📦 OMS (Distribution & Fulfillment)
+- **The 3-Way Match**: Purchases require a matching PO, GRN (`goods_received_notes`), and Supplier Invoice.
+- **Reservation**: `reserved_stock` is created at 'Approved' status. Clear it and update `stock_ledger_entries` at 'Shipped'.
+- **Return Logic**: Sales returns MUST create a `status='CreditNote'` invoice and restore batch stock using `ledgerHelper.postToStockLedger(IN)`.
 
-### C. Module-Specific Invariants (STRICT)
+### 👥 HRMS (Employee Lifecycle)
+- **Statutory Compliance**: Payroll engine MUST pull from `hr_statutory_config` for PF, ESIC, and PT calculations.
+- **Salary Structure**: `salary_slips` generation must cross-reference `hr_attendance` (actual vs scheduled days).
+- **Document Management**: Employee docs (PAN, Aadhaar) MUST be stored with soft-delete in `hr_employee_documents` and filtered from AI.
 
-#### 1. PCD (Partner & MR Management)
-- **Commissions**: Must be auto-calculated upon Order Invoicing. Base rate + scheme bonus logic resides in `pcdService.js`.
-- **MR Sync**: Performance stats MUST be pulled from ERP `pcd_transactions` for financials and MR Tracker for activity.
-- **Targets**: Monthly/Quarterly targets tracked via `pcd_targets`. Status: `PENDING` -> `ON_TRACK` -> `ACHIEVED`.
+### 📋 Compliance & Regulatory
+- **H1 Register**: Every sale of Schedule H1 drugs must be entry-logged to `h1_register` with Patient/Doctor/Batch details.
+- **QC Integration**: `batches.stock` becomes "Available" only after a `qc_records.status='Passed'` entry.
+- **DMS**: All SOPs and licenses must use `dms_versions` for change tracking. Soft-delete only (`status='Deleted'`).
 
-#### 2. OMS (Order Management System)
-- **Lifecycle**: `Pending Approval` -> `Approved` -> `Processing` -> `Shipped` -> `Delivered` -> `Invoiced`.
-- **Stock Reservation**: `reserved_stock` MUST be created when an order is `Approved` and cleared when `Shipped`.
-- **AI Risk**: `ai_risk_score` MUST evaluate distributor credit utilization + aging + order volume.
-
-#### 3. HRMS (Human Resources)
-- **Payroll**: Processing MUST trigger Ledger entries via `ledgerHelper.processVoucher()`.
-- **Exit Clearance**: Triggers auto-reassignment of CRM leads and OMS distributors to the reporting manager.
-- **Attendance**: Anomalies (e.g., multiple misses) MUST be logged to `compliance_logs`.
-
-#### 4. Compliance & Regulatory
-- **Narcotics/H1**: All sales of `is_narcotic` or `schedule_type='H1'` products MUST be logged to `h1_register`.
-- **License Tracking**: `drug_licenses` expiry MUST be checked during Party creation and Order placement.
-- **Cold Chain**: Temperature-sensitive products MUST have `temperature_logs` linked to their batches.
-
-#### 5. POS & Billing
-- **Real-time Stock**: Prevent billing if `batches.stock` is insufficient. No "negative stock" allowed.
-- **GST Logic**: Automated SGST/CGST (Intra-state) vs IGST (Inter-state) calculation based on Party and Company state.
-- **Retail/Wholesale**: Support both "Quick Cash" checkout and "Credit Bill" with distributor selection.
+### 💳 POS & Billing
+- **Concurrency**: Use `SELECT FOR UPDATE` on `batches` when deducting stock during high-volume POS sessions.
+- **Tax Engine**: Auto-calculate CGST/SGST vs IGST by comparing `company_id.state` vs `party_id.state`.
+- **Payment Reconciliation**: PDC (Post-Dated Cheques) must be tracked in `pdc_cheques` and reconciled via `bank_reconciliation`.
 
 ---
 
-## 3. UI/UX & Interaction Standards
+## 3. UI/UX Functional Standards
 
-### A. Visual Aesthetics (Tailwind v4)
-- **Glassmorphism**: Use `backdrop-blur-md` and `bg-white/80` for panels.
-- **Consistency**: Use Lucide icons consistently (`Save`=disk, `Delete`=trash, `View`=eye).
+### A. Layout & Aesthetics (Tailwind v4)
+- **Glassmorphism**: Use `backdrop-blur-lg` + `bg-white/70` for modals and card overlays.
+- **Layout**: Use `ERPLayout` as the root wrapper for consistency (Sidebar + TopNav + Breadcrumbs).
+- **Responsive**: Mobile-first grid: `grid-cols-1 md:grid-cols-2 lg:grid-cols-4`.
 
-### B. Form & Interaction Checklist
-1. **Double-Submit Prevention**: All buttons MUST show `isLoading` (spinner) and become `disabled` immediately upon click.
-2. **Dynamic Loading**: Dropdowns MUST show `(Loading...)` or a spinner during fetch.
-3. **Placeholders**: The first `<option>` in a Select must be a non-selectable prompt.
-4. **Validation**: Inline errors MUST appear in real-time (`onBlur`). Required fields marked with red asterisk `*`.
+### B. Interactive Patterns
+- **Quick Actions**: Top-right "Plus" button for high-frequency tasks (Add Sale, Create Lead, Clock In).
+- **Standardized Icons**:
+  - `CheckCircle` = Success/Approved
+  - `AlertTriangle` = Pending/Review
+  - `XCircle` = Rejected/Overdue
+  - `TrendingUp` = Performance
+- **Skeleton Grids**: All `useDataFetch` components must show matching skeleton rows during `isLoading`.
 
-### C. Dashboard Standards
-- Use `Promise.allSettled` for all multi-endpoint fetches (3+ parallel calls).
-- Use **Skeleton Loaders** for tables and grids; Spinners for small widgets.
-
----
-
-## 4. Agentic AI & Data Intelligence
-
-### A. AI Privacy & Security (Gemini 1.5 Flash)
-- **PII Scrubbing**: NEVER send PII (Aadhaar, PAN, Bank Details) or Secrets to the AI. Use `utils/scrubber.js` first.
-- **Offline Fallback**: If `GEMINI_API_KEY` is missing, use the `HeuristicAnalyst` class for rule-based insights.
-
-### B. Data Signals
-- **Sentiment**: 0-100 range. `Hot > 70`, `Warm > 40`, `Cold < 40`.
-- **Market Intel**: `growth_score` = `min(100, sentiment_score*0.6 + opportunity_count*5 - threat_count*8)`.
+### C. State Management (Zustand)
+- **Persistence**: Store `activeCompanyId`, `activeFinancialYear`, and `sidebarCollapsed` in `persist` storage.
+- **Context**: Use `useAppStore` for global notifications and auth state. Avoid Prop Drilling beyond 2 levels.
 
 ---
 
-## 5. Testing & Verification Lifecycle (MANDATORY)
+## 4. Database Master Invariants
 
-### A. "Reproduction First" Protocol
-- **Bug Fixing**: Write a failing test (Unit or Integration) that reproduces the bug before applying the fix.
-
-### B. The 4-Tier Model
-1. **Tier 1 (Unit)**: Logic in `utils/` or `services/`.
-2. **Tier 2 (Integration)**: Full HTTP → Express → DB cycle using Supertest.
-3. **Tier 3 (Component)**: React renders, loading states, and error boundaries (Vitest + RTL).
-4. **Tier 4 (E2E)**: Playwright flows covering login and critical business transactions.
+- **Master Schema**: `server/schema.sql` is the source of truth.
+- **Column Integrity**:
+  - `users` MUST have `risk_score` and `two_factor_enabled`.
+  - `products` MUST have `selling_rate`, `mrp`, and `is_active`.
+  - `parties` MUST have `company_id` and `current_balance`.
+- **Naming**: Use snake_case for DB columns, camelCase for Frontend JSON. Backend translates using mapping layers.
 
 ---
 
-## 6. Deployment & Environment
+## 5. Testing & Validation (4-Tier Model)
 
-- **VPS Configuration**: root@187.127.169.217. ERP Server locked to port **3002**.
-- **Process Management**: Use `pm2.config.cjs`.
-- **Git Protocol**: Local-first development. GitHub `master` is the authoritative deployment trigger.
+1. **Reproduction Test**: Before fixing a bug, add a failing case to `server/__tests__/`.
+2. **Integration (Tier 2)**: Backend API endpoints must return 200/201 and valid JSON schema.
+3. **Component (Tier 3)**: RTL tests for `Loading`, `Empty`, and `Error` states.
+4. **E2E (Tier 4)**: Playwright "Happy Path" (Login -> Create Invoice -> Verify Ledger).
 
 ---
 
-## 7. Regression Prevention (History)
-- **Auth (2026-06-11)**: Added `risk_score` to users. Reset admin to `Admin@1234`.
-- **CRM (2026-06-11)**: Reconciled `leads` table names and established legacy views.
-- **Finance (2026-06-11)**: Fixed `tds_applicable` and `company_id` columns in COA/Parties.
-- **Nginx (2026-06-11)**: Confirmed port 3002 proxy for `erp.metapharsic.cloud`.
+## 6. Environment & Troubleshooting
+
+- **VPS URL**: https://erp.metapharsic.cloud (Port 3002).
+- **Master Bypass**: `admin` / `Admin@1234`.
+- **Sync**: GitHub `master` → `git pull` on VPS → `pm2 restart metapharsic-erp`.
+- **Logs**: Monitor with `pm2 logs metapharsic-erp --lines 50`.
