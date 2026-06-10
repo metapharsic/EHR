@@ -185,7 +185,6 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
 
 -- 9. Expenses
 CREATE TABLE expenses (
-...
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     category VARCHAR(50) NOT NULL, -- Rent, Salary, etc.
     description TEXT,
