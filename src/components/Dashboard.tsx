@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, PieChart, Pie, Cell } from 'recharts';
 import { DollarSign, TrendingUp, AlertTriangle, AlertOctagon, CreditCard, ShoppingBag, Sparkles, Briefcase, UserCheck, CheckSquare, Flag, Plus, Trash2, Check, Settings, Grid, Filter, Eye, EyeOff, BarChart3, PieChart as PieChartIcon, Calendar, Users, Package, Truck, FileText, TrendingDown, Zap, X, Edit2, Pill, ShoppingCart, ClipboardList, Briefcase as BriefcaseIcon, Shield, MoreHorizontal, Search, RefreshCw } from 'lucide-react';
-import { DASHBOARD_STATS, MOCK_SALES_DATA, MOCK_PRODUCTS, MOCK_INVOICES } from '../constants';
+import { DASHBOARD_STATS, MOCK_SALES_DATA } from '../constants';
 import { getAllEmployees, getEmployeePerformanceStats, initializeSampleData, getAllTasks } from '../services/databaseService';
 import { generateSmartInsights } from '../services/geminiService';
 import { useAuth } from '../context/AuthContext';
@@ -82,7 +82,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const handleAskAI = async () => {
     if (!insightQuery) return;
     setLoadingInsight(true);
-    const result = await generateSmartInsights(insightQuery, { products: MOCK_PRODUCTS, invoices: MOCK_INVOICES });
+    const result = await generateSmartInsights(insightQuery);
     setInsightResult(result);
     setLoadingInsight(false);
   };
@@ -510,7 +510,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
             {insightResult && (
               <div className="mt-4 bg-white/80 p-4 rounded-lg border border-indigo-100 text-indigo-900 text-sm leading-relaxed animate-fadeIn">
-                <strong>AI Insight:</strong> <span dangerouslySetInnerHTML={{ __html: insightResult.replace(/\n/g, '<br/>') }} />
+                <strong className="block mb-2">AI Insight:</strong>
+                <div className="space-y-1">
+                  {insightResult.split('\n').map((line, i) => {
+                    if (!line.trim()) return null;
+                    // Render list items
+                    const isBullet = line.trimStart().startsWith('- ');
+                    const text = isBullet ? line.replace(/^[\s-]+/, '') : line;
+                    // Bold (**text**) → <strong>
+                    const parts = text.split(/\*\*(.+?)\*\*/g).map((part, j) =>
+                      j % 2 === 1 ? <strong key={j}>{part}</strong> : part
+                    );
+                    return isBullet
+                      ? <div key={i} className="flex gap-2"><span className="text-indigo-400">•</span><span>{parts}</span></div>
+                      : <div key={i}>{parts}</div>;
+                  })}
+                </div>
               </div>
             )}
           </div>

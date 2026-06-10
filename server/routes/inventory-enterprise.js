@@ -24,17 +24,23 @@ router.get('/branches', verifyTokenMiddleware, async (req, res) => {
  */
 router.get('/global-summary', verifyTokenMiddleware, async (req, res) => {
     try {
-        const branchCount = await db.query('SELECT COUNT(*) FROM branches');
-        const skuCount = await db.query('SELECT COUNT(*) FROM products WHERE deleted_at IS NULL');
-        const totalStock = await db.query('SELECT SUM(quantity) as total FROM batches');
-        
+        const [branchCount, skuCount, totalStock, criticalLow] = await Promise.all([
+            db.query('SELECT COUNT(*) FROM branches'),
+            db.query('SELECT COUNT(*) FROM products WHERE deleted_at IS NULL'),
+            db.query('SELECT COALESCE(SUM(stock), 0) as total FROM batches'),
+            db.query(`SELECT COUNT(*) FROM products p
+                      WHERE p.deleted_at IS NULL
+                      AND (SELECT COALESCE(SUM(b.stock), 0) FROM batches b WHERE b.product_id = p.id)
+                          <= COALESCE(p.reorder_level, 0)`)
+        ]);
+
         res.json({
             success: true,
             data: {
                 totalBranches: parseInt(branchCount.rows[0].count),
                 totalSKUs: parseInt(skuCount.rows[0].count),
                 totalUnits: parseInt(totalStock.rows[0].total || 0),
-                criticallyLow: 0 // Placeholder for real calculation
+                criticallyLow: parseInt(criticalLow.rows[0].count)
             }
         });
     } catch (error) {

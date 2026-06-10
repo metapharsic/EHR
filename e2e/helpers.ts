@@ -6,7 +6,7 @@
 
 import { request, Page } from '@playwright/test';
 
-const API = 'http://localhost:5000';
+const API = 'http://127.0.0.1:5000';
 let _authToken = '';
 
 export async function getToken(): Promise<string> {

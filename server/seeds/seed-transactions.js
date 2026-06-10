@@ -1,13 +1,14 @@
 'use strict';
 
+require('dotenv').config();
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  host: 'localhost',
-  database: 'metapharsic_erp',
-  user: 'erp_user',
-  password: 'Metapharsic@ERP2026!',
-  port: 5432,
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'metapharsic_erp',
+  user: process.env.DB_USER || 'erp_user',
+  password: process.env.DB_PASSWORD || 'Metapharsic@ERP2026!',
+  port: process.env.DB_PORT || 5432,
 });
 
 // ─── Counters ─────────────────────────────────────────────────────────────────

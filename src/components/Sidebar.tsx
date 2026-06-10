@@ -18,39 +18,34 @@ interface SidebarProps {
 }
 // ... (SECTION_HEADERS and MENU_STRUCTURE remain same)
 const SECTION_HEADERS = {
-  CORE: 'Core Operations',
-  GROWTH: 'PCD & Sales',
+  REVENUE: 'Revenue & Sales',
+  SUPPLY: 'Supply Chain & Ops',
   PRODUCTION: 'Mfg & Quality',
-  OPS: 'Logistics & Ops',
-  ADMIN: 'Administration'
+  PEOPLE: 'Human Capital',
+  FINANCE: 'Finance & Governance',
+  SYSTEM: 'Intelligence & Admin'
 };
 
 const MENU_STRUCTURE = [
   {
-    section: SECTION_HEADERS.CORE,
+    section: SECTION_HEADERS.REVENUE,
     items: [
-      { id: Tab.DASHBOARD, label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { id: Tab.CRM, label: 'CRM (Leads)', icon: <UserPlus size={18} /> },
+      { id: Tab.PCD, label: 'PCD Network', icon: <Map size={18} /> },
+      { id: Tab.OMS, label: 'Order Mgmt (OMS)', icon: <Globe size={18} /> },
       { id: Tab.POS, label: 'POS / Billing', icon: <ShoppingCart size={18} /> },
       { id: Tab.SALES_HISTORY, label: 'Sales Register', icon: <History size={18} /> },
-      { id: Tab.INVENTORY_HUB, label: 'Inventory Hub', icon: <Package size={18} /> },
-      { id: Tab.CUSTOMER_DATABASE, label: 'Customer Database', icon: <Users size={18} /> },
-      { id: Tab.VOUCHER_SETUP, label: 'Voucher Setup', icon: <Settings size={18} /> },
-
-      { id: Tab.PURCHASE, label: 'Purchase', icon: <Truck size={18} /> },
-
-      { id: Tab.INTELLIGENCE_DASHBOARD, label: 'Intelligence Center', icon: <Sparkles size={18} className="text-indigo-500" /> },
-      { id: Tab.ACCOUNTS, label: 'Accounts', icon: <CreditCard size={18} /> },
-      { id: Tab.LEDGER_CREATION, label: 'Ledger Creation', icon: <Plus size={18} /> },
+      { id: Tab.SALES, label: 'Wholesale Sales', icon: <TrendingUp size={18} /> },
     ]
   },
   {
-    section: SECTION_HEADERS.GROWTH,
+    section: SECTION_HEADERS.SUPPLY,
     items: [
-      { id: Tab.HRMS, label: 'HRMS (AI-Era)', icon: <Brain size={18} className="text-indigo-500" /> },
-      { id: Tab.PCD, label: 'PCD Network', icon: <Map size={18} /> },
-      { id: Tab.CRM, label: 'CRM (Leads)', icon: <UserPlus size={18} /> },
-      { id: Tab.OMS, label: 'Order Mgmt (OMS)', icon: <Globe size={18} /> },
-      { id: Tab.SALES, label: 'Sales (Wholesale)', icon: <TrendingUp size={18} /> },
+      { id: Tab.INVENTORY_HUB, label: 'Inventory Hub', icon: <Package size={18} /> },
+      { id: Tab.PURCHASE, label: 'Purchase', icon: <Truck size={18} /> },
+      { id: Tab.LOGISTICS, label: 'Logistics', icon: <Truck size={18} /> },
+      { id: Tab.ASSETS, label: 'Assets & Maint.', icon: <Database size={18} /> },
+      { id: Tab.DOCUMENTS, label: 'Documents (DMS)', icon: <FileText size={18} /> },
     ]
   },
   {
@@ -58,25 +53,34 @@ const MENU_STRUCTURE = [
     items: [
       { id: Tab.MANUFACTURING, label: 'Manufacturing', icon: <Factory size={18} /> },
       { id: Tab.QC, label: 'Quality Control', icon: <ClipboardCheck size={18} /> },
-      { id: Tab.R_AND_D, label: 'R&D / R&D', icon: <Activity size={18} /> },
+      { id: Tab.R_AND_D, label: 'R&D Lab', icon: <Activity size={18} /> },
     ]
   },
   {
-    section: SECTION_HEADERS.OPS,
+    section: SECTION_HEADERS.PEOPLE,
     items: [
-      { id: Tab.MULTI_BRANCH, label: 'Enterprise Hub', icon: <Globe size={18} /> },
-      { id: Tab.LOGISTICS, label: 'Logistics', icon: <Truck size={18} /> },
-      { id: Tab.ASSETS, label: 'Assets & Maint.', icon: <Database size={18} /> },
-      { id: Tab.DOCUMENTS, label: 'Documents (DMS)', icon: <FileText size={18} /> },
-    ]
-  },
-  {
-    section: SECTION_HEADERS.ADMIN,
-    items: [
+      { id: Tab.HRMS, label: 'HRMS (AI-Era)', icon: <Brain size={18} className="text-indigo-500" /> },
       { id: Tab.EMPLOYEES, label: 'HR & Payroll', icon: <Briefcase size={18} /> },
-      { id: Tab.REPORTS, label: 'Reports', icon: <FileBarChart size={18} /> },
+    ]
+  },
+  {
+    section: SECTION_HEADERS.FINANCE,
+    items: [
+      { id: Tab.ACCOUNTS, label: 'Accounts', icon: <CreditCard size={18} /> },
+      { id: Tab.LEDGER_CREATION, label: 'Ledger Creation', icon: <Plus size={18} /> },
+      { id: Tab.VOUCHER_SETUP, label: 'Voucher Setup', icon: <Settings size={18} /> },
       { id: Tab.COMPLIANCE, label: 'Compliance', icon: <ShieldCheck size={18} /> },
+      { id: Tab.CUSTOMER_DATABASE, label: 'Customer DB', icon: <Users size={18} /> },
+    ]
+  },
+  {
+    section: SECTION_HEADERS.SYSTEM,
+    items: [
+      { id: Tab.DASHBOARD, label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { id: Tab.INTELLIGENCE_DASHBOARD, label: 'Intelligence Center', icon: <Sparkles size={18} className="text-indigo-500" /> },
+      { id: Tab.REPORTS, label: 'Reports', icon: <FileBarChart size={18} /> },
       { id: Tab.AUDIT, label: 'Audit Logs', icon: <Layers size={18} /> },
+      { id: Tab.MULTI_BRANCH, label: 'Enterprise Hub', icon: <Globe size={18} /> },
       { id: Tab.SETTINGS, label: 'Settings', icon: <Settings size={18} /> },
     ]
   }

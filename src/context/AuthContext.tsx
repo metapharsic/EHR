@@ -43,37 +43,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Initialize auth state on mount
   useEffect(() => {
+    let isMounted = true;
+    
+    // Fail-safe: Force loading to false after 15 seconds no matter what
+    const failSafeTimer = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('AuthContext: Initialization taking too long, forcing loading to false (fail-safe)');
+        setLoading(false);
+      }
+    }, 15000);
+
     const initializeAuth = async () => {
       console.log('AuthContext: Initializing auth state...');
       try {
-        if (apiClient.isAuthenticated()) {
-          console.log('AuthContext: Token found in storage, verifying...');
-          // Verify token is still valid by making a simple request
+        const isAuth = apiClient.isAuthenticated();
+        console.log(`AuthContext: isAuthenticated() = ${isAuth}`);
+        
+        if (isAuth) {
+          console.log('AuthContext: Token found, verifying with server...');
           try {
-            // Try to fetch user profile (implementation depends on your backend)
-            // For now, just verify the token exists and set a default user
-            // In a real app, you would call GET /auth/me here
-            const userData: User = {
-              id: localStorage.getItem('userId') || '1',
-              username: localStorage.getItem('username') || 'admin',
-              name: localStorage.getItem('name') || 'Admin',
-              role: (localStorage.getItem('role') || 'ADMIN') as UserRole,
-            };
-            setUser(userData);
-            console.log('AuthContext: User state restored from storage');
-            setLoading(false);
-          } catch (err) {
-            console.error('AuthContext: Token validation failed', err);
-            apiClient.logoutClient();
-            setLoading(false);
+            // Verify token by fetching actual user profile from server
+            const response = await apiClient.get<{ user: User }>('/auth/me');
+            if (isMounted) {
+              setUser(response.user);
+              console.log('AuthContext: Session verified successfully:', response.user.username);
+            }
+          } catch (err: any) {
+            console.error('AuthContext: Session verification failed', err);
+            if (isMounted) {
+              if (err.status === 401 || err.status === 403 || err.name === 'AbortError') {
+                console.log('AuthContext: Invalid session or timeout, clearing state');
+                setUser(null);
+                apiClient.logoutClient();
+              }
+            }
           }
         } else {
-          console.log('AuthContext: No valid token found');
-          setLoading(false);
+          console.log('AuthContext: No valid token found in storage');
         }
       } catch (err) {
-        console.error('AuthContext: Auth initialization failed', err);
-        setLoading(false);
+        console.error('AuthContext: Auth initialization fatal error', err);
+      } finally {
+        if (isMounted) {
+          console.log('AuthContext: Initialization complete, setting loading to false');
+          setLoading(false);
+          clearTimeout(failSafeTimer);
+        }
       }
     };
 
@@ -95,6 +110,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     window.addEventListener('auth-error', handleAuthError);
 
     return () => {
+      isMounted = false;
+      clearTimeout(failSafeTimer);
       window.removeEventListener('auth-expired', handleAuthExpired);
       window.removeEventListener('auth-error', handleAuthError);
     };

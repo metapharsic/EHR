@@ -57,14 +57,11 @@ export const IntelligenceDashboard: React.FC = () => {
  const fetchIntelligence = async () => {
  setIsLoading(true);
  try {
- const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
- const headers = { 'Authorization': `Bearer ${token}` };
- 
- // FIX: use allSettled so one failed endpoint doesn't silently kill the rest
+ // Use apiClient for consistent headers and base URL
  const [finRes, custRes, posRes] = await Promise.allSettled([
-   fetch('/api/analytics/financial/summary', { headers }).then(r => r.json()),
-   fetch('/api/analytics/customers/drift', { headers }).then(r => r.json()),
-   fetch('/api/pos/terminal/summary', { headers }).then(r => r.json()),
+   apiClient.get('/analytics/financial/summary'),
+   apiClient.get('/analytics/customers/drift'),
+   apiClient.get('/pos/terminal/summary'),
  ]);
 
  if (finRes.status === 'fulfilled' && finRes.value?.success) setFinancials(finRes.value.data);
@@ -81,38 +78,27 @@ export const IntelligenceDashboard: React.FC = () => {
  fetchIntelligence();
  }, []);
 
- // Poll for job status
+ // Batch-poll job status — single request for all pending jobs (fixes N+1)
  useEffect(() => {
- const timer = setInterval(async () => {
- // FIX: include 'delayed' as terminal-stale — stop polling delayed jobs too
  const pendingJobs = activeJobs.filter(j => !['completed', 'failed', 'delayed'].includes(j.status));
  if (pendingJobs.length === 0) return;
 
- for (const job of pendingJobs) {
+ const timer = setInterval(async () => {
  try {
- const token = (localStorage.getItem('accessToken') || localStorage.getItem('token'));
- const response = await fetch(`/api/analytics/reports/status/${job.jobId}`, {
- headers: { 'Authorization': `Bearer ${token}` }
- });
- const data = await response.json();
+ const ids = pendingJobs.map(j => j.jobId).join(',');
+ const data = await apiClient.get(`/analytics/reports/status/batch?jobIds=${ids}`);
+ if (!data.success) return;
 
- if (data.success) {
- updateJob(job.jobId, {
- status: data.data.state,
- progress: data.data.progress,
- result: data.data.result
- });
-
- if (data.data.state === 'completed') {
- addNotification({
- type: 'success',
- message: `Intelligence Report ${job.reportId} is ready!`
- });
+ data.data.forEach((item: any) => {
+ const job = pendingJobs.find(j => j.jobId === item.id);
+ if (!job) return;
+ updateJob(item.id, { status: item.state, progress: item.progress, result: item.result });
+ if (item.state === 'completed') {
+ addNotification({ type: 'success', message: `Intelligence Report ${job.reportId} is ready!` });
  }
- }
+ });
  } catch (err) {
- console.error('Polling error:', err);
- }
+ console.error('Batch poll error:', err);
  }
  }, 3000);
 
@@ -126,16 +112,7 @@ export const IntelligenceDashboard: React.FC = () => {
  const startReport = async (type: string) => {
  setIsRequesting(true);
  try {
- const token = (localStorage.getItem('accessToken') || localStorage.getItem('token'));
- const response = await fetch('/api/analytics/reports/generate', {
- method: 'POST',
- headers: {
- 'Content-Type': 'application/json',
- 'Authorization': `Bearer ${token}`
- },
- body: JSON.stringify({ type, params: {} })
- });
- const data = await response.json();
+ const data = await apiClient.post('/analytics/reports/generate', { type, params: {} });
 
  if (data.success) {
  setActiveJobs(prev => [{

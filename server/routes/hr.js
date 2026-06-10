@@ -204,7 +204,7 @@ router.get(
       ${where}
       ORDER BY e.name
     `, params);
-    res.json({ success: true, data: result.rows });
+    res.json({ success: true, data: result.rows, employees: result.rows });
   })
 );
 

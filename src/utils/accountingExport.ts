@@ -15,78 +15,135 @@ function autoWidth(data: Record<string, any>[]): { wch: number }[] {
   }));
 }
 
-// ─── Helper: open a print window with styled HTML ────────────────────────────
+// ─── Shared logo path (SVG — works in all modern browsers) ───────────────────
+const LOGO_SRC = '/logo.svg';
+
+// ─── Shared branded print header HTML ─────────────────────────────────────────
+function buildPrintHeader(title: string, company?: any): string {
+  const co = company || {};
+  const generated = new Date().toLocaleString('en-IN');
+  return `
+    <!-- Branded Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+      border-bottom:2.5px solid #1a56db;padding-bottom:12px;margin-bottom:20px">
+      <!-- Logo + Company -->
+      <div style="display:flex;align-items:center;gap:12px">
+        <img src="${LOGO_SRC}" alt="Metapharsic" style="height:56px;width:56px;border-radius:50%;
+          border:2px solid #e2e8f0"/>
+        <div>
+          <div style="font-size:18px;font-weight:900;color:#1e3a8a;letter-spacing:-0.5px">
+            ${co.name || 'Metapharsic Lifesciences Pvt. Ltd.'}
+          </div>
+          <div style="font-size:9px;font-weight:600;color:#64748b;letter-spacing:2px;text-transform:uppercase">
+            Lifesciences ERP System
+          </div>
+          ${co.address ? `<div style="font-size:9px;color:#94a3b8;margin-top:2px">
+            ${co.address}${co.city ? ', ' + co.city : ''}${co.state ? ', ' + co.state : ''} ${co.pinCode || ''}
+          </div>` : ''}
+          ${co.gstin ? `<div style="font-size:9px;color:#1e3a8a;font-weight:700">GSTIN: ${co.gstin}${co.drugLicenseNo ? ' &nbsp;|&nbsp; DL: ' + co.drugLicenseNo : ''}</div>` : ''}
+        </div>
+      </div>
+      <!-- Title block -->
+      <div style="text-align:center;flex:1;padding:0 20px">
+        <div style="font-size:17px;font-weight:900;color:#1e293b;text-transform:uppercase;
+          letter-spacing:1px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;margin-bottom:4px">
+          ${title}
+        </div>
+        ${co.phone ? `<div style="font-size:9px;color:#64748b">📞 ${co.phone}${co.email ? ' &nbsp;|&nbsp; ✉ ' + co.email : ''}</div>` : ''}
+      </div>
+      <!-- Meta -->
+      <div style="text-align:right">
+        <div style="font-size:10px;color:#475569;font-weight:600">📅 ${generated}</div>
+        <div style="font-size:9px;border:1px solid #e2e8f0;border-radius:4px;
+          padding:2px 8px;margin-top:4px;color:#94a3b8;display:inline-block">
+          CONFIDENTIAL
+        </div>
+      </div>
+    </div>`;
+}
+
+// ─── Shared print footer HTML ──────────────────────────────────────────────────
+function buildPrintFooter(): string {
+  return `
+    <div style="margin-top:32px;border-top:1px dashed #e2e8f0;padding-top:10px;
+      display:flex;align-items:center;justify-content:space-between;font-size:9px;color:#94a3b8">
+      <div style="display:flex;align-items:center;gap:6px">
+        <img src="${LOGO_SRC}" style="height:16px;opacity:0.5" alt=""/>
+        <span>© 2026 Metapharsic Lifesciences Pvt. Ltd. — Confidential &amp; Internal Use Only</span>
+      </div>
+      <span>This is a computer-generated document. No signature required.</span>
+    </div>`;
+}
+
 // ─── Helper: open a print window with styled HTML ────────────────────────────
 export function printReport(title: string, html: string, company?: any) {
-  const win = window.open('', '_blank', 'width=1000,height=700');
+  const win = window.open('', '_blank', 'width=1100,height=780');
   if (!win) { alert('Please allow popups to print.'); return; }
-  
-  const companyHeader = company ? `
-    <div style="text-align: center; border-bottom: 2px solid #1D3557; padding-bottom: 12px; margin-bottom: 20px;">
-      <div style="margin-bottom: 10px;">
-        <img src="/logo.png" style="height: 60px; object-contain: center;" alt="Logo" />
-      </div>
-      <h2 style="font-size: 28px; font-weight: 950; color: #1D3557; margin-bottom: 6px; letter-spacing: -0.5px; text-transform: uppercase;">${company.name || 'Metapharsic ERP'}</h2>
-      <div style="font-size: 11px; color: #475569; line-height: 1.6; max-width: 700px; margin: 0 auto; font-weight: 500;">
-        ${company.address || ''}${company.city ? `, ${company.city}` : ''}${company.state ? `, ${company.state}` : ''} ${company.pinCode || ''}<br/>
-        ${company.phone ? `Phone: ${company.phone} &nbsp;|&nbsp; ` : ''}
-        ${company.email ? `Email: ${company.email}` : ''}<br/>
-        ${company.gstin ? `<strong>GSTIN: ${company.gstin}</strong>` : ''}
-        ${company.drugLicenseNo ? ` &nbsp;|&nbsp; DL No: ${company.drugLicenseNo}` : ''}
-      </div>
-      <div style="margin-top: 12px; font-size: 16px; font-weight: 800; color: #1D3557; text-transform: uppercase; letter-spacing: 3px; border-top: 1px solid #e2e8f0; display: inline-block; padding: 4px 20px;">${title}</div>
-      <div style="font-size: 9px; color: #94a3b8; margin-top: 4px;">Report Generated: ${new Date().toLocaleString('en-IN')}</div>
-    </div>
-  ` : `
-    <div style="text-align: center; border-bottom: 2px solid #1D3557; padding-bottom: 10px; margin-bottom: 20px;">
-      <div style="margin-bottom: 8px;">
-        <img src="/logo.png" style="height: 50px;" alt="Logo" />
-      </div>
-      <h1 style="font-size: 22px; font-weight: 900; color: #1D3557;">${title}</h1>
-      <div class="meta" style="font-size: 10px; color: #64748b;">Generated: ${new Date().toLocaleString('en-IN')} &nbsp;|&nbsp; Metapharsic ERP</div>
-    </div>
-  `;
 
   win.document.write(`<!DOCTYPE html><html><head>
-    <title>${title}</title>
+    <title>${title} — Metapharsic ERP</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
     <style>
       @media print {
         body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .no-print { display: none; }
-        @page { margin: 1.5cm; }
+        .no-print { display: none !important; }
+        @page { margin: 18mm 14mm; size: A4; }
       }
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1e293b; padding: 40px; position: relative; line-height: 1.4; }
-      
-      /* Watermark */
-      body::before {
-        content: "METAPHARSIC ENTERPRISE HUB";
-        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-35deg);
-        font-size: 90px; color: rgba(29, 53, 87, 0.04); white-space: nowrap; pointer-events: none;
-        z-index: -1; font-weight: 900; text-transform: uppercase; letter-spacing: 10px;
-      }
+      body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px;
+             color: #1e293b; padding: 36px; position: relative; line-height: 1.5; }
 
-      h1 { font-size: 18px; font-weight: 900; color: #1D3557; margin-bottom: 4px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 15px; border: 1px solid #e2e8f0; }
-      th { background: #1D3557; color: #fff; padding: 10px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #1D3557; }
-      td { padding: 8px 12px; border: 1px solid #e2e8f0; font-size: 11px; }
+      /* ── Watermark ── */
+      .wm {
+        position: fixed; top: 50%; left: 50%;
+        transform: translate(-50%, -50%) rotate(-35deg);
+        z-index: -1; pointer-events: none;
+        display: flex; flex-direction: column; align-items: center;
+        opacity: 0.05;
+      }
+      .wm img  { width: 220px; }
+      .wm span { font-size: 26px; font-weight: 900; letter-spacing: 8px;
+                 text-transform: uppercase; color: #1a56db;
+                 font-family: 'Segoe UI', sans-serif; margin-top: 2px; }
+
+      h1 { font-size: 18px; font-weight: 900; color: #1e3a8a; margin-bottom: 4px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 15px;
+              border: 1px solid #e2e8f0; }
+      th { background: #1e3a8a; color: #fff; padding: 9px 12px; text-align: left;
+           font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+           border: 1px solid #1e3a8a; }
+      td { padding: 7px 12px; border: 1px solid #e2e8f0; font-size: 11px; }
       tr:nth-child(even) { background: #f8fafc; }
-      .total-row td { font-weight: 900; background: #f1f5f9; border-top: 2px solid #1D3557; border-bottom: 2px solid #1D3557; color: #0f172a; }
-      .text-right { text-align: right; }
+      .total-row td { font-weight: 900; background: #eff6ff;
+                      border-top: 2px solid #1e3a8a; color: #0f172a; }
+      .text-right  { text-align: right; }
       .text-center { text-align: center; }
-      .badge { padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; }
+      .badge       { padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; }
       .badge-green { background: #dcfce7; color: #166534; }
+      .badge-blue  { background: #dbeafe; color: #1e40af; }
+      .badge-red   { background: #fee2e2; color: #991b1b; }
     </style>
   </head><body>
-    ${companyHeader}
+
+    <!-- Watermark -->
+    <div class="wm">
+      <img src="${LOGO_SRC}" alt="Metapharsic"/>
+      <span>Metapharsic</span>
+    </div>
+
+    ${buildPrintHeader(title, company)}
     <div class="content">${html}</div>
-    <div style="margin-top: 40px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px dashed #e2e8f0; padding-top: 12px;">
-       This is a computer-generated document. Metapharsic Enterprise Hub Premium ERP.
+    ${buildPrintFooter()}
+
+    <div class="no-print" style="position:fixed;bottom:20px;right:20px;display:flex;gap:8px">
+      <button onclick="window.print()"
+        style="padding:10px 20px;background:#1a56db;color:white;border:none;
+               border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;
+               box-shadow:0 4px 12px rgba(26,86,219,0.3)">
+        🖨️ Print / Save PDF
+      </button>
     </div>
-    <div class="no-print" style="position: fixed; bottom: 20px; right: 20px;">
-       <button onclick="window.print()" style="padding: 10px 20px; background: #1D3557; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">🖨 Print Report</button>
-    </div>
-    <script>setTimeout(() => { window.print(); }, 800);</script>
+    <script>setTimeout(() => { window.print(); }, 900);</script>
   </body></html>`);
   win.document.close();
 }
@@ -96,10 +153,11 @@ export function printReport(title: string, html: string, company?: any) {
  */
 export function addExcelBranding(ws: any, title: string, company?: any) {
   const brandRows = [
-    [company?.name || 'METAPHARSIC PREMIUM ERP'],
-    [company ? `${company.address || ''}, ${company.city || ''}` : 'ERP System Report'],
+    [company?.name || 'METAPHARSIC LIFESCIENCES PVT. LTD.'],
+    [company ? `${company.address || ''}, ${company.city || ''}, ${company.state || ''}` : 'Lifesciences ERP System'],
+    [company?.gstin ? `GSTIN: ${company.gstin}` : 'Confidential — Internal Use Only'],
     [title.toUpperCase()],
-    [`Generated: ${new Date().toLocaleString('en-IN')}`],
+    [`Generated: ${new Date().toLocaleString('en-IN')} | © 2026 Metapharsic Lifesciences`],
     [] // empty row
   ];
   utils.sheet_add_aoa(ws, brandRows, { origin: 'A1' });
@@ -729,7 +787,10 @@ export function printPOSInvoice(invoice: any, company?: any) {
     <div class="invoice-container">
       <div class="header">
         <div class="header-left">
-          <div class="store-name">${company?.name || 'METAPHARSIC LIFESCIENCES STORES'}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <img src="${LOGO_SRC}" alt="Logo" style="height:36px;width:36px;border-radius:50%;border:1.5px solid #e2e8f0"/>
+            <div class="store-name" style="margin:0">${company?.name || 'METAPHARSIC LIFESCIENCES'}</div>
+          </div>
           <div>${company?.address || '000, HMT NAGAR, NACHARAM,'}</div>
           <div>${company?.city || 'HYDERABAD'} - ${company?.pinCode || '500 076'}, ${company?.state || 'TELANGANA'} ${company?.phone || '0000000000'}</div>
           <div>Phone : ${company?.phone || '0000000000'}</div>

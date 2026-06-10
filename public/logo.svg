@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <!-- Outer ring gradient: teal → blue → gold -->
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#00c8c8"/>
+      <stop offset="40%"  stop-color="#1a56db"/>
+      <stop offset="70%"  stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#c8920a"/>
+    </linearGradient>
+    <!-- Icon inner gradient: teal-cyan to deep blue -->
+    <linearGradient id="iconGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%"   stop-color="#00d4d4"/>
+      <stop offset="45%"  stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <!-- Gold accent gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#f0b429"/>
+      <stop offset="100%" stop-color="#c8920a"/>
+    </linearGradient>
+    <!-- Drop shadow -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.15)"/>
+    </filter>
+    <!-- Clip circle -->
+    <clipPath id="circleClip">
+      <circle cx="100" cy="100" r="88"/>
+    </clipPath>
+  </defs>
+
+  <!-- White background circle -->
+  <circle cx="100" cy="100" r="98" fill="white" filter="url(#shadow)"/>
+
+  <!-- Gradient outer ring -->
+  <circle cx="100" cy="100" r="97" fill="none" stroke="url(#ringGrad)" stroke-width="7"/>
+
+  <!-- Second inner thin ring accent -->
+  <circle cx="100" cy="100" r="90" fill="none" stroke="url(#ringGrad)" stroke-width="1.5" opacity="0.35"/>
+
+  <!-- ── Central Icon: Stylised M + DNA/Leaf motif ── -->
+  <g clip-path="url(#circleClip)" transform="translate(100,92)">
+
+    <!-- Left leaf/petal - outer -->
+    <path d="M-28,-38 C-42,-28 -44,2 -28,18 C-18,26 -6,24 0,14 C-12,8 -18,-8 -16,-24 Z"
+          fill="url(#iconGrad)" opacity="0.9"/>
+
+    <!-- Right leaf/petal - outer -->
+    <path d="M28,-38 C42,-28 44,2 28,18 C18,26 6,24 0,14 C12,8 18,-8 16,-24 Z"
+          fill="url(#iconGrad)" opacity="0.9"/>
+
+    <!-- Centre vertical stem -->
+    <path d="M-4,-44 C-4,-44 -6,0 -2,20 C-1,24 1,24 2,20 C6,0 4,-44 4,-44 Z"
+          fill="url(#iconGrad)"/>
+
+    <!-- Left inner highlight petal -->
+    <path d="M-22,-30 C-30,-20 -30,4 -18,14 C-10,20 -4,16 0,10 C-8,6 -12,-6 -10,-20 Z"
+          fill="white" opacity="0.25"/>
+
+    <!-- Right inner highlight petal -->
+    <path d="M22,-30 C30,-20 30,4 18,14 C10,20 4,16 0,10 C8,6 12,-6 10,-20 Z"
+          fill="white" opacity="0.25"/>
+
+    <!-- DNA helix dots - left strand -->
+    <circle cx="-14" cy="-28" r="2.5" fill="url(#goldGrad)"/>
+    <circle cx="-18" cy="-14" r="2"   fill="url(#goldGrad)" opacity="0.8"/>
+    <circle cx="-16" cy="0"   r="2"   fill="url(#goldGrad)" opacity="0.6"/>
+    <circle cx="-10" cy="12"  r="1.5" fill="url(#goldGrad)" opacity="0.5"/>
+
+    <!-- DNA helix dots - right strand -->
+    <circle cx="14"  cy="-28" r="2.5" fill="url(#goldGrad)"/>
+    <circle cx="18"  cy="-14" r="2"   fill="url(#goldGrad)" opacity="0.8"/>
+    <circle cx="16"  cy="0"   r="2"   fill="url(#goldGrad)" opacity="0.6"/>
+    <circle cx="10"  cy="12"  r="1.5" fill="url(#goldGrad)" opacity="0.5"/>
+
+    <!-- Cross-link bar top -->
+    <rect x="-14" y="-32" width="28" height="2.5" rx="1.25" fill="url(#goldGrad)" opacity="0.6"/>
+    <!-- Cross-link bar mid -->
+    <rect x="-17" y="-16" width="34" height="2" rx="1" fill="url(#goldGrad)" opacity="0.4"/>
+
+    <!-- Bottom rounded base -->
+    <ellipse cx="0" cy="22" rx="16" ry="5" fill="url(#iconGrad)" opacity="0.5"/>
+  </g>
+
+  <!-- ── Text: Metapharsic ── -->
+  <text x="100" y="154"
+        font-family="'Segoe UI', Arial, sans-serif"
+        font-size="16.5"
+        font-weight="800"
+        fill="#1e293b"
+        text-anchor="middle"
+        letter-spacing="0.5">Metapharsic</text>
+
+  <!-- ── Text: LIFESCIENCES ── -->
+  <text x="100" y="168"
+        font-family="'Segoe UI', Arial, sans-serif"
+        font-size="8"
+        font-weight="600"
+        fill="#64748b"
+        text-anchor="middle"
+        letter-spacing="2.5">LIFESCIENCES</text>
+</svg>

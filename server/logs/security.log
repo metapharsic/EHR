@@ -143,3 +143,25 @@
 {"timestamp":"2026-06-03T16:45:29.555Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1"}
 {"timestamp":"2026-06-03T16:49:18.493Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1"}
 {"timestamp":"2026-06-03T16:49:18.642Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"00000000-0000-0000-0000-000000000001","username":"testuser","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-06-03T20:52:26.661Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::1"}
+{"timestamp":"2026-06-03T20:52:30.155Z","level":"SECURITY","message":"Password reset token generated","userId":"11111111-1111-1111-1111-111111111111"}
+{"timestamp":"2026-06-03T20:52:30.248Z","level":"SECURITY","message":"Password successfully reset","userId":"11111111-1111-1111-1111-111111111111"}
+{"timestamp":"2026-06-03T20:52:30.360Z","level":"SECURITY","message":"Password reset token generated","userId":"11111111-1111-1111-1111-111111111111"}
+{"timestamp":"2026-06-03T20:52:33.870Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"lockout_test_user_xyz","ip":"::1"}
+{"timestamp":"2026-06-03T20:52:33.874Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"lockout_test_user_xyz","ip":"::1"}
+{"timestamp":"2026-06-03T20:52:33.877Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"lockout_test_user_xyz","ip":"::1"}
+{"timestamp":"2026-06-03T20:52:33.881Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"lockout_test_user_xyz","ip":"::1"}
+{"timestamp":"2026-06-03T20:52:33.885Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"lockout_test_user_xyz","ip":"::1"}
+{"timestamp":"2026-06-03T20:59:25.252Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-06-03T20:59:53.436Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::1"}
+{"timestamp":"2026-06-03T20:59:55.867Z","level":"SECURITY","message":"Password reset token generated","userId":"11111111-1111-1111-1111-111111111111"}
+{"timestamp":"2026-06-03T20:59:55.939Z","level":"SECURITY","message":"Password successfully reset","userId":"11111111-1111-1111-1111-111111111111"}
+{"timestamp":"2026-06-03T20:59:56.043Z","level":"SECURITY","message":"Password reset token generated","userId":"11111111-1111-1111-1111-111111111111"}
+{"timestamp":"2026-06-03T21:00:03.622Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"lockout_test_user_xyz","ip":"::1"}
+{"timestamp":"2026-06-03T21:00:03.625Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"lockout_test_user_xyz","ip":"::1"}
+{"timestamp":"2026-06-03T21:00:03.633Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"lockout_test_user_xyz","ip":"::1"}
+{"timestamp":"2026-06-03T21:00:03.636Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"lockout_test_user_xyz","ip":"::1"}
+{"timestamp":"2026-06-03T21:00:03.639Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"lockout_test_user_xyz","ip":"::1"}
+{"timestamp":"2026-06-04T05:34:02.861Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::1"}
+{"timestamp":"2026-06-04T05:34:30.559Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::1"}
+{"timestamp":"2026-06-07T19:40:05.049Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"22222222-2222-2222-2222-222222222223","username":"accountant","ip":"::1"}

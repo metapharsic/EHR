@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { Bell, AlertCircle, CheckCircle, Info, X, MessageCircle } from 'lucide-react';
 import { sendNotificationToWhatsApp, shouldAutoSendToWhatsApp, getWhatsAppConfig } from '../services/whatsappService';
 import { Tab } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 export interface Notification {
   id: string;
@@ -161,6 +162,28 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     }
   }, [notifications.length]);
 
+  // Stable ref so the WS callback doesn't re-create on every render
+  const addNotificationRef = useRef<(n: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void>();
+
+  // WebSocket — receive server-pushed events as notifications
+  const handleWsMessage = useCallback((event: any) => {
+    const typeMap: Record<string, Notification['type']> = {
+      success: 'success', error: 'error', warning: 'warning', info: 'info',
+      stock_alert: 'warning', job_complete: 'success', compliance_alert: 'warning'
+    };
+    const notifType = typeMap[event.type] ?? 'info';
+    const module = event.module?.toUpperCase() || (event.type === 'stock_alert' ? 'INVENTORY' : 'SYSTEM');
+    addNotificationRef.current?.({
+      type: notifType,
+      title: event.title || event.type.replace(/_/g, ' '),
+      message: event.message || '',
+      priority: event.priority || 'medium',
+      module,
+    });
+  }, []);
+
+  useWebSocket({ onMessage: handleWsMessage });
+
   const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
     const sourceInfo = notification.sourceTable
       ? { table: notification.sourceTable, label: notification.sourceLabel || notification.sourceTable }
@@ -181,6 +204,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       sendNotificationToWhatsApp(newNotification);
     }
   };
+
+  // Keep ref in sync so WS callback always calls the latest closure
+  addNotificationRef.current = addNotification;
 
   const sendToWhatsApp = async (notificationId: string, phoneNumber?: string): Promise<{ success: boolean; error?: string }> => {
     const notification = notifications.find((n) => n.id === notificationId);

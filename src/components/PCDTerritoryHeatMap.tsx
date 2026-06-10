@@ -35,7 +35,7 @@ const PCDTerritoryIntelligence: React.FC = () => {
   const runAnalysis = useCallback(async () => {
     setIsAiAnalyzing(true);
     try {
-      const res = await apiClient.get<{ insights: GeospatialInsight[] }>('/pcd/geospatial/analyze');
+      const res = await apiClient.get<{ success: boolean; insights: GeospatialInsight[] }>('/pcd/geospatial/analyze');
       if (res.success) setInsights(res.insights);
     } catch (e) {
       console.error('Analysis failed', e);
@@ -97,7 +97,7 @@ const PCDTerritoryIntelligence: React.FC = () => {
            disabled={isAnalyzing}
            className="relative z-10 px-6 py-2 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-[0.1em] transition-all flex items-center gap-2"
          >
-           <RefreshCw size={14} className={isAnalyzing ? 'animate-spin' : ''} />
+           <RefreshCcw size={14} className={isAnalyzing ? 'animate-spin' : ''} />
            {isAnalyzing ? 'Processing Nodes...' : 'Recalculate Coverage'}
          </button>
       </div>

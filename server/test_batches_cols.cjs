@@ -12,13 +12,13 @@ const pool = new Pool({
 async function main() {
   try {
     const res = await pool.query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-      ORDER BY table_name
+      SELECT routine_name, routine_definition 
+      FROM information_schema.routines 
+      WHERE routine_schema = 'public' 
+        AND routine_definition LIKE '%0-1000%'
     `);
-    console.log('Tables in public schema:');
-    console.log(res.rows.map(r => r.table_name));
+    console.log('Matching routines:');
+    console.log(res.rows);
   } catch (err) {
     console.error(err);
   } finally {

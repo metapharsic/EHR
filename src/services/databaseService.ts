@@ -339,18 +339,15 @@ export const deleteInvoice = async (id: string): Promise<boolean> => {
 
 export const deleteMedicalRepresentative = async (id: string): Promise<boolean> => {
   try {
-    const response = await fetch('/api/employees/' + id, { method: 'DELETE' });
+    await apiClient.delete('/employees/' + id);
     return true;
   } catch (error) { return false; }
 };
 
 export const getAllTasks = async (): Promise<any[]> => {
   try {
-    const response = await fetch('/api/tasks');
-    if (response.ok) {
-      const data = await response.json();
-      return data.data || [];
-    }
+    const data = await apiClient.get('/tasks');
+    return data.data || data || [];
   } catch (error) {
     console.warn('Backend API not available, falling back to local storage');
   }
@@ -368,11 +365,7 @@ export const saveTask = async (task: any): Promise<boolean> => {
     }
     localStorage.setItem('erp_tasks', JSON.stringify(tasks));
 
-    const response = await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(task),
-    });
+    await apiClient.post('/tasks', task);
     return true;
   } catch (error) {
     console.error('Error saving task:', error);
@@ -386,9 +379,7 @@ export const deleteTask = async (taskId: string): Promise<boolean> => {
     const filteredTasks = tasks.filter((t: any) => t.id !== taskId);
     localStorage.setItem('erp_tasks', JSON.stringify(filteredTasks));
 
-    const response = await fetch('/api/tasks/' + taskId, {
-      method: 'DELETE'
-    });
+    await apiClient.delete('/tasks/' + taskId);
     return true;
   } catch (error) {
     console.error('Error deleting task:', error);

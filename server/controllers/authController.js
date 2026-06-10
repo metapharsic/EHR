@@ -387,6 +387,32 @@ async function refreshToken(req, res) {
 }
 
 // ============================================
+// GET CURRENT USER
+// ============================================
+async function getCurrentUser(req, res) {
+  try {
+    const userId = req.user.userId;
+
+    const { rows } = await db.query(
+      'SELECT * FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = rows[0];
+    res.json({
+      user: buildUserResponse(user)
+    });
+  } catch (error) {
+    logger.error('Get current user error', { error: error.message, userId: req.user?.userId });
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+}
+
+// ============================================
 // LOGOUT
 // ============================================
 async function logout(req, res) {
@@ -588,5 +614,6 @@ module.exports = {
   enable2FA,
   confirm2FA,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  getCurrentUser
 };

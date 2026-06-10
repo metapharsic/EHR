@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const { WebSocketServer } = require('ws');
 const db = require('./db');
 const logger = require('./utils/logger');
 const authController = require('./controllers/authController');
@@ -47,6 +48,12 @@ app.use(corsMiddleware);
 
 // Request logging & security check
 app.use(securityLogger);
+
+// GLOBAL LOGGER for debugging routing issues
+app.use((req, res, next) => {
+  console.log(`[SERVER] INCOMING: ${req.method} ${req.url} (Original: ${req.originalUrl})`);
+  next();
+});
 
 // Global rate limiting
 app.use(globalLimiter);
@@ -138,6 +145,10 @@ app.post('/api/auth/refresh-token', async (req, res) => {
     await authController.refreshToken(req, res);
 });
 
+app.get('/api/auth/me', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
+    await authController.getCurrentUser(req, res);
+});
+
 app.post('/api/auth/forgot-password', authLimiter, async (req, res) => {
     await authController.forgotPassword(req, res);
 });
@@ -193,18 +204,19 @@ const voucherRoutes = require('./routes/vouchers');
 const settingsRoutes = require('./routes/settings');
 const geospatialRoutes = require('./routes/geospatial');
 const gstRoutes = require('./routes/gst');
+const taskRoutes = require('./routes/tasks');
 
 app.use('/api/pcd/geospatial', geospatialRoutes);
 app.use('/api/pcd', pcdRoutes);
 app.use('/api/gst', gstRoutes);
+app.use('/api/analytics', analyticRoutes);
+app.use('/api/tasks', taskRoutes);
 app.use('/api/inventory', inventoryRoutes);
-app.use('/api/inventory', inventoryRoutesFull);
 app.use('/api/inventory-full', inventoryRoutesFull);
 app.use('/api/reports', reportRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/pos', posRoutes);
 app.use('/api/purchase', purchaseRoutes);
-app.use('/api/analytics', analyticRoutes);
 app.use('/api/accounting', accountingRoutes);
 app.use('/api/accounting/advanced', advancedAccountingRoutes);
 app.use('/api/manufacturing', manufacturingRoutes);
@@ -230,6 +242,8 @@ app.use('/api/dms', dmsRoutes);
 app.use('/api/inventory-enterprise', inventoryEnterpriseRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/settings', settingsRoutes);
+const aiRoutes = require('./routes/ai');
+app.use('/api/ai', aiRoutes);
 
 // Helper to wrap async routes
 const asyncRoute = (fn) => (req, res, next) => {
@@ -259,6 +273,24 @@ initializeDatabase().then(() => {
 // ERROR HANDLING MIDDLEWARE (Applied Last)
 // ============================================
 
+// ============================================
+// SERVE STATIC FILES (Production)
+// ============================================
+if (process.env.NODE_ENV === 'production') {
+    const path = require('path');
+    const distPath = path.join(__dirname, '..', 'dist');
+    app.use(express.static(distPath));
+    
+    // Support SPA routing (redirect all non-API requests to index.html)
+    app.get('*', (req, res, next) => {
+        if (!req.path.startsWith('/api') && !req.path.startsWith('/uploads')) {
+            res.sendFile(path.join(distPath, 'index.html'));
+        } else {
+            next();
+        }
+    });
+}
+
 // 404 Handler
 app.use((req, res) => {
     logger.warn('404 Route not found', { method: req.method, path: req.path, ip: req.ip });
@@ -285,6 +317,46 @@ app.use((err, req, res, next) => {
     });
 });
 
+// ── WebSocket server for real-time push notifications ──────────────────────
+// Attached to the same HTTP server — no extra port needed.
+// Clients connect at ws://localhost:5000/ws and receive JSON events.
+const wss = new WebSocketServer({ noServer: true });
+const wsClients = new Map(); // userId → Set<WebSocket>
+
+const broadcastToUser = (userId, event) => {
+    const sockets = wsClients.get(String(userId));
+    if (!sockets) return;
+    const payload = JSON.stringify(event);
+    sockets.forEach(ws => { if (ws.readyState === 1) ws.send(payload); });
+};
+
+const broadcastAll = (event) => {
+    const payload = JSON.stringify(event);
+    wsClients.forEach(sockets => sockets.forEach(ws => { if (ws.readyState === 1) ws.send(payload); }));
+};
+
+wss.on('connection', (ws, req) => {
+    // Expect first message: { type: 'auth', token: '...' }
+    ws.once('message', async (raw) => {
+        try {
+            const { token } = JSON.parse(raw);
+            const { verifyAccessToken } = require('./utils/jwt');
+            const result = verifyAccessToken(token);
+            if (!result.valid) { ws.close(4001, 'Unauthorized'); return; }
+            const userId = String(result.decoded.userId);
+            if (!wsClients.has(userId)) wsClients.set(userId, new Set());
+            wsClients.get(userId).add(ws);
+            ws.send(JSON.stringify({ type: 'connected', userId }));
+            ws.on('close', () => { wsClients.get(userId)?.delete(ws); });
+        } catch { ws.close(4001, 'Unauthorized'); }
+    });
+    ws.on('error', err => logger.error('WS error:', err.message));
+});
+
+// Export so routes can push events
+app.set('broadcastToUser', broadcastToUser);
+app.set('broadcastAll', broadcastAll);
+
 const server = app.listen(port, () => {
     logger.info(`🚀 Metapharsic ERP Server running`, {
         port,
@@ -304,6 +376,15 @@ const server = app.listen(port, () => {
 ║  Health: http://localhost:${port}/health   ║
 ╚════════════════════════════════════════════╝
     `);
+});
+
+// Attach WebSocket upgrade to the HTTP server
+server.on('upgrade', (req, socket, head) => {
+    if (req.url === '/ws') {
+        wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+    } else {
+        socket.destroy();
+    }
 });
 
 // Graceful shutdown

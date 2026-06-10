@@ -146,9 +146,11 @@ function verifyRefreshToken(token) {
  * Express middleware to verify access token
  */
 function verifyTokenMiddleware(req, res, next) {
+  console.log(`[AUTH] ${req.method} ${req.path}`);
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.warn(`[AUTH] No token for ${req.path}`);
     return res.status(401).json({
       error: 'Unauthorized',
       message: 'Access token is required'
@@ -159,6 +161,7 @@ function verifyTokenMiddleware(req, res, next) {
   const result = verifyAccessToken(token);
 
   if (!result.valid) {
+    console.error(`[AUTH] Invalid token for ${req.path}:`, result.message);
     if (result.expired) {
       return res.status(401).json({
         error: 'TokenExpired',
@@ -172,6 +175,7 @@ function verifyTokenMiddleware(req, res, next) {
   }
 
   req.user = result.decoded;
+  console.log(`[AUTH] User verified: ${req.user.username} for ${req.path}`);
   next();
 }
 

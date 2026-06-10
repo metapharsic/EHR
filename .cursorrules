@@ -733,3 +733,18 @@ This file is the SINGLE SOURCE OF TRUTH for all architectural decisions.
   5. `risk_score` in [0, 100] for all records
   6. status ∈ {current, overdue, blocked} always
   7. `generated_at` is always a fresh ISO timestamp at request time
+
+### Recently Added (2026-06-08) — Ledger Creation & Chart of Accounts
+
+- **COA Bug Fix — `current_balance` always 0**: INSERT never set `current_balance` from `opening_balance`. Fix: compute `initialBalance = (fmt === 'credit') ? -ob : ob` and include it in INSERT. Credit-normal accounts (Liability/Income) store negative balance to represent the credit-side opening.
+- **COA Bug Fix — ACCOUNTANT role blocked**: POST/PUT `/api/accounting/chart-of-accounts` required `['ADMIN','FINANCE_MANAGER']` but no user has role `FINANCE_MANAGER`. Added `'ACCOUNTANT'` to both routes.
+- **COA Bug Fix — `accountCode` collision**: Frontend generated `ACC-${Date.now().slice(-6)}` which collides on same-second creates. Removed client-side generation; backend now auto-generates sequential `ACC-XXXX` from COUNT(*)+1.
+- **COA Fix — PUT `current_balance` sync**: When `opening_balance` or `accountFormat` is changed via PUT, the route now re-fetches existing values and recomputes `current_balance` with the same sign rule.
+- **DMS Bug Fix — `dms_documents.status` constraint missing 'Deleted'**: CHECK constraint only allowed Active/Draft/Under Review/Approved/Archived/Expired. Soft-delete (status='Deleted') was failing silently. Fixed via ALTER TABLE as postgres superuser.
+- **DMS Bug Fix — `current_version` type mismatch**: Column was INTEGER but version labels are strings like '2.1'. Changed to VARCHAR(20).
+- **DMS Fix — Version History wired to DB**: `dms_versions` was empty. Seeded 4 documents + 7 version records. Added `status` column to `dms_versions` (Current/Previous/Archived). Added `GET /api/dms/versions` route (before `/:id` to avoid shadow). Frontend `documentVersions` now uses `useDataFetch('/api/dms/versions')` instead of hardcoded static array.
+- **COA Invariants (must always hold)**:
+  1. `current_balance = opening_balance` for debit-normal accounts (Asset/Expense) at creation
+  2. `current_balance = -opening_balance` for credit-normal accounts (Liability/Income/Equity) at creation
+  3. `account_code` is unique — backend enforces UNIQUE constraint and returns 400 on conflict
+  4. ACCOUNTANT, FINANCE_MANAGER, ADMIN roles can all create/update ledgers

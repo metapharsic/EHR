@@ -356,4 +356,32 @@ router.get('/reports/status/:jobId', verifyTokenMiddleware, async (req, res) => 
   }
 });
 
+// Batch job status — replaces N individual polls with one request (fixes N+1 anti-pattern)
+// GET /api/analytics/reports/status/batch?jobIds=1,2,3
+router.get('/reports/status/batch', verifyTokenMiddleware, async (req, res) => {
+  try {
+    const ids = String(req.query.jobIds || '').split(',').map(s => s.trim()).filter(Boolean).slice(0, 50);
+    if (ids.length === 0) return res.json({ success: true, data: [] });
+
+    const jobFetches = ids.map(id =>
+      Promise.race([
+        reportQueue.getJob(id),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+      ]).catch(() => null)
+    );
+    const jobs = await Promise.allSettled(jobFetches);
+
+    const data = await Promise.all(jobs.map(async (r, i) => {
+      const job = r.status === 'fulfilled' ? r.value : null;
+      if (!job) return { id: ids[i], state: 'not_found', progress: 0, result: null };
+      const state = await job.getState().catch(() => 'unknown');
+      return { id: ids[i], state, progress: job.progress(), result: job.returnvalue };
+    }));
+
+    res.json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

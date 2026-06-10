@@ -80,6 +80,7 @@ test.describe("Phase 11 — Assets: API", () => {
   test("P11-10 | Asset allocation → stock ledger OUT (cross-module)", async () => {
     if (!createdAssetId) { test.skip(); return; }
     const empRes = await api("get", "/api/hr/employees");
+    console.log("P11-10 DIAGNOSTIC - Status:", empRes.status, "Body type:", typeof empRes.body, "Keys:", empRes.body ? Object.keys(empRes.body) : "null", "Employees key length:", empRes.body?.employees?.length);
     const employees = Array.isArray(empRes.body) ? empRes.body : (empRes.body?.employees ?? []);
     if (employees.length === 0) { test.skip(); return; }
     const { status } = await api("post", "/api/assets/" + createdAssetId + "/allocate", {

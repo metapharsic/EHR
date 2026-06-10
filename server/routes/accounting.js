@@ -135,32 +135,50 @@ router.get('/chart-of-accounts', verifyTokenMiddleware, asyncRoute(async (req, r
     }
 }));
 
-router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER']), verify2FAMiddleware, asyncRoute(async (req, res) => {
+router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT']), verify2FAMiddleware, asyncRoute(async (req, res) => {
     try {
-        const { 
-            accountCode, accountName, accountType, openingBalance, group, description, status, 
+        const {
+            accountCode, accountName, accountType, openingBalance, group, description, status,
             gstApplicable, accountFormat, costCenter,
             alias, inventoryAffected, ledgerType, activateInterest,
             mailingName, mailingAddress, mailingCountry, mailingState,
             provideBankDetails, panItNo
         } = req.body;
-        
-        if (!accountCode || !accountName || !accountType) {
-            return res.status(400).json({ error: 'Missing required fields: accountCode, accountName, accountType' });
+
+        if (!accountName || !accountType) {
+            return res.status(400).json({ error: 'Missing required fields: accountName, accountType' });
         }
-        
+
+        // Auto-generate accountCode if not provided — use MAX to avoid collisions with existing codes
+        let finalCode = accountCode || null;
+        if (!finalCode) {
+            const seqRes = await db.query(
+                `SELECT COALESCE(MAX(CAST(SUBSTRING(account_code FROM 5) AS INT)), 0) as max_seq
+                 FROM chart_of_accounts
+                 WHERE account_code ~ '^ACC-[0-9]+$' AND company_id = $1`,
+                [req.user.companyId || 1]
+            );
+            finalCode = `ACC-${String(parseInt(seqRes.rows[0].max_seq) + 1).padStart(4, '0')}`;
+        }
+
+        // current_balance = opening_balance adjusted for account normal balance side
+        const ob = Number(openingBalance) || 0;
+        const fmt = accountFormat || 'debit';
+        // Credit-normal accounts: opening balance Cr means positive balance stored as negative debit offset
+        const initialBalance = fmt === 'credit' ? -ob : ob;
+
         const { rows } = await db.query(
             `INSERT INTO chart_of_accounts (
-                account_code, account_name, account_type, opening_balance, account_group, description, status, 
+                account_code, account_name, account_type, opening_balance, current_balance, account_group, description, status,
                 gst_applicable, account_format, cost_center_id, company_id, created_by, created_at,
                 alias, inventory_affected, ledger_type, activate_interest,
                 mailing_name, mailing_address, mailing_country, mailing_state,
                 provide_bank_details, pan_it_no
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING *`,
             [
-                accountCode, accountName, accountType, openingBalance || 0, group || null, description || null, status || 'Active', 
-                gstApplicable || false, accountFormat || 'debit', costCenter || null, req.user.companyId || 1, req.user.userId,
+                finalCode, accountName, accountType, ob, initialBalance, group || null, description || null, status || 'Active',
+                gstApplicable || false, fmt, costCenter || null, req.user.companyId || 1, req.user.userId,
                 alias || null, inventoryAffected || false, ledgerType || null, activateInterest || false,
                 mailingName || accountName, mailingAddress || null, mailingCountry || 'India', mailingState || null,
                 provideBankDetails || false, panItNo || null
@@ -178,47 +196,64 @@ router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['
     }
 }));
 
-router.put('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER']), verify2FAMiddleware, asyncRoute(async (req, res) => {
+router.put('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT']), verify2FAMiddleware, asyncRoute(async (req, res) => {
     try {
-        const { 
+        const {
             accountName, accountType, costCenter,
             alias, inventoryAffected, ledgerType, activateInterest,
             mailingName, mailingAddress, mailingCountry, mailingState,
             provideBankDetails, panItNo, status, group, openingBalance, accountFormat, gstApplicable
         } = req.body;
-        
+
+        // Recompute current_balance if opening_balance or accountFormat is being changed
+        let balanceClause = '';
+        const extraParams = [];
+        if (openingBalance !== undefined || accountFormat !== undefined) {
+            // Fetch existing values to fill in whichever wasn't provided
+            const existing = await db.query('SELECT opening_balance, account_format FROM chart_of_accounts WHERE id = $1', [req.params.id]);
+            if (existing.rows.length) {
+                const ob = openingBalance !== undefined ? Number(openingBalance) : Number(existing.rows[0].opening_balance);
+                const fmt = accountFormat || existing.rows[0].account_format || 'debit';
+                const newBalance = fmt === 'credit' ? -ob : ob;
+                extraParams.push(newBalance);
+                balanceClause = `, current_balance = $${19 + extraParams.length - 1}`;
+            }
+        }
+
         const { rows } = await db.query(
-            `UPDATE chart_of_accounts SET 
-                account_name = COALESCE($1, account_name), 
-                account_type = COALESCE($2, account_type), 
-                cost_center_id = COALESCE($3, cost_center_id), 
-                alias = COALESCE($4, alias), 
-                inventory_affected = COALESCE($5, inventory_affected), 
-                ledger_type = COALESCE($6, ledger_type), 
+            `UPDATE chart_of_accounts SET
+                account_name = COALESCE($1, account_name),
+                account_type = COALESCE($2, account_type),
+                cost_center_id = COALESCE($3, cost_center_id),
+                alias = COALESCE($4, alias),
+                inventory_affected = COALESCE($5, inventory_affected),
+                ledger_type = COALESCE($6, ledger_type),
                 activate_interest = COALESCE($7, activate_interest),
-                mailing_name = COALESCE($8, mailing_name), 
-                mailing_address = COALESCE($9, mailing_address), 
-                mailing_country = COALESCE($10, mailing_country), 
+                mailing_name = COALESCE($8, mailing_name),
+                mailing_address = COALESCE($9, mailing_address),
+                mailing_country = COALESCE($10, mailing_country),
                 mailing_state = COALESCE($11, mailing_state),
-                provide_bank_details = COALESCE($12, provide_bank_details), 
-                pan_it_no = COALESCE($13, pan_it_no), 
-                status = COALESCE($14, status), 
+                provide_bank_details = COALESCE($12, provide_bank_details),
+                pan_it_no = COALESCE($13, pan_it_no),
+                status = COALESCE($14, status),
                 account_group = COALESCE($15, account_group),
-                opening_balance = COALESCE($16, opening_balance), 
-                account_format = COALESCE($17, account_format), 
-                gst_applicable = COALESCE($18, gst_applicable),
-                updated_at = NOW() 
+                opening_balance = COALESCE($16, opening_balance),
+                account_format = COALESCE($17, account_format),
+                gst_applicable = COALESCE($18, gst_applicable)
+                ${balanceClause},
+                updated_at = NOW()
              WHERE id = $19 RETURNING *`,
             [
                 accountName || null, accountType || null, costCenter || null,
-                alias || null, inventoryAffected === undefined ? null : inventoryAffected, 
+                alias || null, inventoryAffected === undefined ? null : inventoryAffected,
                 ledgerType || null, activateInterest === undefined ? null : activateInterest,
                 mailingName || null, mailingAddress || null, mailingCountry || null, mailingState || null,
-                provideBankDetails === undefined ? null : provideBankDetails, panItNo || null, 
+                provideBankDetails === undefined ? null : provideBankDetails, panItNo || null,
                 status || null, group || null,
-                openingBalance === undefined ? null : openingBalance, accountFormat || null, 
+                openingBalance === undefined ? null : openingBalance, accountFormat || null,
                 gstApplicable === undefined ? null : gstApplicable,
-                req.params.id
+                req.params.id,
+                ...extraParams
             ]
         );
         res.json(rows[0] || {});

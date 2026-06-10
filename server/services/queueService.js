@@ -6,89 +6,150 @@ const db = require('../db');
 // ASYNCHRONOUS TASK QUEUE (Phase 3 Foundation)
 // ============================================
 
-// Initialize Redis-backed queues
-const reportQueue = new Queue('report-generation', {
-  redis: {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: process.env.REDIS_PORT || 6379,
-  }
-});
+let reportQueue;
+let isRedisAvailable = false;
+const mockJobs = new Map(); // Store mock jobs for polling
+
+// Attempt to initialize Bull with Redis
+try {
+  reportQueue = new Queue('report-generation', {
+    redis: {
+      host: process.env.REDIS_HOST || '127.0.0.1',
+      port: process.env.REDIS_PORT || 6379,
+    },
+    settings: {
+      connectTimeout: 5000,
+      maxRetriesPerRequest: 1,
+    }
+  });
+
+  reportQueue.on('error', (err) => {
+    // Suppress flood of connection errors
+    if (!isRedisAvailable) return; 
+    console.warn('[QUEUE] Redis connection lost, switching to in-memory fallback');
+    isRedisAvailable = false;
+  });
+
+  // Basic check to see if we're actually connected
+  // reportQueue.client.on('ready', () => { isRedisAvailable = true; });
+  // For now, assume unavailable until proven otherwise by a successful operation
+} catch (err) {
+  console.error('[QUEUE] Failed to initialize Bull:', err.message);
+}
 
 /**
- * Process Report Generation Jobs
+ * Process Logic (Extracted for reuse in fallback)
  */
-reportQueue.process(async (job) => {
-  const { reportId, type, params, userId } = job.data;
+async function processReportData(data) {
+  const { reportId, type, params, userId } = data;
+  logger.info(`Processing report: ${reportId}`, { type, userId });
   
-  logger.info(`Starting background report generation: ${reportId}`, { type, userId });
+  // Simulate processing time
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  let result = {};
+  if (type === 'inventory_intelligence') {
+    result = {
+      generatedAt: new Date(),
+      summary: "Analyzed 15,000 movements. Predicted stock-out for 12 items.",
+      recommendations: ["Order MetaMol x500", "Return Expired Batch B129"]
+    };
+  } else if (type === 'financial_health') {
+    result = {
+      generatedAt: new Date(),
+      summary: "Financial liquidity is high. Working capital optimized.",
+      recommendations: ["Increase credit limit for Tier-1 Distributors"]
+    };
+  } else if (type === 'demand_forecast') {
+    result = {
+      generatedAt: new Date(),
+      summary: "Forecast indicates 15% growth in Cardiovascular category.",
+      recommendations: ["Increase production of MetaCardio 50mg"]
+    };
+  } else {
+    result = { generatedAt: new Date(), summary: "General report generated successfully." };
+  }
+
+  return { success: true, reportId, result };
+}
+
+/**
+ * Bull Processor (Standard path)
+ */
+if (reportQueue) {
+  reportQueue.process(async (job) => {
+    return await processReportData(job.data);
+  });
+}
+
+/**
+ * STATUS POLLING WRAPPER
+ * Intercepts calls to reportQueue.getJob to check mockJobs
+ */
+const getJob = async (jobId) => {
+  if (mockJobs.has(jobId)) {
+    return mockJobs.get(jobId);
+  }
+  if (!isRedisAvailable || !reportQueue) return null;
   
   try {
-    // 1. Update status to 'processing'
-    // await db.query('UPDATE reports SET status = $1 WHERE id = $2', ['processing', reportId]);
-    
-    // 2. Simulate heavy data aggregation (The "Heavy Lifting")
-    let progress = 0;
-    for(let i = 0; i < 5; i++) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 10s total heavy task
-      progress += 20;
-      job.progress(progress);
-      logger.debug(`Report ${reportId} progress: ${progress}%`);
-    }
-
-    // 3. Logic for different report types
-    let result = {};
-    if (type === 'inventory_intelligence') {
-      // In a real scenario, this would run complex SQL across 100k+ rows
-      result = {
-        generatedAt: new Date(),
-        summary: "Analyzed 15,000 movements. Predicted stock-out for 12 items.",
-        recommendations: ["Order MetaMol x500", "Return Expired Batch B129"]
-      };
-    }
-
-    // 4. Mark as completed in DB
-    // await db.query('UPDATE reports SET status = $1, result = $2, completed_at = NOW() WHERE id = $3', 
-    //   ['completed', JSON.stringify(result), reportId]);
-
-    logger.info(`Successfully completed report: ${reportId}`);
-    
-    return { 
-      success: true, 
-      reportId,
-      result 
-    };
-  } catch (error) {
-    logger.error(`Error processing report ${reportId}: ${error.message}`);
-    // await db.query('UPDATE reports SET status = $1, error = $2 WHERE id = $3', 
-    //   ['failed', error.message, reportId]);
-    throw error;
+    return await reportQueue.getJob(jobId);
+  } catch (err) {
+    return null;
   }
-});
-
-// Event Listeners for transparency
-reportQueue.on('completed', (job, result) => {
-  logger.info(`Job ${job.id} completed with result: ${JSON.stringify(result)}`);
-});
-
-reportQueue.on('failed', (job, err) => {
-  logger.error(`Job ${job.id} failed: ${err.message}`);
-});
+};
 
 /**
  * Add a new report job to the queue
  */
 const addReportJob = async (data) => {
-  return await reportQueue.add(data, {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 5000,
-    },
-    removeOnComplete: true,
-  });
+  // If Redis is likely down or we're in fallback mode
+  if (!isRedisAvailable) {
+    const jobId = `mock-${Date.now()}`;
+    logger.warn('[QUEUE] Redis unavailable, queuing In-Memory:', jobId);
+    
+    const mockJob = {
+      id: jobId,
+      data,
+      state: 'active',
+      progressValue: 0,
+      returnvalue: null,
+      getState: async function() { return this.state; },
+      progress: function(p) { if(p !== undefined) this.progressValue = p; return this.progressValue; }
+    };
+    
+    mockJobs.set(jobId, mockJob);
+
+    // Process in background (don't await)
+    processReportData(data).then(result => {
+      mockJob.state = 'completed';
+      mockJob.progressValue = 100;
+      mockJob.returnvalue = result;
+      logger.info('[QUEUE] Mock Job Completed:', jobId);
+    }).catch(err => {
+      mockJob.state = 'failed';
+      logger.error('[QUEUE] Mock Job Failed:', jobId, err.message);
+    });
+
+    return mockJob;
+  }
+
+  try {
+    const job = await reportQueue.add(data, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 },
+      removeOnComplete: true,
+    });
+    isRedisAvailable = true; // Proven connection
+    return job;
+  } catch (err) {
+    console.warn('[QUEUE] Redis failure on add, falling back:', err.message);
+    isRedisAvailable = false;
+    return await addReportJob(data); 
+  }
 };
 
 module.exports = {
-  reportQueue,
+  reportQueue: { getJob }, // Export wrapper for status checks
   addReportJob
 };

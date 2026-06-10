@@ -39,7 +39,7 @@ router.get('/batches/:id', verifyTokenMiddleware, verify2FAMiddleware, async (re
 // GET: List all godowns
 router.get('/godowns', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const result = await db.query(
             `SELECT id, company_id, name, address, manager_id, is_default, status, 
                     created_at, updated_at
@@ -64,7 +64,7 @@ router.get('/godowns', verifyTokenMiddleware, verify2FAMiddleware, async (req, r
 router.get('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         
         const result = await db.query(
             `SELECT * FROM godowns WHERE id = $1 AND company_id = $2`,
@@ -86,7 +86,7 @@ router.get('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (re
 router.post('/godowns', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
         const { name, address, manager_id, is_default } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         
         // Validate required fields
         if (!name) {
@@ -118,7 +118,7 @@ router.put('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (re
     try {
         const { id } = req.params;
         const { name, address, manager_id, status } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         
         const result = await db.query(
             `UPDATE godowns 
@@ -155,7 +155,7 @@ router.put('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (re
 router.get('/stock-ledger', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
         const { product_id, batch_id, godown_id, from_date, to_date, movement_type, page = 1, limit = 100 } = req.query;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const offset = (page - 1) * limit;
         
         let whereClause = 'WHERE sle.company_id = $1';
@@ -304,7 +304,7 @@ router.post('/stock-ledger/internal', async (req, res) => {
 router.post('/reconciliation/start', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
         const { godown_id, reconciliation_period_from, reconciliation_period_to } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const userId = req.user.id;
         
         if (!godown_id) {
@@ -339,7 +339,7 @@ router.post('/reconciliation/:id/entry', verifyTokenMiddleware, verify2FAMiddlew
     try {
         const { id } = req.params;
         const { product_id, batch_id, physical_qty, variance_reason, notes } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         
         if (!product_id || physical_qty === undefined) {
             return res.status(400).json({ error: 'Product and physical quantity are required' });
@@ -391,7 +391,7 @@ router.post('/reconciliation/:id/entry', verifyTokenMiddleware, verify2FAMiddlew
 router.get('/reconciliation/:id', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         
         // Get header
         const headerResult = await db.query(
@@ -443,7 +443,7 @@ router.put('/reconciliation/:id/status', verifyTokenMiddleware, verify2FAMiddlew
     try {
         const { id } = req.params;
         const { status } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const userId = req.user.id;
         
         if (!['InProgress', 'Completed', 'Approved', 'Rejected', 'Cancelled'].includes(status)) {
@@ -512,7 +512,7 @@ router.put('/reconciliation/:id/status', verifyTokenMiddleware, verify2FAMiddlew
 router.post('/returns', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
         const { note_type, party_id, reference_invoice, return_date, reason } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const userId = req.user.id;
         
         if (!note_type || !party_id) {
@@ -588,7 +588,7 @@ router.post('/returns/:id/items', verifyTokenMiddleware, verify2FAMiddleware, as
 router.get('/returns', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
         const { note_type, status, page = 1, limit = 50 } = req.query;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const offset = (page - 1) * limit;
         
         let whereClause = 'WHERE rn.company_id = $1';
@@ -635,7 +635,7 @@ router.put('/returns/:id/status', verifyTokenMiddleware, verify2FAMiddleware, as
     try {
         const { id } = req.params;
         const { status } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const userId = req.user.id;
         
         if (!['Draft', 'Submitted', 'Approved', 'Rejected', 'Received', 'Closed'].includes(status)) {
@@ -686,7 +686,7 @@ router.post('/stock-summary', verifyTokenMiddleware, verify2FAMiddleware, async 
         const { startDate, endDate, godownId } = req.body;
         const sDate = startDate || '2000-01-01';
         const eDate = endDate || new Date().toISOString().split('T')[0];
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
 
         let sql = `
             WITH OpeningStock AS (
@@ -727,7 +727,7 @@ router.post('/stock-summary', verifyTokenMiddleware, verify2FAMiddleware, async 
 // GET: All Stock Journals
 router.get('/stock-journals', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const result = await db.query(
             `SELECT sj.id, sj.journal_number as "no", sj.date, sj.narration, sj.status, sj.created_at
              FROM stock_journals sj
@@ -745,7 +745,7 @@ router.get('/stock-journals', verifyTokenMiddleware, verify2FAMiddleware, async 
 // GET: All Stock Transfers
 router.get('/stock-transfers', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const result = await db.query(
             `SELECT st.id, st.transfer_number as "transferNo", st.date, st.narration, st.status, st.created_at,
                     st.source_branch_id as "sourceBranchId", st.dest_branch_id as "destBranchId",
@@ -767,7 +767,7 @@ router.get('/stock-transfers', verifyTokenMiddleware, verify2FAMiddleware, async
 // GET: All Stock Reconciliations / Physical Stocks
 router.get('/reconciliations', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const result = await db.query(
             `SELECT sr.id, sr.reconciliation_number as "no", sr.reconciliation_date as "date", sr.status, sr.created_at,
                     sr.total_system_qty as "totalSystemQty", sr.total_physical_qty as "totalPhysicalQty",
@@ -791,7 +791,7 @@ router.post('/reconciliations', verifyTokenMiddleware, verify2FAMiddleware, asyn
     const client = await db.getClient();
     try {
         const { date, srcGodown, items = [], placeOfSupply } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const userId = req.user.id;
 
         await client.query('BEGIN');
@@ -901,7 +901,7 @@ router.post('/stock-journals', verifyTokenMiddleware, verify2FAMiddleware, async
     const client = await db.getClient();
     try {
         const { date, narration, items = [] } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const userId = req.user.id;
         
         await client.query('BEGIN');
@@ -978,7 +978,7 @@ router.post('/stock-transfers', verifyTokenMiddleware, verify2FAMiddleware, asyn
     const client = await db.getClient();
     try {
         const { date, sourceBranchId, destBranchId, transferNo, narration, items = [] } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const userId = req.user.id;
         
         await client.query('BEGIN');
@@ -1037,7 +1037,7 @@ router.post('/purchases/direct', verifyTokenMiddleware, verify2FAMiddleware, asy
     const client = await db.getClient();
     try {
         const { invoiceNo, party, supplierName, date, totalAmount, items = [] } = req.body;
-        const companyId = req.user.company_id || 1;
+        const companyId = req.user.companyId || 1;
         const userId = req.user.id;
         
         await client.query('BEGIN');

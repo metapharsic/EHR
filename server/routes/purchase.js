@@ -190,7 +190,7 @@ router.post('/', async (req, res) => {
     // 3. Insert purchase order
     const { rows: poResult } = await client.query(
       `INSERT INTO purchase_orders 
-       (invoice_no, supplier_id, order_date, status, created_by)
+       (po_number, supplier_id, date, status, created_by)
        VALUES ($1, $2, $3, 'Draft', $4)
        RETURNING id`,
       [invoice_no, supplier_id, order_date, req.user.userId]
@@ -202,9 +202,9 @@ router.post('/', async (req, res) => {
     for (const item of items) {
       await client.query(
         `INSERT INTO purchase_order_items 
-         (purchase_order_id, product_id, quantity, purchase_rate)
-         VALUES ($1, $2, $3, $4)`,
-        [poId, item.product_id, item.quantity, item.purchase_rate]
+         (po_id, product_id, quantity, unit_price, total_amount)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [poId, item.product_id, item.quantity, item.purchase_rate, (item.quantity * item.purchase_rate)]
       );
     }
 
@@ -520,28 +520,18 @@ router.put('/:id', async (req, res) => {
     // 1. Update purchase order header
     const { rows } = await client.query(
       `UPDATE purchase_orders 
-       SET invoice_no = COALESCE($1, invoice_no),
+       SET po_number = COALESCE($1, po_number),
            supplier_id = COALESCE($2, supplier_id),
-           order_date = COALESCE($3, order_date),
-           expected_delivery_date = COALESCE($4, expected_delivery_date),
-           payment_terms = COALESCE($5, payment_terms),
-           delivery_mode = COALESCE($6, delivery_mode),
-           notes = COALESCE($7, notes),
-           status = COALESCE($8, status),
-           updated_at = NOW(),
-           updated_by = $9
-       WHERE id = $10
+           date = COALESCE($3, date),
+           status = COALESCE($4, status),
+           updated_at = NOW()
+       WHERE id = $5
        RETURNING *`,
       [
         invoice_no, 
         supplier_id, 
         order_date, 
-        expected_delivery_date, 
-        payment_terms, 
-        delivery_mode, 
-        notes, 
         status, 
-        req.user.userId, 
         id
       ]
     );
@@ -555,22 +545,19 @@ router.put('/:id', async (req, res) => {
     if (items && items.length > 0) {
       // For simplicity, we'll replace existing items. 
       // In a production app, you might want to reconcile (update/insert/delete)
-      await client.query('DELETE FROM purchase_order_items WHERE purchase_order_id = $1', [id]);
+      await client.query('DELETE FROM purchase_order_items WHERE po_id = $1', [id]);
       
       for (const item of items) {
         await client.query(
           `INSERT INTO purchase_order_items 
-           (purchase_order_id, product_id, quantity, purchase_rate, mrp, gst_rate, batch_no, expiry_date)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+           (po_id, product_id, quantity, unit_price, total_amount)
+           VALUES ($1, $2, $3, $4, $5)`,
           [
             id, 
             item.product_id, 
             item.quantity, 
-            item.purchase_rate, 
-            item.mrp || 0, 
-            item.gst_rate || 0, 
-            item.batch_no, 
-            item.expiry_date
+            item.purchase_rate,
+            (item.quantity * item.purchase_rate)
           ]
         );
       }
@@ -599,9 +586,9 @@ router.put('/:id', async (req, res) => {
  * Mark items as received
  */
 router.post('/:id/receive', async (req, res) => {
+  const { id } = req.params;
   const client = await db.getClient();
   try {
-    const { id } = req.params;
     const { items = [] } = req.body;
     const companyId = req.user.companyId || 1;
     const userId = req.user.userId;
@@ -611,12 +598,12 @@ router.post('/:id/receive', async (req, res) => {
     await client.query('BEGIN');
 
     // Fetch PO details for reference
-    const { rows: poRows } = await client.query('SELECT invoice_no, supplier_id FROM purchase_orders WHERE id = $1', [id]);
+    const { rows: poRows } = await client.query('SELECT po_number, supplier_id FROM purchase_orders WHERE id = $1', [id]);
     if (poRows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ success: false, error: 'Purchase order not found' });
     }
-    const { invoice_no: poNumber } = poRows[0];
+    const { po_number: poNumber } = poRows[0];
 
     let totalReceivedValue = 0;
 
@@ -640,12 +627,12 @@ router.post('/:id/receive', async (req, res) => {
       const batchMrp = item.mrp || productDefaults.mrp || 0;
       const batchSellingRate = item.selling_rate || productDefaults.selling_rate || 0;
 
-      // Add to/Update batches using canonical column names (batch_no and quantity)
+      // Add to/Update batches using canonical column names (batch_number and stock)
       const { rows: batchRows } = await client.query(
-        `INSERT INTO batches (id, product_id, batch_no, expiry_date, purchase_rate, quantity, mrp, selling_rate)
+        `INSERT INTO batches (id, product_id, batch_number, expiry_date, purchase_rate, stock, mrp, selling_rate)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         ON CONFLICT (product_id, batch_no) 
-         DO UPDATE SET quantity = batches.quantity + EXCLUDED.quantity
+         ON CONFLICT (product_id, batch_number) 
+         DO UPDATE SET stock = batches.stock + EXCLUDED.stock
          RETURNING id, godown_id`,
         [uuidv4(), item.product_id, item.batch_no, item.expiry_date, item.cost, item.received_qty, batchMrp, batchSellingRate]
       );

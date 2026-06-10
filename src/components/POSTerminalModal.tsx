@@ -3,8 +3,8 @@ import TallyVoucherEntry from './TallyVoucherEntry';
 import { useAppStore } from '../store/useAppStore';
 
 interface POSTerminalModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   onSuccess?: () => void;
   initialItems?: any[];
   editingInvoice?: any;
@@ -17,9 +17,12 @@ const POSTerminalModal: React.FC<POSTerminalModalProps> = ({
   initialItems = [],
   editingInvoice,
 }) => {
-  const { posState } = useAppStore();
+  const { posState, posTerminalOpen, setPosState } = useAppStore();
 
-  if (!isOpen || posState === 'closed') return null;
+  const activeIsOpen = isOpen !== undefined ? isOpen : posTerminalOpen;
+  const activeOnClose = onClose || (() => setPosState('closed'));
+
+  if (!activeIsOpen || posState === 'closed') return null;
 
   // The wrapper styling depends on the posState
   // If full or side, App.tsx handles the container size through the CSS Grid.
@@ -60,12 +63,12 @@ const POSTerminalModal: React.FC<POSTerminalModalProps> = ({
         }
       `}</style>
       <TallyVoucherEntry
-        key={String(isOpen)}
+        key={String(activeIsOpen)}
         initialType="Sales"
         hideTopBanner={true}
         initialItems={initialItems}
         editingInvoice={editingInvoice}
-        onClose={onClose}
+        onClose={activeOnClose}
         onSuccess={() => {
           if (onSuccess) onSuccess();
         }}

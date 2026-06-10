@@ -28,6 +28,8 @@ router.get('/analyze', verifyTokenMiddleware, async (req, res) => {
 
         // 1. Check for UNDERSERVED regions (High demand, no partners)
         for (const demand of demandData) {
+            if (!demand.latitude || !demand.longitude) continue;
+
             const nearbyPartners = partners.filter(p => {
                 if (!p.latitude || !p.longitude) return false;
                 return getDistanceKm(demand.latitude, demand.longitude, p.latitude, p.longitude) <= demand.radius_km;

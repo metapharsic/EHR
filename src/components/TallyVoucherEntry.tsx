@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
- Plus, Printer, Save, X, Search, ChevronRight, 
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import {
+ Plus, Printer, Save, X, Search, ChevronRight,
  Calculator, HelpCircle, AlertCircle, Trash2, Maximize2, Minimize2, PanelRightClose, Pause, Paperclip, Calendar, Minus,
- ChevronLeft, UserCircle, History, Package, DollarSign, Wallet, ShoppingCart, ArrowUpRight, ArrowDownLeft, FileText, RefreshCcw, ShoppingBag, Menu, Activity, Heart, User, Users, MapPin, Beaker, ChevronDown, ChevronUp, Mail, MessageSquare, Share2, CreditCard, Smartphone
+ ChevronLeft, UserCircle, History, Package, DollarSign, Wallet, ShoppingCart, ArrowUpRight, ArrowDownLeft, FileText, RefreshCcw, ShoppingBag, Menu, Activity, Heart, User, Users, MapPin, Beaker, ChevronDown, ChevronUp, Mail, MessageSquare, Share2, CreditCard, Smartphone,
+ Zap, Clock, Star, Scan, TrendingUp
 } from 'lucide-react';
+import { useQuickBillingAutomation } from '../hooks/useQuickBillingAutomation';
 import { useDataFetch } from '../hooks/useDataFetch';
 import { useCompany } from '../context/CompanyContext';
 import { apiClient } from '../services/apiClient';
@@ -38,6 +40,9 @@ const ClockDisplay: React.FC = () => {
 
 const TallyVoucherEntry: React.FC<VoucherEntryProps> = ({ initialType = 'Sales', onClose, onSuccess, initialItems, editingInvoice }) => {
   const { containerRef, mode } = usePOSLayout();
+
+  // ── Quick Billing Automation ──────────────────────────────────────────────
+  const automation = useQuickBillingAutomation();
   const isCompact = mode === 'compact';
   const { company } = useCompany();
   const { posState, setPosState, posBillState, setPosBillState, clearPosBillState } = useAppStore();
@@ -538,20 +543,22 @@ const TallyVoucherEntry: React.FC<VoucherEntryProps> = ({ initialType = 'Sales',
   const getPurchaseRate = (product: any, batch?: any) => Number(batch?.purchase_rate || product?.purchase_rate || 0);
 
   const applyProductToRow = (index: number, product: any, batch?: any) => {
-    const rate = voucherType === 'Purchase' ? getPurchaseRate(product, batch) : getSellingRate(product, batch);
+    // Auto-FEFO: if no batch provided and autoFefo is on, pick best batch automatically
+    const resolvedBatch = batch ?? automation.pickBatch(product);
+    const rate = voucherType === 'Purchase' ? getPurchaseRate(product, resolvedBatch) : getSellingRate(product, resolvedBatch);
     const newItems = [...items];
     newItems[index] = {
       ...newItems[index],
       name: product.name,
       product_id: product.id,
-      batch_id: batch?.id || '',
-      batchNumber: getBatchNo(batch),
-      expiryDate: batch?.expiry_date || '',
-      mrp: Number(batch?.mrp || product.mrp || rate || 0),
+      batch_id: resolvedBatch?.id || '',
+      batchNumber: getBatchNo(resolvedBatch),
+      expiryDate: resolvedBatch?.expiry_date || '',
+      mrp: Number(resolvedBatch?.mrp || product.mrp || rate || 0),
       rate: String(rate || ''),
-      purchaseRate: getPurchaseRate(product, batch),
+      purchaseRate: getPurchaseRate(product, resolvedBatch),
       gstPercent: product.gst || product.gst_percent || 0,
-      stockAvailable: batch?.stock || product.current_stock || 0,
+      stockAvailable: resolvedBatch?.stock || product.current_stock || 0,
       quantity: newItems[index].quantity || '1'
     };
     newItems[index].amount = (parseFloat(newItems[index].quantity) || 1) * (parseFloat(newItems[index].rate) || 0);
@@ -559,6 +566,10 @@ const TallyVoucherEntry: React.FC<VoucherEntryProps> = ({ initialType = 'Sales',
       newItems.push({ name: '', quantity: '', rate: '', amount: 0, stockAvailable: 0, mrp: 0, gstPercent: 0, discPercent: '0.00' });
     }
     setItems(newItems);
+    // Track recently used product
+    automation.trackProduct(product);
+    // Auto-advance focus to quantity field of this row
+    automation.advanceToNextRow(index - 1);
   };
 
   const handleScanSubmit = (e: React.FormEvent) => {

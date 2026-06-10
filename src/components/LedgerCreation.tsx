@@ -224,10 +224,8 @@ const LedgerCreation: React.FC = () => {
 
  setLoading(true);
  try {
- const finalData = {
- ...formData,
- accountCode: formData.accountCode || `ACC-${Date.now().toString().slice(-6)}`
- };
+ // accountCode is optional — backend auto-generates ACC-XXXX if omitted
+ const finalData = { ...formData };
 
  await ChartOfAccountsService.createAccount(finalData as any);
  notifyAccounting('Success', `Ledger "${formData.accountName}" created successfully`, 'success');

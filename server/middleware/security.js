@@ -73,7 +73,7 @@ const corsMiddleware = cors({
 // Global rate limiter (all requests)
 const globalLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 500, // Increased to 500 for dev/dashboard
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 5000, // High limit for dev
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true, // Return rate limit info in RateLimit-* headers
   legacyHeaders: false, // Disable X-RateLimit-* headers
@@ -82,7 +82,8 @@ const globalLimiter = rateLimit({
     return req.user?.id || req.ip;
   },
   skip: (req, res) => {
-    // Skip rate limiting for health checks and localhost
+    // Skip rate limiting for health checks, localhost, and in development
+    if (process.env.NODE_ENV === 'development') return true;
     return req.path === '/health' || req.ip === '::1' || req.ip === '127.0.0.1' || req.ip.includes('localhost');
   },
   handler: (req, res) => {

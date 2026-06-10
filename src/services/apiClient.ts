@@ -141,6 +141,12 @@ class APIClient {
   ): Promise<T> {
     const { skipAuth = false, retry = 0, ...fetchOptions } = options;
     
+    // Ensure we have latest tokens from storage (in case updated by AuthContext)
+    if (!skipAuth) {
+      this.accessToken = localStorage.getItem('accessToken');
+      this.refreshToken = localStorage.getItem('refreshToken');
+    }
+
     // Construct URL robustly to avoid double /api/
     let url = endpoint.startsWith(API_BASE_URL) 
       ? endpoint 
@@ -148,7 +154,9 @@ class APIClient {
     if (url.includes('/api/api/')) {
       url = url.replace('/api/api/', '/api/');
     }
-    
+
+    console.log(`[API] Calling: ${url} (Original: ${endpoint})`);
+
     const headers = new Headers(fetchOptions.headers || {});
 
     // Add authorization header if not skipped
@@ -166,11 +174,16 @@ class APIClient {
 
     headers.set('Content-Type', 'application/json');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
     try {
       const response = await fetch(url, {
         ...fetchOptions,
         headers,
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       // Handle 401 - token expired or invalid
       if (response.status === 401 && !skipAuth && retry < 1) {

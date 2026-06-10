@@ -28,26 +28,32 @@ const Documents: React.FC = () => {
  `/api/dms?search=${searchTerm}&category=${selectedCategory}&status=${selectedStatus}`
  );
  const { data: statsResponse } = useDataFetch('/api/dms/stats');
+ const { data: versionsResponse } = useDataFetch('/api/dms/versions');
 
  const documents = dmsResponse?.data || [];
  const stats = statsResponse?.data || { total: 0, active: 0, expiring: 0, draft: 0, pending: 0 };
+ const documentVersions: DocumentVersion[] = (versionsResponse?.data || []).map((v: any) => ({
+   id: String(v.id),
+   documentId: v.documentId,
+   title: v.title,
+   version: (v.version || '').replace(/^v/, ''),
+   fileUrl: '',
+   fileSize: Number(v.fileSize) || 0,
+   uploadedBy: v.uploadedBy || '—',
+   uploadDate: v.uploadDate ? new Date(v.uploadDate).toISOString().slice(0, 10) : '—',
+   changeLog: v.changeLog || '',
+   approvedBy: v.approvedBy || '',
+   approvalDate: v.approvalDate || '',
+   status: v.status || 'Previous',
+ }));
 
  const [sortBy, setSortBy] = useState<'title' | 'uploadDate' | 'version' | 'size'>('title');
  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
  const [showUploadModal, setShowUploadModal] = useState(false);
  const [selectedDocument, setSelectedDocument] = useState<DocRecord | null>(null);
  const [showPreviewModal, setShowPreviewModal] = useState(false);
- 
- // Mock data for other tabs
- const [documentVersions] = useState<DocumentVersion[]>([
- { id: 'VER-001', documentId: 'DOC-001', version: '2.1', title: 'SOP for Tablet Compression', fileUrl: '/documents/doc-001-v2.1.pdf', fileSize: 2400000, uploadedBy: 'Dr. R. Singh', uploadDate: '2023-10-15', changeLog: 'Updated compression parameters and quality checks', approvedBy: 'Quality Head', approvalDate: '2023-10-16', status: 'Current' },
- { id: 'VER-002', documentId: 'DOC-001', version: '2.0', title: 'SOP for Tablet Compression', fileUrl: '/documents/doc-001-v2.0.pdf', fileSize: 2300000, uploadedBy: 'Dr. R. Singh', uploadDate: '2023-08-20', changeLog: 'Revised equipment specifications', approvedBy: 'Quality Head', approvalDate: '2023-08-22', status: 'Previous' },
- { id: 'VER-003', documentId: 'DOC-001', version: '1.0', title: 'SOP for Tablet Compression', fileUrl: '/documents/doc-001-v1.0.pdf', fileSize: 2100000, uploadedBy: 'Dr. R. Singh', uploadDate: '2023-05-10', changeLog: 'Initial version with basic compression guidelines', approvedBy: 'Quality Head', approvalDate: '2023-05-12', status: 'Archived' },
- { id: 'VER-004', documentId: 'DOC-007', version: '1.2', title: 'Equipment Validation Protocol', fileUrl: '/documents/doc-007-v1.2.pdf', fileSize: 3100000, uploadedBy: 'Validation Team', uploadDate: '2023-07-15', changeLog: 'Added validation criteria for new tablet press machine', approvedBy: 'Validation Manager', approvalDate: '2023-07-18', status: 'Current' },
- { id: 'VER-005', documentId: 'DOC-007', version: '1.1', title: 'Equipment Validation Protocol', fileUrl: '/documents/doc-007-v1.1.pdf', fileSize: 2900000, uploadedBy: 'Validation Team', uploadDate: '2023-04-22', changeLog: 'Updated validation procedures for HVAC systems', approvedBy: 'Validation Manager', approvalDate: '2023-04-25', status: 'Previous' },
- { id: 'VER-006', documentId: 'DOC-009', version: '2.0', title: 'GMP Training Manual', fileUrl: '/documents/doc-009-v2.0.pdf', fileSize: 5200000, uploadedBy: 'Training Manager', uploadDate: '2023-06-20', changeLog: 'Revised for 2023 regulatory updates and new training modules', approvedBy: 'QA Head', approvalDate: '2023-06-25', status: 'Current' },
- { id: 'VER-007', documentId: 'DOC-010', version: '3.1', title: 'Material Safety Data Sheet - API', fileUrl: '/documents/doc-010-v3.1.pdf', fileSize: 1500000, uploadedBy: 'QC Department', uploadDate: '2023-09-30', changeLog: 'Updated with latest toxicological data and exposure limits', approvedBy: 'QC Manager', approvalDate: '2023-10-02', status: 'Current' }
- ]);
+ const [selectedFile, setSelectedFile] = useState<File | null>(null);
+ const [isUploading, setIsUploading] = useState(false);
  
  const [workflows] = useState<DocumentWorkflow[]>([
  { id: 'WF-001', documentId: 'DOC-005', documentTitle: 'Employee Hygiene Policy', currentStep: 'Review', assignedTo: 'HR Manager', dueDate: '2023-11-15', comments: [], status: 'In Progress', createdAt: '2023-09-12', updatedAt: '2023-10-20' },
@@ -73,12 +79,14 @@ const Documents: React.FC = () => {
  ]);
 
  // New Document Form State
- const [newDoc, setNewDoc] = useState<Partial<DocRecord>>({
+ const [newDoc, setNewDoc] = useState<Partial<DocRecord & { docType: string }>>({
  title: '',
  category: 'SOP',
+ docType: 'PDF',
  version: '1.0',
  status: 'Active',
- expiryDate: ''
+ expiryDate: '',
+ description: ''
  });
 
  // Filter Logic
@@ -123,18 +131,86 @@ const Documents: React.FC = () => {
  const storageUsed = '13.5 GB'; // Mock value
 
  // Actions
- const handleDelete = (id: string) => {
- if(window.confirm('Are you sure you want to delete this document?')) {
- // Integration with DELETE /api/dms/:id would go here
- alert('Delete functionality integrated with backend');
+ const [isDragging, setIsDragging] = useState(false);
+
+ const handleDrag = (e: React.DragEvent) => {
+   e.preventDefault();
+   e.stopPropagation();
+   if (e.type === 'dragenter' || e.type === 'dragover') {
+     setIsDragging(true);
+   } else if (e.type === 'dragleave') {
+     setIsDragging(false);
+   }
+ };
+
+ const handleDrop = (e: React.DragEvent) => {
+   e.preventDefault();
+   e.stopPropagation();
+   setIsDragging(false);
+   if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+     setSelectedFile(e.dataTransfer.files[0]);
+   }
+ };
+
+ const handleDelete = async (id: string) => {
+ if (!window.confirm('Are you sure you want to delete this document?')) return;
+ try {
+ const res = await fetch(`/api/dms/${id}`, {
+ method: 'DELETE',
+ headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}` }
+ });
+ const data = await res.json();
+ if (res.ok) {
+ refetch();
+ } else {
+ alert(data.error || 'Failed to delete document');
+ }
+ } catch {
+ alert('Network error while deleting document');
  }
  };
 
- const handleUpload = (e: React.FormEvent) => {
+ const handleUpload = async (e: React.FormEvent) => {
  e.preventDefault();
- // Integration with POST /api/dms would go here
- alert('Upload functionality integrated with backend');
+ if (!selectedFile) {
+ alert('Please select a file to upload');
+ return;
+ }
+
+ setIsUploading(true);
+ try {
+ const formData = new FormData();
+ formData.append('file', selectedFile);
+ formData.append('title', newDoc.title || '');
+ formData.append('category', newDoc.category || 'SOP');
+ formData.append('type', newDoc.docType || 'PDF');
+ formData.append('version', newDoc.version || '1.0');
+ formData.append('status', newDoc.status || 'Active');
+ formData.append('expiryDate', newDoc.expiryDate || '');
+ formData.append('description', newDoc.description || '');
+
+ const res = await fetch('/api/dms', {
+ method: 'POST',
+ headers: {
+ 'Authorization': `Bearer ${localStorage.getItem('accessToken') || localStorage.getItem('token')}`
+ },
+ body: formData
+ });
+
+ const data = await res.json();
+ if (res.ok) {
  setShowUploadModal(false);
+ setNewDoc({ title: '', category: 'SOP', docType: 'PDF', version: '1.0', status: 'Active', expiryDate: '', description: '' });
+ setSelectedFile(null);
+ refetch();
+ } else {
+ alert(data.error || 'Failed to save document');
+ }
+ } catch {
+ alert('Network error while saving document');
+ } finally {
+ setIsUploading(false);
+ }
  };
 
  const getFileIcon = (type: string) => {
@@ -164,8 +240,25 @@ const Documents: React.FC = () => {
  };
 
  const handleDownload = (doc: DocRecord) => {
- // Mock download functionality
- alert(`Downloading ${doc.title}`);
+ // Documents are stored as metadata only (no file binary in DB).
+ // Trigger a download of document info as a text file instead.
+ const content = [
+ `Document: ${doc.title}`,
+ `ID: ${doc.id}`,
+ `Category: ${doc.category}`,
+ `Version: v${doc.version}`,
+ `Status: ${doc.status}`,
+ `Author: ${doc.author}`,
+ `Upload Date: ${doc.uploadDate}`,
+ doc.expiryDate ? `Expiry Date: ${doc.expiryDate}` : ''
+ ].filter(Boolean).join('\n');
+ const blob = new Blob([content], { type: 'text/plain' });
+ const url = URL.createObjectURL(blob);
+ const a = document.createElement('a');
+ a.href = url;
+ a.download = `${doc.id}_${doc.title.replace(/[^a-zA-Z0-9]/g, '_')}.txt`;
+ a.click();
+ URL.revokeObjectURL(url);
  };
 
  const getCategoryIcon = (category: string) => {
@@ -1613,21 +1706,48 @@ const Documents: React.FC = () => {
  <button onClick={() => setShowUploadModal(false)} className="hover:bg-slate-700 p-1 rounded"><X size={18}/></button>
  </div>
  <form onSubmit={handleUpload} className="p-6 space-y-4">
- <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer">
- <Upload size={32} className="mx-auto text-slate-400 mb-2"/>
- <p className="text-sm font-medium text-slate-600">Click to browse or drag file here</p>
- <p className="text-xs text-slate-400 mt-1">PDF, DOCX, JPG up to 10MB</p>
+ <div 
+   onDragEnter={handleDrag}
+   onDragOver={handleDrag}
+   onDragLeave={handleDrag}
+   onDrop={handleDrop}
+   onClick={() => document.getElementById('doc-file-input')?.click()}
+   className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+     isDragging ? 'border-primary bg-primary/10 scale-[1.02]' : 
+     selectedFile ? 'border-primary bg-primary/5' : 
+     'border-slate-300 bg-slate-50 hover:bg-slate-100'
+   }`}
+ >
+ <input 
+ id="doc-file-input"
+ type="file" 
+ className="hidden" 
+ onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+ />
+ <Upload size={32} className={`mx-auto mb-2 ${isDragging || selectedFile ? 'text-primary' : 'text-slate-400'}`}/>
+ {selectedFile ? (
+ <div>
+ <p className="text-sm font-bold text-slate-800">{selectedFile.name}</p>
+ <p className="text-xs text-slate-500 mt-1">{(selectedFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+ <p className="text-[10px] text-primary font-bold mt-2 uppercase tracking-wider underline">Click to change file</p>
+ </div>
+ ) : (
+ <>
+ <p className="text-sm font-medium text-slate-600">{isDragging ? 'Drop file now' : 'Click to browse or drag file here'}</p>
+ <p className="text-xs text-slate-400 mt-1">PDF, DOCX, JPG, XLSX, PPTX up to 50MB</p>
+ </>
+ )}
  </div>
 
  <div>
- <label className="block text-sm font-medium text-slate-700 mb-1">Document Title</label>
- <input required type="text" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. SOP for Packaging" value={newDoc.title} onChange={e => setNewDoc({...newDoc, title: e.target.value})} />
+ <label className="block text-sm font-medium text-slate-700 mb-1">Document Title *</label>
+ <input required type="text" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. SOP for Packaging Process" value={newDoc.title} onChange={e => setNewDoc({...newDoc, title: e.target.value})} />
  </div>
 
  <div className="grid grid-cols-2 gap-4">
  <div>
- <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
- <select className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary bg-white" value={newDoc.category} onChange={e => setNewDoc({...newDoc, category: e.target.value as any})}>
+ <label className="block text-sm font-medium text-slate-700 mb-1">Category *</label>
+ <select required className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary bg-white" value={newDoc.category} onChange={e => setNewDoc({...newDoc, category: e.target.value as any})}>
  <option value="SOP">SOP</option>
  <option value="License">License</option>
  <option value="Report">Report</option>
@@ -1637,15 +1757,21 @@ const Documents: React.FC = () => {
  </select>
  </div>
  <div>
- <label className="block text-sm font-medium text-slate-700 mb-1">Version</label>
- <input type="text" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary" value={newDoc.version} onChange={e => setNewDoc({...newDoc, version: e.target.value})} />
+ <label className="block text-sm font-medium text-slate-700 mb-1">Document Type</label>
+ <select className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary bg-white" value={newDoc.docType} onChange={e => setNewDoc({...newDoc, docType: e.target.value})}>
+ <option value="PDF">PDF</option>
+ <option value="DOCX">DOCX</option>
+ <option value="XLSX">XLSX</option>
+ <option value="PPTX">PPTX</option>
+ <option value="JPG">JPG/Image</option>
+ </select>
  </div>
  </div>
 
  <div className="grid grid-cols-2 gap-4">
  <div>
- <label className="block text-sm font-medium text-slate-700 mb-1">Expiry Date (Optional)</label>
- <input type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary" value={newDoc.expiryDate} onChange={e => setNewDoc({...newDoc, expiryDate: e.target.value})} />
+ <label className="block text-sm font-medium text-slate-700 mb-1">Version</label>
+ <input type="text" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary" value={newDoc.version} onChange={e => setNewDoc({...newDoc, version: e.target.value})} />
  </div>
  <div>
  <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
@@ -1657,10 +1783,21 @@ const Documents: React.FC = () => {
  </div>
  </div>
 
+ <div>
+ <label className="block text-sm font-medium text-slate-700 mb-1">Expiry Date (Optional)</label>
+ <input type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary" value={newDoc.expiryDate} onChange={e => setNewDoc({...newDoc, expiryDate: e.target.value})} />
+ </div>
+
+ <div>
+ <label className="block text-sm font-medium text-slate-700 mb-1">Description (Optional)</label>
+ <textarea rows={2} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary" placeholder="Brief description of the document..." value={newDoc.description} onChange={e => setNewDoc({...newDoc, description: e.target.value})} />
+ </div>
+
  <div className="pt-2 flex justify-end gap-3">
- <button type="button" onClick={() => setShowUploadModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
- <button type="submit" className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-sky-600 text-sm flex items-center gap-2">
- <FileCheck size={16}/> Save Document
+ <button type="button" onClick={() => { setShowUploadModal(false); setSelectedFile(null); }} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
+ <button type="submit" disabled={isUploading} className="px-4 py-2 bg-primary text-white font-medium rounded-lg hover:bg-sky-600 text-sm flex items-center gap-2 disabled:opacity-50">
+ {isUploading ? <RefreshCw className="animate-spin" size={16}/> : <FileCheck size={16}/>}
+ {isUploading ? 'Uploading...' : 'Save Document'}
  </button>
  </div>
  </form>

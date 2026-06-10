@@ -151,6 +151,37 @@ router.get('/dropdown', async (req, res) => {
 });
 
 /**
+ * GET /api/logistics/stats
+ * Fetch aggregate statistics for dispatches
+ */
+router.get('/stats', async (req, res) => {
+  try {
+    const totalQuery = 'SELECT COUNT(*) as "totalDispatches", SUM(shipping_cost) as "totalRevenue" FROM dispatches';
+    const deliveredQuery = "SELECT COUNT(*) as count FROM dispatches WHERE status = 'Delivered'";
+    const pendingQuery = "SELECT COUNT(*) as count FROM dispatches WHERE status NOT IN ('Delivered', 'Cancelled', 'Returned')";
+    
+    const [totalRes, deliveredRes, pendingRes] = await Promise.all([
+      db.query(totalQuery),
+      db.query(deliveredQuery),
+      db.query(pendingQuery)
+    ]);
+    
+    res.json({
+      success: true,
+      data: {
+        totalDispatches: parseInt(totalRes.rows[0].totalDispatches || 0),
+        deliveredCount: parseInt(deliveredRes.rows[0].count || 0),
+        pendingCount: parseInt(pendingRes.rows[0].count || 0),
+        totalRevenue: parseFloat(totalRes.rows[0].totalRevenue || 0)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching logistics stats:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * GET /api/logistics/:id
  */
 router.get('/:id', async (req, res, next) => {
@@ -179,7 +210,10 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', async (req, res) => {
   try {
     const data = req.body;
-    const totalCharges = (Number(data.shippingCost) || 0) + (Number(data.handlingCharges) || 0);
+    if (!(data.invoice_no || data.invoiceNo) || !(data.customer_name || data.customerName)) {
+      return res.status(400).json({ success: false, error: 'Required fields missing: invoice_no and customer_name' });
+    }
+    const totalCharges = (Number(data.shipping_cost || data.shippingCost) || 0) + (Number(data.handling_charges || data.handlingCharges) || 0);
 
     const query = `
       INSERT INTO dispatches (
@@ -195,12 +229,37 @@ router.post('/', async (req, res) => {
     `;
 
     const result = await db.query(query, [
-      data.invoiceNo, data.customerName, data.customerAddress, data.customerCity, data.customerState, data.customerPincode,
-      data.dispatchDate || new Date(), data.expectedDeliveryDate, data.transporter, data.transporterId, data.lrNumber,
-      data.ewayBillNo, data.ewayBillDate, data.boxes || 1, data.weight, data.volume, data.packageType || 'Box',
-      data.fragile || false, data.temperatureControlled || false, data.insuranceValue || 0, data.insuranceCompany,
-      data.codAmount || 0, data.shippingCost || 0, data.handlingCharges || 0, totalCharges, data.paymentMode || 'Prepaid',
-      data.status || 'Packed', data.vehicleNumber, data.driverName, data.driverContact, data.routeDetails,
+      data.invoice_no || data.invoiceNo,
+      data.customer_name || data.customerName,
+      data.customer_address || data.customerAddress,
+      data.customer_city || data.customerCity,
+      data.customer_state || data.customerState,
+      data.customer_pincode || data.customerPincode,
+      data.dispatch_date || data.dispatchDate || new Date(),
+      data.expected_delivery_date || data.expectedDeliveryDate,
+      data.transporter,
+      data.transporter_id || data.transporterId,
+      data.lr_number || data.lrNumber,
+      data.eway_bill_no || data.ewayBillNo,
+      data.eway_bill_date || data.ewayBillDate,
+      data.boxes || 1,
+      data.weight,
+      data.volume,
+      data.package_type || data.packageType || 'Box',
+      data.fragile || false,
+      data.temperature_controlled || data.temperatureControlled || false,
+      data.insurance_value || data.insuranceValue || 0,
+      data.insurance_company || data.insuranceCompany,
+      data.cod_amount || data.codAmount || 0,
+      data.shipping_cost || data.shippingCost || 0,
+      data.handling_charges || data.handlingCharges || 0,
+      totalCharges,
+      data.payment_mode || data.paymentMode || 'Prepaid',
+      data.status || 'Packed',
+      data.vehicle_number || data.vehicleNumber,
+      data.driver_name || data.driverName,
+      data.driver_contact || data.driverContact,
+      data.route_details || data.routeDetails,
       req.user.username, req.user.username
     ]);
 

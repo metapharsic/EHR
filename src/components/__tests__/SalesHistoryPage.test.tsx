@@ -72,9 +72,9 @@ const MOCK_DETAIL = {
 
 const setupMocks = (overrides: any = {}) => {
   mockGet.mockImplementation((url: string) => {
-    if (url.includes('/stats')) return Promise.resolve({ data: { success: true, data: overrides.stats ?? MOCK_STATS } });
-    if (url.includes('/invoices/inv-001')) return Promise.resolve({ data: { success: true, data: MOCK_DETAIL } });
-    return Promise.resolve({ data: { success: true, data: overrides.invoices ?? MOCK_INVOICES, total: overrides.total ?? MOCK_INVOICES.length, page: 0, limit: 50 } });
+    if (url.includes('/stats')) return Promise.resolve({ success: true, data: overrides.stats ?? MOCK_STATS });
+    if (url.includes('/invoices/inv-001')) return Promise.resolve({ success: true, data: MOCK_DETAIL });
+    return Promise.resolve({ success: true, data: overrides.invoices ?? MOCK_INVOICES, total: overrides.total ?? MOCK_INVOICES.length, page: 0, limit: 50 });
   });
 };
 
@@ -452,7 +452,7 @@ describe('SalesHistoryPage', () => {
     it('still renders when stats endpoint fails (Promise.allSettled)', async () => {
       mockGet.mockImplementation((url: string) => {
         if (url.includes('/stats')) return Promise.reject(new Error('Stats failed'));
-        return Promise.resolve({ data: { success: true, data: MOCK_INVOICES, total: 3, page: 0, limit: 50 } });
+        return Promise.resolve({ success: true, data: MOCK_INVOICES, total: 3, page: 0, limit: 50 });
       });
       render(<SalesHistoryPage />);
       await waitFor(() => {
