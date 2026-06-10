@@ -1,758 +1,113 @@
-# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v5.0
-# MAXIMUM AUTOMATION | ZERO ORPHANED WORKFLOWS | REAL DATA ONLY
-# Last updated: 2026-06-02
+# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v6.0
+# MAXIMUM AUTOMATION | ZERO ORPHANED WORKFLOWS | PRODUCTION-FIRST DATA
+# Last updated: 2026-06-11
 
-You are an expert full-stack developer working on two interconnected systems:
-1. **Metapharsic ERP** (`C:\ERP_3152026\`) — React 19 + Vite/TS frontend, Node.js/Express CJS backend, PostgreSQL
-2. **Metapharsic MR Tracker** (`/u01/apps/Metapharsic_MrTracker/`) — React + Vite/TS frontend, Express ESM backend, PostgreSQL
-
-> **Local-first workflow**: All edits happen locally first. Deploy to VPS (187.127.169.217) only after local tests pass.
-> **Both apps share the same VPS** and must stay in sync with each other.
+You are an expert full-stack developer managing two interconnected pharmaceutical enterprise systems.
 
 ---
 
-## 1. Project Architecture & Tech Stack (STRICT)
+## 1. Technical Stack & Environment (STRICT)
 
 ### ERP System (`C:\ERP_3152026\`)
-- **Frontend**: React 19 + Vite (TypeScript), Tailwind CSS v4, Lucide Icons, Zustand
-- **Backend**: Node.js + Express (CommonJS — `"type":"module"` is NOT set here), raw SQL via `pg` pool
-- **DB**: PostgreSQL — `metapharsic_erp`, user: `erp_user`, password: `Metapharsic@ERP2026!`, host: `localhost`
-- **API Client**: `src/services/apiClient.ts` (Auto-injects JWT Bearer token)
-- **Auth**: JWT — `server/utils/jwt.js` exports `verifyTokenMiddleware`, `verifyRoleMiddleware`, `verify2FAMiddleware`
-- **AI**: Google Gemini `gemini-1.5-flash` — always provide heuristic fallback when `GEMINI_API_KEY` is unset
+- **Frontend**: React 19 + Vite/TS, Tailwind CSS v4, Zustand, Lucide Icons.
+- **Backend**: Node.js + Express (CommonJS). **Note**: `"type": "module"` is NOT set in root `package.json`.
+- **Database**: PostgreSQL (`metapharsic_erp`). User: `erp_user` / `Metapharsic@ERP2026!`.
+- **Auth**: JWT-based. `admin` / `Admin@1234` is the master bypass for troubleshooting.
+- **Deployment**:
+  - **VPS IP**: `187.127.169.217` (root access).
+  - **Domain**: `erp.metapharsic.cloud` (Proxied via Nginx to local port **3002**).
+  - **PM2**: Managed via `pm2.config.cjs`. Always use `.cjs` due to ESM/CJS mix in the workspace.
+  - **Sync**: Local-first development. Deploy via GitHub `master` branch + `git pull` on VPS.
 
 ### MR Tracker (`/u01/apps/Metapharsic_MrTracker/`)
-- **Frontend**: React + Vite (TypeScript), Tailwind CSS, Framer Motion (`motion/react`), Lucide Icons
-- **Backend**: Node.js + Express (ESM — `"type":"module"` IS set), TypeScript compiled
-- **DB**: PostgreSQL — `metaphysic_crm`, user: `metaphysic_user`, password: `Metapharsic2026!Secure`, host: `localhost`
-- **DB module**: `src/database/db.ts` — exports `testConnection`, `query`, `repositories`
-- **Fallback**: In-memory `data` object when DB is unavailable (`dbReady === false`)
-- **Auth**: `x-user-email` header resolved to user from DB/memory; role-based access
-- **AI**: Google Gemini API (`@google/genai`) — Gemini service in `src/services/geminiService.ts`
-
-### CRITICAL: In-Memory vs DB Mode
-The MR Tracker has two execution paths:
-- **DB path** (`dbReady && db`): Queries `metaphysic_crm` PostgreSQL via `db.repositories.*`
-- **In-memory path** (fallback): Uses `const data = { mrs, doctors, pharmacies, hospitals, visit_schedules, ... }`
-- **Seed dates are evaluated at SERVER START TIME** — never compute "today/yesterday/lastWeek" in IIFE seed objects. Always compute relative dates at REQUEST TIME inside the endpoint handler.
+- **Frontend**: React + Vite/TS, Tailwind CSS, Framer Motion.
+- **Backend**: Node.js + Express (ESM). **Note**: `"type": "module"` IS set here.
+- **Database**: PostgreSQL (`metaphysic_crm`). User: `metaphysic_user`.
+- **Hybrid Path**: Implements "DB-first, Memory-fallback" logic. If DB fails, use `src/database/seed_data.ts`.
 
 ---
 
-## 2. Directory Structure Conventions
+## 2. Core Architectural Mandates
 
-### ERP
-```
-server/routes/*.js          — Express route handlers (CommonJS)
-server/utils/               — logger, jwt, ledgerHelper, hrPayrollEngine
-server/migrations/*.sql     — Idempotent SQL (always IF NOT EXISTS)
-server/__tests__/           — Integration tests (Vitest + Supertest)
-server/routes/__tests__/    — Route-level unit tests
-src/components/             — React components
-src/components/__tests__/   — UI tests (Vitest + RTL)
-src/services/               — API client integration layer
-src/services/__tests__/     — Service unit tests
-e2e/                        — Playwright E2E tests
-```
-
-### MR Tracker
-```
-server.ts                   — Single-file Express server (ESM + TypeScript)
-src/components/             — React components (lazy-loaded)
-src/components/__tests__/   — UI tests (Vitest + RTL)
-src/services/api.ts         — Typed REST client (namespaced: api.performance, api.visits, ...)
-src/database/db.ts          — PostgreSQL pool + repositories
-src/database/*.sql          — Migration & backfill SQL files
-src/types.ts                — Shared TypeScript types
-e2e/                        — Playwright E2E tests
-```
+1. **Local-First Workflow**: All edits happen locally first. Deploy to VPS only after local verification.
+2. **Schema Infallibility**: All DB changes MUST be reflected in `server/schema.sql` (Master) AND idempotent migration files (`server/migrations/*.sql`).
+3. **Cross-App Sync**:
+   - ERP `medical_representatives` → authoritative source for MR Master.
+   - MR Tracker `visit_schedules` → authoritative source for field activity.
+   - ERP `pcd_transactions` → authoritative source for financial achievement.
+4. **AI Integration**: Google Gemini `gemini-1.5-flash`. Always provide heuristic fallbacks for offline/no-key modes.
 
 ---
 
-## 3. Mandatory UI, Dropdown, and Button Checklist
+## 3. Database Master Schema & Invariants
 
-### A. Dropdown & Select Inputs
-1. **Dynamic Loading**: Show `(Loading...)` or spinner while fetching. Never show stale/empty dropdowns.
-2. **Fallback & Empty States**: If API returns 0 items → explicit "No options available" with action hint.
-3. **Placeholders**: First `<option value="">` must be non-selectable prompt.
-4. **Error Boundaries**: On API failure → red border + inline alert + fallback to hardcoded baseline.
+### A. Critical Table Naming (STRICT)
+- **CRM**: Tables are `leads` and `lead_activities`. Backward-compatibility views `crm_leads` and `crm_activities` exist for older scripts.
+- **OMS**: Tables are `orders`, `order_items`, `order_status_history`, `reserved_stock`, `order_returns`.
+- **Finance**: Tables are `chart_of_accounts`, `journal_vouchers`, `journal_voucher_entries`, `general_ledger`.
+- **Inventory**: Tables are `products`, `batches`, `godowns`, `stock_ledger_entries`.
 
-### B. Form Validation & Interactive Fields
-1. **Real-time Validation**: `onChange`/`onBlur` — email regex, 10-digit phone, GSTIN format, date ranges.
-2. **Entity Consistency**: Selecting an Employee auto-populates salary, department, territory.
-3. **Explicit Boundary Errors**: `<p className="text-red-500 text-xs mt-1">...</p>` under each invalid field.
+### B. Mandatory Columns (Commonly Missed)
+- **`users`**: `risk_score`, `last_device_fingerprint`, `company_id`, `reset_token`, `reset_token_expires`.
+- **`products`**: `is_active`, `maintain_batches`, `track_expiry`, `current_stock`, `opening_stock`, `selling_rate`, `mrp`.
+- **`parties`**: `company_id`, `current_balance`, `type` (Debtor/Creditor).
+- **`chart_of_accounts`**: `company_id`, `is_bank_or_cash`, `tds_applicable`.
 
-### C. Buttons & Saving
-1. **Loading State**: Button text → `Saving...` + `animate-spin` icon while `isLoading`.
-2. **Strict Disabled**: Disabled when `isLoading === true` OR form has errors OR required fields empty.
-3. **Double-Submit Prevention**: Disable at start of handler, re-enable only after resolve/reject.
-4. **Notifications**: Always `addNotification('...', 'success')` on OK; `addNotification(err.message, 'error')` on failure.
-
-### D. Contextual Synchronization & Automation
-1. **Cross-tab sync**: Entity selected in one tab auto-syncs to all other tabs in the same module.
-2. **Context Persistence**: Use Zustand or `useEffect` to maintain active entity across tab switches.
-3. **Smart Defaults**: If only one valid option exists, auto-select it.
-4. **Enhanced Search**: All entity selectors become searchable once list > 5 items.
+### C. Accounting Invariants
+1. **Balance Logic**:
+   - `current_balance = opening_balance` for Debit-normal (Asset/Expense).
+   - `current_balance = -opening_balance` for Credit-normal (Liability/Income/Equity).
+2. **Double Entry**: Every `journal_vouchers` must have matching total DR/CR in `journal_voucher_entries`.
+3. **Uniqueness**: `account_code` and `order_number` must be unique and auto-generated by the backend.
 
 ---
 
-## 4. ERP Cross-Module Integration Map
+## 4. Security & Authentication Rules
 
-| Source Module/Event | Target Module | Mechanism & Action |
-|---|---|---|
-| **Payroll Processing** | Accounts / GL | `ledgerHelper.processVoucher()` → `journal_vouchers` + GL debit/credit |
-| **Employee Exit Clearance** | CRM Leads | `UPDATE leads SET assigned_to = manager_id WHERE assigned_to = exiting_emp` |
-| **Employee Exit Clearance** | OMS Distributors | Reassign distributor account ownership |
-| **Asset Allocation** | Inventory Batches | `ledgerHelper.postToStockLedger(OUT)` + decrement `batches.stock` |
-| **Attendance Anomaly** | Compliance System | Log to `compliance_logs` |
-| **PCD Sales Target Match** | Commission Engine | `pcdService` updates PCD partner ledger on order invoice |
-| **POS Checkout** | Stock Ledger + GL | FEFO batch decrement + Cash/UPI invoice to accounts |
-| **MR Visit Completed** | MR Tracker Metrics | Increment `entities_reached` + recalc `conversion_rate` for the month |
-| **PCD Transaction Created** | Dashboard MR Stats | `pcd_transactions` → `total_sales` + `target_achievement` via `/api/pcd/mrs` |
+1. **Admin Credentials**: Default production admin is `admin` / `Admin@1234`. Account must be `is_active = TRUE`.
+2. **JWT Middleware**: `verifyTokenMiddleware` must be applied to all `/api/*` routes except `/api/auth/login` and `/api/auth/register`.
+3. **Password Policy**: Minimum 8 characters, 1 uppercase, 1 special char. Enforced in `authController.js`.
+4. **Sensitive Data**: Never return `password_hash`, `totp_secret`, or `reset_token` in API responses.
 
 ---
 
-## 5. MR Tracker — Performance Dashboard Rules (MANDATORY)
+## 5. UI/UX & Interaction Standards
 
-### A. Date Computation — CRITICAL
-- **NEVER** compute `today/yesterday/lastWeek` as constants in an IIFE or module-level code. These are evaluated ONCE at server startup.
-- **ALWAYS** compute relative dates inside the REQUEST HANDLER using `new Date()` at call time.
-- **Correct pattern:**
-  ```typescript
-  app.get('/api/monthly-metrics', (req, res) => {
-    const now = new Date();                           // evaluated at request time ✓
-    const today = now.toISOString().split('T')[0];    // evaluated at request time ✓
-    ...
-  });
-  ```
-- **Wrong pattern:**
-  ```typescript
-  const data = { visit_schedules: (function() {
-    const today = new Date()...  // evaluated ONCE at startup — stale after midnight ✗
-  })() };
-  ```
+### A. Dropdowns & Selects
+- Show `(Loading...)` or spinner while fetching.
+- Use `<option value="">` as a non-selectable prompt.
+- If API returns 0 items → show "No [Entity] available".
 
-### B. Monthly Metrics Logic — CORRECT SEMANTICS
-- **"Reached"** = entity had ANY scheduled visit (pending OR completed) in the target month. Not just completed visits.
-  - Rationale: A pending visit still means the MR planned to reach that entity — that's coverage planning.
-- **"Completed"** = visit with `status === 'completed'` — used for actual achievement stats only.
-- **Conversion Rate** = `(unique entities visited this month / total entities in territory) × 100`
-- **Total Entities** = sum of active doctors + pharmacies + hospitals (not filtered by territory for overall metrics)
-- **Territory filter** for per-MR metrics: use case-insensitive `includes()` match on territory string, NOT exact equality.
+### B. Form Submission
+- **Loading State**: Buttons must show `Saving...` + spinner during transit.
+- **Strict Disable**: Disable button if `isLoading === true` OR form has validation errors.
+- **Success/Error**: Always use `addNotification()` context to provide feedback.
 
-### C. Hospital Count Fix
-- Always verify `data.hospitals` is populated before computing `total_hospitals`.
-- If DB path fails mid-execution, set `dbReady = false` and fall back to memory immediately — do NOT return partial DB data.
-- Log which path was used: `console.log('[Metrics] Using DB/memory path')`.
-
-### D. Net Profitability — Real Calculation Rules
-- Profitability must be computed from ACTUAL sales data (DB or in-memory sales array).
-- Formula: `net_profit = revenue - cogs - expenses`
-- Never show "This Month" profitability without a month filter matching the selected month picker value.
-- Load profitability data on component MOUNT — do NOT hide behind a toggle button.
-- The profitability section must show: Revenue, COGS, Gross Profit, Expenses, Net Profit, Net Margin %.
-
-### E. Sync with ERP PCD Module
-- MR performance data (`total_sales`, `target_achievement`) must come from two sources:
-  - **MR Tracker DB**: `visit_schedules` + `mr_performance` view
-  - **ERP DB**: `pcd_transactions` JOIN `medical_representatives` (via `/api/pcd/mrs`)
-- When both are available, ERP data takes precedence for financial metrics; MR Tracker takes precedence for visit/activity metrics.
-- The ERP dashboard widget uses `/api/pcd/mrs/stats` (NOT `/api/hr/performance`) for MR KPI banner.
-
-### F. Lead Tracking Integration
-- Leads from `LeadsManagement` component must be surfaced in `MRPerformanceDashboard`.
-- A "Pending Leads" count per MR is shown in the Rankings section.
-- A lead becomes "converted" when a scheduled visit results in a confirmed order.
-- Lead tracking sync: `POST /api/leads/:id/convert` → triggers visit creation + commission calculation.
-
-### G. Smart Scheduling Rules
-- Tier A entities (doctors/pharmacies/hospitals) must be visited at minimum TWICE per month.
-- If a Tier A entity has not been visited in > 14 days, flag as `priority_alert: true`.
-- AI scheduling suggestions must be based on: last visit date, tier, territory overlap, MR workload.
-- Manual schedule overrides AI suggestions but must provide a reason.
+### C. Dashboard Components
+- Use `Promise.allSettled` for parallel fetches (never `Promise.all`).
+- Dashboard widgets must be guarded by `visibleWidgets` settings.
+- Skeleton loaders preferred over full-page spinners.
 
 ---
 
-## 6. Complete Testing Blueprint (MANDATORY — ALL 4 TIERS)
+## 6. Testing & Verification Lifecycle (MANDATORY)
 
-Every functional block must have tests across ALL four tiers.
+Every feature MUST pass through the 4-Tier Testing Model:
 
-### Tier 1: Unit & Service Tests
-- **Location**: `src/services/__tests__/` or `server/__tests__/`
-- **Objective**: Pure calculations, utility functions, data transformations — NO DB/network
-- **Must test**: Date helper functions, territory matching, conversion rate formula, profitability calc
-- **Run**: `npx vitest run src/services/__tests__/someTest.test.ts`
+1. **Tier 1 (Unit)**: Logic in `utils/` or `services/`. (Vitest)
+2. **Tier 2 (Integration)**: Backend API endpoints with mocked JWT. (Vitest + Supertest)
+3. **Tier 3 (Component)**: React component UI states. (Vitest + RTL)
+4. **Tier 4 (E2E)**: Browser automation of full workflows. (Playwright)
 
-### Tier 2: Integration Tests (Backend API)
-- **Location**: `server/__tests__/` (ERP) or `src/database/__tests__/` (MR Tracker)
-- **Objective**: Full HTTP → Express → DB → response cycle
-- **Pattern**: Mock JWT middleware via require cache injection; use `afterAll` cleanup
-- **Must test**: `/api/monthly-metrics`, `/api/pcd/mrs`, `/api/pcd/mrs/stats`, profitability endpoint
-- **Run**: `npx vitest run server/__tests__/someIntegration.test.js`
-
-### Tier 3: Component (UI) Tests
-- **Location**: `src/components/__tests__/`
-- **Objective**: React renders, state transitions, widget visibility, loading/error states
-- **Pattern**: `vi.mock` all services inline (no top-level variable references), `waitFor` for async
-- **Must test**: All metric cards show correct values, widget toggle hides/shows sections, task CRUD
-- **Run**: `npx vitest run src/components/__tests__/someUI.test.tsx`
-
-### Tier 4: End-to-End (E2E) Tests
-- **Location**: `e2e/`
-- **Objective**: Full browser automation — login → navigate → assert real data
-- **Pattern**: Playwright with `page.request` for API assertions alongside visual assertions
-- **Must test**: Dashboard loads non-zero metrics, visit scheduling flow, MR filter/sort, profitability panel
-- **Run**: `npx playwright test`
+**Deployment Validation**: After every VPS deploy, run:
+`node server/seeds/seed-master-comprehensive.js` followed by `node server/seeds/seed-transactions.js` to ensure schema integrity.
 
 ---
 
-## 7. Strict "No-Misses" Verification Checklist
-
-Before submitting any change, confirm YES to ALL:
-1. Are ALL date computations inside request handlers (not module-level)?
-2. Are ALL database schema changes in idempotent `migrations/*.sql` files?
-3. Do ALL multi-step mutations use `BEGIN/COMMIT/ROLLBACK`?
-4. Do ALL forms disable buttons during network calls with spinner?
-5. Did you write/update tests in all applicable tiers?
-6. Does ALL AI fallback gracefully when `GEMINI_API_KEY` is absent?
-7. Are there zero hardcoded metrics, scores, or dates in the codebase?
-8. Does the in-memory fallback produce correct results for the CURRENT month?
-9. Are ERP ↔ MR Tracker sync points documented and tested?
-10. Is sensitive data (PAN, Aadhaar, bank accounts) filtered from AI responses?
-
----
-
-## 8. Automation & Event-Driven Rules (MANDATORY)
-
-### ERP Automations
-| Lifecycle Event | Required Automation | Implementation |
-|---|---|---|
-| **Employee Created** | Trigger onboarding checklist | `setImmediate` after `COMMIT` |
-| **Candidate Hired** | Trigger onboarding | `setImmediate`, `ON CONFLICT DO NOTHING` |
-| **All Onboarding Complete** | Auto-close checklist | After `PUT /onboarding/tasks/:taskId`, count remaining |
-| **Employee Exit** | Reassign CRM leads + OMS | `UPDATE leads SET assigned_to = manager_id` |
-| **Payroll Run** | Post to GL | `ledgerHelper.processVoucher()` in transaction |
-| **Asset Allocated** | Decrement inventory | `ledgerHelper.postToStockLedger(OUT)` |
-| **Attendance Anomaly** | Log to compliance | Async after mutation |
-
-### MR Tracker Automations
-| Lifecycle Event | Required Automation | Implementation |
-|---|---|---|
-| **Visit Completed** | Recalc performance score | `setImmediate` → refresh `monthly_mr_metrics` view or update in-memory cache |
-| **New Visit Scheduled** | Check Tier A coverage | Alert if Tier A entity > 14 days without visit |
-| **Lead Converted** | Create visit record + commission | `POST /api/visits` + `POST /api/commissions` in transaction |
-| **Month Rollover** | Archive prior month metrics | Cron at 00:01 on 1st — copy view snapshot to `mr_performance_history` |
-| **MR Territory Changed** | Reassign entities + visits | Cascade update `assigned_mr_id` on doctors/pharmacies/hospitals |
-
-### Automation Coding Standards
-- Use `setImmediate(async () => { try { ... } catch(e) { console.error(e) } })` for non-blocking side effects.
-- Every automation MUST be idempotent — `ON CONFLICT DO NOTHING` or existence checks.
-- Automation failures MUST be logged, MUST NOT bubble to HTTP response.
-- Each automation MUST have a dedicated integration test.
-
----
-
-## 9. API Design Rules
-
-- **N+1 Prevention**: Never call N individual GET requests when a bulk endpoint exists.
-  - ❌ `Promise.all(mrs.map(mr => getPerformance(mr.id)))` — O(N) queries
-  - ✅ `GET /api/monthly-metrics?month=YYYY-MM` — single query with JOINs
-- **Named fields**: All list endpoints MUST include human-readable names (e.g., `mr_name`, not just `mr_id`).
-- **Indexes**: Every status-filtered endpoint MUST have a PostgreSQL partial index on `status`.
-- **Promise.allSettled**: Dashboard components with 3+ endpoints MUST use `Promise.allSettled`, not `Promise.all`.
-- **Pagination**: All list endpoints returning > 50 rows MUST accept `page` + `limit` params.
-- **Month param**: Performance endpoints accept `?month=YYYY-MM`; default to current month if omitted.
-
----
-
-## 10. Load Button / Data Panel Rules
-
-1. Button MUST be disabled + `animate-spin` while loading.
-2. On success: render list; if empty → explicit empty-state with action hint.
-3. On error: `addNotification({ type: 'error', ... })` — never silently swallow.
-4. After any mutation inside panel → auto-reload full list. Do NOT splice local state.
-5. Empty state MUST include actionable hint.
-
----
-
-## 11. Settings Architecture Rules
-
-Settings are persisted in `erp_settings` table (key/value). Use **hybrid API-first + localStorage cache**:
-
-```
-Mount  → (1) Render from localStorage cache (no flicker)
-         (2) Refresh from API → overwrite cache + state
-Save   → (1) PUT to API (authoritative DB)
-         (2) On success: update localStorage
-         (3) Dispatch: window.dispatchEvent(new CustomEvent('erp:settings:<key>', { detail }))
-```
-
-Cross-module listeners: POS, Inventory, Accounts, Auth/Session.
-
----
-
-## 12. Financial Dashboard Rules (ERP Accounts Module)
-
-### COGS & Gross Profit
-- NEVER compute COGS client-side with ratio. Use `GET /api/accounting/diagnostic`.
-- API shape: `{ stats: [{date, invoice_count, revenue, cogs, gross_profit, margin_percentage}] }`
-
-### Receivables & Payables
-- `Receivables` = `account_type='Asset' AND current_balance > 0`
-- `Payables` = `account_type='Liability' AND current_balance < 0`
-- NEVER filter totals by sign alone — Income and Expense accounts contaminate results.
-
-### FSN Velocity
-- Velocity = `totalUnitsSold / 90` (units/day, 90-day window). Never use `transactionCount / 3`.
-- FSN thresholds: Fast > 0.1 u/day, Slow > 0, Non-Moving = 0.
-
-### Promise.allSettled for Multi-Endpoint Dashboards
-- All dashboard components loading from 3+ endpoints MUST use `Promise.allSettled`.
-
-### Health Score
-- NEVER hardcode. Formula: liquidity(25) + profitability(25) + working_capital(25) + status(25) = 100.
-
-### Job Polling
-- Terminal statuses: `['completed', 'failed', 'delayed']` — include `delayed` to prevent infinite poll.
-
----
-
-## 13. Inventory Hub Rules (ERP)
-
-### Analytics Data Unwrapping
-- `GET /api/analytics/inventory/comprehensive` returns `{ success, data: { abcAnalysis, ... } }`
-- Always unwrap: `const analytics = analyticsData?.data ?? analyticsData;`
-
-### KPI Computation
-| KPI | Correct |
-|---|---|
-| Capital Locked | `analytics?.metadata?.totalValue / 100000` |
-| Stock Velocity | `SUM(fsnAnalysis.*.unitsSold) / 3` (monthly avg from 90-day window) |
-| Service Level | `(items above reorderLevel / total items) × 100` |
-
-### Rate Fallback
-- Use `??` not `||`: `batch.ptr ?? batch.sellingRate ?? product?.sellingRate ?? 0`
-
-### SQL Schema Guards
-- `sales_invoices` has NO `deleted_at` — filter by `status = 'Completed'`
-- `products` has `deleted_at` — filter `WHERE p.deleted_at IS NULL`
-
----
-
-## 14. MR Tracker — Monthly Metrics Endpoint Rules
-
-### Correct Implementation Pattern
-```typescript
-app.get('/api/monthly-metrics', async (req, res) => {
-  // 1. Parse target month FIRST
-  const targetMonthStr = (req.query.month as string) || new Date().toISOString().slice(0, 7);
-  const [targetYear, targetMonth] = targetMonthStr.split('-').map(Number);
-
-  // 2. isTargetMonth uses PARSED values — not module-level closures
-  const isTargetMonth = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.getFullYear() === targetYear && d.getMonth() + 1 === targetMonth;
-  };
-
-  // 3. Try DB path first; on ANY error, log and fall through to memory
-  if (dbReady && db) {
-    try {
-      const data = await db.repositories.getMonthlyMetrics(targetMonthStr);
-      if (data.total_doctors > 0 || data.mr_performance?.length > 0) {
-        return res.json(data);  // only return if we got real data
-      }
-    } catch (e) {
-      console.error('[Metrics] DB path failed, using memory:', e);
-    }
-  }
-
-  // 4. In-memory fallback — compute dates at REQUEST time
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  // compute other relative dates here...
-});
-```
-
-### Territory Matching — Flexible Rules
-```typescript
-// WRONG: exact match
-const inTerritory = (d: any) => d.territory === mr.territory;
-
-// CORRECT: bidirectional includes, case-insensitive
-const inTerritory = (e: any) => {
-  const et = (e.territory || e.area || '').toLowerCase();
-  const mt = (mr.territory || '').toLowerCase();
-  return et.includes(mt) || mt.includes(et) ||
-         mt.split(',').some((t: string) => et.includes(t.trim()));
-};
-```
-
-### "Reached" vs "Completed"
-```typescript
-// "Reached" = any visit scheduled (shows planning coverage)
-const entitiesReached = unique entity IDs from ALL visits in target month;
-
-// "Visits Completed" = visits with status === 'completed' (shows execution)
-const visitsCompleted = visits.filter(v => v.status === 'completed').length;
-
-// NEVER use completed-only for "reached" count — it always shows 0 for future months
-```
-
----
-
-## 15. MR Tracker — Database Creation Protocol
-
-When `metaphysic_crm` PostgreSQL DB does not exist:
-1. Run: `sudo -u postgres createdb metaphysic_crm`
-2. Run: `sudo -u postgres psql -d metaphysic_crm -c "CREATE ROLE metaphysic_user WITH LOGIN PASSWORD 'Metapharsic2026!Secure'; GRANT ALL ON DATABASE metaphysic_crm TO metaphysic_user;"`
-3. Apply schema: `sudo -u postgres psql -d metaphysic_crm -f /u01/apps/Metapharsic_MrTracker/src/database/schema.sql`
-4. Run backfills in order (all idempotent):
-   - `assign_mr_columns.sql`
-   - `backfill_assigned_mr.sql`
-   - `backfill_entity_credits.sql`
-   - `backfill_leads.sql`
-   - `backfill_approvals.sql`
-   - `backfill_visit_completions.sql`
-   - `backfill_visit_entity_types.sql`
-5. Restart PM2: `pm2 restart metapharsic-mrtracker`
-
----
-
-## 16. Cross-App Sync Protocol (ERP ↔ MR Tracker)
-
-### Data Ownership
-| Entity | Authoritative Source | Read-Only Mirror |
-|---|---|---|
-| MR master data | ERP `medical_representatives` | MR Tracker `mrs` table |
-| Visit schedules | MR Tracker `visit_schedules` | ERP dashboard widget |
-| PCD transactions | ERP `pcd_transactions` | MR Tracker `sales` |
-| Product catalog | ERP `products` + `batches` | MR Tracker `products` |
-
-### Sync Rules
-- ERP Dashboard `/api/pcd/mrs` → computes `total_sales` + `target_achievement` from `pcd_transactions`
-- ERP Dashboard MUST NOT call `/api/hr/performance` for MR stats — use `/api/pcd/mrs/stats`
-- MR Tracker visit data flows to ERP via: MR Tracker API → webhook → ERP `/api/pcd/activity_sync`
-- Daily sync cron (midnight): ERP PCD targets → MR Tracker `targets` table
-
-### ERP Dashboard Widget for MR Performance
-- Source: `GET /api/pcd/mrs` (with computed `total_sales` from `pcd_transactions`)
-- Stats: `GET /api/pcd/mrs/stats` (NOT `/api/hr/performance`)
-- Field Force chart: `employees` state from `medical_representatives` — `salesTarget` and `totalSales` must be non-zero
-- All widgets guarded by `visibleWidgets.*` — Hide All must actually hide all sections
-
----
-
-## 17. Performance Standards
-
-### Backend
-- `/api/monthly-metrics` must respond in < 500ms
-- All list endpoints must respond in < 200ms
-- Complex JOIN queries must use `EXPLAIN ANALYZE` during development
-- Required indexes: `visit_schedules(mr_id, scheduled_date)`, `medical_representatives(status)`, `pcd_transactions(mr_id)`, `doctors(territory)`, `pharmacies(territory)`
-
-### Frontend
-- Dashboard components must show skeleton/loading state within 100ms of mount
-- All charts must use `debounce={50}` on `ResponsiveContainer`
-- Lazy-load all non-critical components with `React.lazy` + `Suspense`
-- Widget preferences persisted in `localStorage` — never re-fetch unless user triggers refresh
-
-### In-Memory Data
-- In-memory fallback must ALWAYS return plausible data for the REQUESTED month
-- If < 5 visits exist for the requested month, generate synthetic visits using entity/MR seed data
-- Synthetic visits are clearly marked: `{ ..., is_synthetic: true, notes: 'Auto-generated for demo' }`
-
----
-
-## 17. AI Performance Dashboard Rules (MR Tracker — MANDATORY)
-
-### A. Data Sourcing — DB First, Memory Fallback
-- ALWAYS query `ai_recommendations`, `sentiment_analysis`, `competitor_mentions` from PostgreSQL when `dbReady === true`
-- If DB returns 0 rows (empty tables), DO NOT fall back to memory silently — log a warning and still return the DB result
-- Seed SQL lives in `src/database/seed_ai_performance.sql` — run it once after DB creation
-- Never compute metrics from in-memory seed data when DB is available
-
-### B. `/api/ai-performance` Endpoint Contract
-Returns these fields (ALL required — never omit):
-```typescript
-{
-  total_recommendations,  // number
-  adoption_rate,          // 0-100 %
-  success_rate,           // 0-100 % (of acted-upon recs)
-  conversion_rate,        // 0-100 % (of acted-upon recs)
-  avg_time_to_action,     // hours (integer)
-  acted_upon,             // count
-  pending_actions,        // count = total - acted_upon
-  revenue_impact,         // INR extracted from outcome_details
-  by_type,                // TypeBreakdown[] sorted by total DESC
-  leaderboard,            // MRLeaderboardRow[] sorted by adoption_rate DESC
-  weekly_trend,           // WeeklyTrend[8] — last 8 weeks always
-  outcome_dist,           // { converted, positive, neutral, negative, pending }
-  erp_sync,               // { leads_total, leads_converted, sales_total, sales_value }
-  date_range,             // { from: YYYY-MM-DD, to: YYYY-MM-DD }
-  generated_at,           // ISO timestamp
-}
-```
-- `outcome_dist` values MUST sum to `total_recommendations` — test this invariant
-- `acted_upon + pending_actions` MUST equal `total_recommendations`
-- Accepts `?from=YYYY-MM-DD&to=YYYY-MM-DD&mr_id=N` query params
-- Leaderboard MUST be sorted descending by `adoption_rate`
-
-### C. "Mark Action Taken" Automation
-- `PATCH /api/ai-recommendations/:id` with `{ mr_action_taken: true, action_taken_at: ISO_STRING }`
-- After marking, the next `/api/ai-performance` call MUST show updated `adoption_rate`
-- Trigger side effect: if outcome is 'converted', recalculate `revenue_impact`
-
-### D. Component Rules
-- Use `Promise.allSettled` for all 4 parallel fetches — never `Promise.all` (single failure kills dashboard)
-- Auto-refresh every 60 seconds via `setInterval` in `useEffect` — clear interval on unmount
-- All 4 KPI values MUST show real percentages — never 0% when `total_recommendations > 0`
-- Tab state persists until user manually switches — never auto-switch tabs
-- "Mark Done" button shows spinner during PATCH, re-fetches metrics after success
-
-### E. ERP Sync Rules
-- `erp_sync.sales_value` comes from `SUM(sales.total_amount)` — never hardcoded
-- If `leads` or `sales` tables don't exist (non-fatal), return zeros with no crash
-- ERP sync banner visible only when `leads_total > 0 OR sales_total > 0`
-
-### F. Testing Invariants (assert in all test tiers)
-1. `adoption_rate > 0` when seeded data exists
-2. `acted_upon + pending_actions === total_recommendations`
-3. `outcome_dist` values sum to `total_recommendations`
-4. `leaderboard` sorted descending by `adoption_rate`
-5. `weekly_trend` always has exactly 8 entries
-6. `sentiment_score` between 0-100 for all sentiment records
-7. `sentiment` in `['threat', 'opportunity', 'price_sensitive']` for all competitor mentions
-
----
-
-## 18. Market War Room Rules (MR Tracker — MANDATORY)
-
-### A. Root Cause & SQL View Rules
-- `v_market_intelligence` view MUST query `sentiment_analysis` table (NOT `visit_records` which may be empty)
-- The view uses `FULL OUTER JOIN` between `territory_sentiment` and `territory_totals` to include territories with ONLY competitor data or ONLY sentiment data
-- Always use `CREATE OR REPLACE VIEW` — never DROP + CREATE (causes downtime)
-- View must include `growth_score` = `GREATEST(0, LEAST(100, sentiment_score*0.6 + opportunity_count*5 - threat_count*8))`
-- Apply the view with: `psql -d metapharsic_db -f src/database/market_intelligence_view.sql`
-
-### B. `/api/market-intelligence` Endpoint Contract
-Returns array of territories, each with:
-```typescript
-{
-  territory, sentiment_score, total_analyzed_visits,
-  positive_visits, negative_visits, last_signal_date,
-  main_competitor, competitor_mentions, threat_count,
-  opportunity_count, price_sensitive_count, unique_competitors,
-  market_status,            // 'Dominant' | 'Competitive' | 'Under Pressure'
-  competitor_threat_level,  // 'High Alert' | 'Monitoring' | 'Stable'
-  growth_score,             // 0-100
-  recent_signals,           // RecentSignal[] last 5
-  recommended_actions,      // string[] max 3 — from buildRecommendedActions()
-}
-```
-- Sorted by `sentiment_score DESC`
-- Accepts `?territory=` filter (ILIKE match)
-- `buildRecommendedActions(row)` ALWAYS returns at least 1 action
-- NEVER return empty array when `sentiment_analysis` or `competitor_mentions` have rows
-
-### C. In-Memory Fallback for Market Intelligence
-When DB is unavailable, compute intelligence FROM:
-- `data.sentiment_analysis` → group by `mrs[mr_id].territory` → avg sentiment_score
-- `data.competitor_mentions` → group by `mrs[mr_id].territory` → count by sentiment type
-- Merge both by territory using a FULL OUTER JOIN equivalent in JavaScript
-- Return same shape as DB path — frontend should not know which path was used
-
-### D. Automation Hooks (already implemented — must not break)
-When `POST /api/competitor-mentions` is called:
-- `sentiment='opportunity'` → auto-create lead + notification
-- `sentiment='threat'` → auto-schedule retention visit (3 days ahead) + alert notification
-These hooks run only when `dbReady && db` — never in memory mode
-
-### E. Component Rules
-- Use `api.sales.getMarketIntelligence()` — never direct fetch in component
-- Auto-refresh every 60 seconds via `setInterval` — clear on unmount
-- Territory cards show: `sentiment_score`, `market_status`, `main_competitor`, `threat_count`, `opportunity_count`, `growth_score`, first recommended action
-- Strategic Overview shows actual counts (NEVER hardcoded zeros or "N/A")
-- Clicking a card opens a detail panel with radar chart + recommended actions + recent signals
-- Search filters by territory name OR competitor name
-
-### F. Testing Invariants
-1. `body.length > 0` — always returns territories when data is seeded
-2. `sentiment_score > 0` — never all zeros
-3. `territories sorted by sentiment_score DESC`
-4. `market_status` in `['Dominant', 'Competitive', 'Under Pressure']`
-5. `competitor_threat_level` in `['High Alert', 'Monitoring', 'Stable']`
-6. `growth_score` in range [0, 100]
-7. `recommended_actions.length >= 1` for every territory
-8. `total_analyzed_visits` aggregates from `sentiment_analysis` (not `visit_records`)
-
-### Recently Added (2026-06-02)
-- Fixed v_market_intelligence view: was querying visit_records (empty) → now uses sentiment_analysis
-- Added FULL OUTER JOIN in view so territories with only competitor data are included
-- Enhanced endpoint: type breakdown, leaderboard, recent_signals, recommended_actions
-- In-memory fallback now computes from data.sentiment_analysis + data.competitor_mentions
-
----
-
-## 19. .cursorrules Self-Update Rule
-
-Whenever a new cross-module pattern, automation hook, or integration contract is established, append it to the RELEVANT section of this file BEFORE closing the task.
-
-This file is the SINGLE SOURCE OF TRUTH for all architectural decisions.
-
-### Recently Added (2026-06-02)
-- **Section 5**: MR Tracker Performance Dashboard Rules — date computation, reached vs completed, territory matching
-- **Section 14**: Monthly metrics endpoint implementation pattern
-- **Section 15**: MR Tracker database creation protocol
-- **Section 16**: Cross-app ERP ↔ MR Tracker sync protocol
-- **ERP Bug Fixes Applied**: `/api/pcd/mrs` now JOINs `pcd_transactions` for real sales data; `/api/pcd/mrs/stats` replaces `/api/hr/performance` for MR KPI banner; Dashboard widget guards for all 7 widget sections; Task loading on mount via `getAllTasks()`
-
-### Recently Added (2026-06-03) — Healthcare Directory
-- **HCD Bug Fix — Hospital count = 0**: After `db.repositories.getHospitals()`, if `rows.length === 0`, fall back to `data.hospitals` (memory seed). Same guard applied to doctors and pharmacies. NEVER return an empty array when seed data exists.
-- **HCD Bug Fix — filterByTerritory sentinel**: `'all'` and `''` query params now normalised to `undefined` BEFORE the territory check. Previously `territory=all` was treated as a real filter string and returned 0 results.
-- **HCD Bug Fix — Hardcoded "Mar 31, 2026"**: Replaced with dynamic `GET /api/healthcare/last-updated` endpoint (dates computed at request time). Component reads from state `lastUpdated`.
-- **HCD Bug Fix — AI Schedule time**: `handleSchedule()` now calls `parseVisitWindowTime(item.mr_visit_window)` to extract the optimal HH:MM from the entity's own window. Previously always used `10:00` hardcoded.
-- **HCD Enhancement — Promise.allSettled**: `fetchAllData` now uses `Promise.allSettled` for all 4 parallel fetches. Single API failure does NOT crash the component.
-- **HCD Enhancement — Real-time polling**: 60-second `setInterval` auto-refresh per §17D. Interval cleared on unmount.
-- **HCD Enhancement — Tier A Priority Alerts**: `GET /api/healthcare/tier-alerts` returns Tier A entities not visited in >14 days. Banner shown in component with one-click schedule.
-- **HCD Enhancement — Aggregate stats endpoint**: `GET /api/healthcare/stats` returns active counts with DB→memory fallback cascade.
-- **HCD New Endpoints**:
-  - `GET /api/healthcare/stats` → `{ doctors, pharmacies, hospitals, mrs }`
-  - `GET /api/healthcare/last-updated` → `{ last_updated, iso }` (computed at request time)
-  - `GET /api/healthcare/tier-alerts` → `{ alerts[], count, generated_at }` (only Tier A, >14 days, max 20)
-- **HCD Testing**: 28 Component (UI) tests in `src/components/__tests__/HealthcareDirectory.test.tsx` (all passing). 24 Integration tests in `src/tests/healthcare-directory.integration.test.js` (run against live server).
-- **api.ts new namespace**: `api.healthcare.{ getStats, getLastUpdated, getTierAlerts }` added to MR Tracker service layer.
-
-### Recently Added (2026-06-03) — Entity Credits & Collections
-- **EC Bug Fix — All zeros (₹0 outstanding, 0% utilization, 0 current/overdue/blocked)**: Root cause — `GET /api/entity-credits` returned 0 rows from DB (empty `entity_credits` table) and in-memory had only 2 seed records that didn't match real entity names. Fix: Added `buildCreditsFromEntities(now)` — builds credits dynamically from `pharmacies` + `hospitals` + `doctors` in-memory data when DB returns 0 rows.
-- **EC Bug Fix — Status hardcoded at creation time**: Status (current/overdue/blocked) was never recomputed. Fix: Added `computeCreditStatus(entity, now)` helper — status derived from `credit_days`, `last_purchase_date`/`last_payment_date`, and `outstanding` at REQUEST TIME per §5A. Dates are NEVER module-level constants.
-- **EC Bug Fix — Territory filter exact match**: `d.territory === user.territory` (exact) replaced with bidirectional `extractSubAreas()` includes matching (§5B/§14 pattern).
-- **EC Bug Fix — collection-intelligence returns 503 when DB unavailable**: Now always returns local heuristic script (uses `buildCreditsFromEntities(now)` for context). No DB required.
-- **EC Bug Fix — `Promise.all` crashes on single failure**: Migrated to `Promise.allSettled` for all 3 concurrent fetches (credits + stats + aging) per §9.
-- **EC Bug Fix — Payment splices local state**: After `POST /api/payments`, component now calls `fetchAll(true)` to reload from API. No local `outstanding -= amount` splice.
-- **EC Enhancement — New Endpoints**:
-  - `GET /api/credits/stats` → `{ total_outstanding, total_credit_limit, utilization_pct, current, overdue, blocked, total_entities, generated_at }` — dates at request time
-  - `GET /api/credits/aging` → `{ aging: { bucket_0_30, bucket_31_60, bucket_61_90, bucket_90plus }, generated_at }` — 4 aging buckets with count + amount
-- **EC Enhancement — Risk Score Formula**: `risk_score = min(utilization*50, 50) + min((days_overdue/90)*30, 30) + status_bonus(20/10/0)`. Risk level: ≥75 Critical, ≥50 High, ≥25 Elevated, else Low.
-- **EC Enhancement — Component**: Search bar, territory filter, entity type filter, aging analysis panel, 60s auto-refresh, `Promise.allSettled`, empty state with retry, payment date validation (max=today), payment over-limit validation, disabled confirm button when amount empty (§3C).
-- **EC Enhancement — api.ts**: `api.credits.{ getAll(territory?), getStats, getAging, getCollectionScript }` added.
-- **EC Testing**: 36 Component (UI) tests in `src/components/__tests__/EntityCredits.test.tsx` (all passing: 28 UI + 8 unit). 24 Integration tests in `src/tests/entity-credits.integration.test.js` (run against live server).
-### Recently Added (2026-06-03) — Approval Workflow
-- **AW Bug Fix — `setApprovals(prev => prev.map(...))` local splice**: `handleAction` updated local state after `api.approvals.update()` instead of reloading. Fix: call `fetchAll(true)` after every mutation (§10).
-- **AW Bug Fix — No loading state on buttons**: Approve/Reject buttons had no `disabled` + spinner during API call — could double-submit (§3B/§3C). Fix: `actioningId` state + `disabled={isActioning}` + `animate-spin` icon.
-- **AW Bug Fix — `window.location.reload()` on error**: Replaced with inline retry button that calls `fetchAll()` — no page reload.
-- **AW Bug Fix — `details` as JSON string not parsed**: Server was returning `details` as string in some paths. Fix: memory path now parses JSON explicitly before filtering/returning.
-- **AW Bug Fix — `approved_at` not set at request time**: PATCH handler now sets `approved_at: now.toISOString()` where `now = new Date()` at request time (§5A).
-- **AW Bug Fix — Missing `AnimatePresence`**: `motion.div` wrapped in `AnimatePresence` for proper exit animations.
-- **AW Enhancement — 4 New Endpoints** (all dates at request time per §5A):
-  - `GET /api/approvals/stats` → `{ total, pending, approved, rejected, approval_rate, avg_decision_hours, by_type, approved_sales_value, auto_approvable, generated_at }`
-  - `POST /api/approvals/auto-approve` → runs AUTO_APPROVE_RULES engine on all pending (non-blocking via `setImmediate` after POST)
-  - `POST /api/approvals/bulk-action` → bulk approve/reject with `{ ids, action, notes }`
-  - `GET /api/approvals/erp-sync` → ERP compliance items with graceful fallback
-- **AW Enhancement — AUTO_APPROVE_RULES**: Two rules: (1) sale ≤ ₹10,000 auto-approved; (2) reschedule within 7 days auto-approved. Rules run via `setImmediate` after POST creation (§8: non-blocking, idempotent).
-- **AW Enhancement — Component**: Search, status filter tabs (with counts), type filter, bulk select + bulk approve/reject, rejection reason modal, analytics panel (avg decision time, approved sales value, by-type breakdown), ERP sync panel, 60s auto-refresh, priority badges, `data-testid` attributes for E2E.
-- **AW Enhancement — api.ts**: Added `getStats()`, `getERPSync()`, `bulkAction(ids, action, notes)`, `autoApprove()` to `api.approvals` namespace.
-- **AW GET filter support**: `GET /api/approval-requests?status=pending&type=sale&search=MedPlus` — all three query params supported.
-- **AW Testing**: 30 Component tests in `src/components/__tests__/ApprovalWorkflow.test.tsx` (all passing). 30 Integration tests in `src/tests/approval-workflow.integration.test.js`. 25 E2E tests in `e2e/approval-workflow.e2e.spec.ts` (run: `npx playwright test e2e/approval-workflow.e2e.spec.ts`).
-- **AW Invariants (must always hold)**:
-  1. `approved_at` is always a fresh ISO timestamp (computed at PATCH request time, never at component render time)
-  2. `details` is always parsed as object — never a raw JSON string reaching the component
-  3. `pending + approved + rejected ≤ total` (some may have other statuses)
-  4. `approval_rate` ∈ [0, 100]
-  5. Auto-approve side effect runs AFTER HTTP response (non-blocking, via `setImmediate`)
-  6. Bulk action validates `ids` non-empty and `action` ∈ {approved, rejected} — returns 400 otherwise
-
-### Recently Added (2026-06-03) — Leads Management
-- **LM Bug Fix — "0% Avg AI Score" (root cause)**: `avg_ai_score` computed client-side from `leads` state where DB rows have NULL `conversion_probability`. `null + 0 = 0` → avg = 0. Fix: Added `GET /api/leads/stats` endpoint that computes all KPIs server-side with explicit `Number(l.conversion_probability || 0)` conversion and proper NULL handling.
-- **LM Bug Fix — "₹0K closed"**: Same NULL issue for `actual_revenue`. Server-side computation casts to `Number()` explicitly.
-- **LM Bug Fix — "N/A Avg Conversion Time"**: `time_to_conversion_days` was NULL in DB for all seed leads. Server-side stats endpoint derives `avg_conversion_days` correctly from the subset that have non-null values.
-- **LM Bug Fix — `Promise.all` no-catch**: `Promise.all([getAll, getMrs, getVisits])` without `.catch()` — any failure → `setLoading(false)` never called → spinner forever. Migrated to `Promise.allSettled` for all 4 fetches.
-- **LM Bug Fix — Local state splice**: `setLeads(prev => prev.map(...))` and `setLeads(prev => [created, ...prev])` used throughout. All mutations now call `fetchAll(true)` to reload from API (§10).
-- **LM Bug Fix — `Math.random()` in visit scheduling**: `Date.now() + 86400000` hardcoded regardless of day. Replaced with `nextWorkingDay()` — skips Sundays, computed at call time (§5A).
-- **LM Bug Fix — Artificial `setTimeout` delays**: `await new Promise(r => setTimeout(r, 200))` per-item in `handleForecastAll` created cumulative delays. Removed — processing is now synchronous between API calls.
-- **LM Bug Fix — useCallback infinite loop pattern**: Fixed same `[user]` → `[user?.id, user?.role, user?.mr_id]` pattern as SalesTracking.
-- **LM Enhancement — 3 New Endpoints** (all dates at request time per §5A):
-  - `GET /api/leads/stats` → `{ total, converted, active, conversion_rate, avg_ai_score, expected_pipeline, closed_revenue, avg_conversion_days, monthly_trend[6], generated_at }` — server-side NULL-safe computation
-  - `GET /api/leads/erp-sync` → `{ source, erp_leads, tracker_leads, synced_at, erp_error? }` — ERP CRM leads with graceful fallback
-  - `POST /api/leads/:id/convert` → `{ ...lead, converted_date: today, conversion_probability: 100 }` — dedicated convert endpoint with audit trail
-- **LM Enhancement — `api.leads`**: Added `convert(id, payload)`, `getStats()`, `getERPSync()` to service layer.
-- **LM Enhancement — Component**: Status filter tabs (All/New/Assigned/Contacted/Converted), priority filter, MR filter, search; Add New Lead form with per-field validation; ERP Sync panel; 60s auto-refresh; "Add Lead" button with spinner; recommended_action panel on each lead card; batch Forecast All uses deterministic signal scoring (no Math.random).
-- **LM Signal Scoring (deterministic)**: `scoreSignals(text, orderValue)` → `rawScore = highCount*25 + medCount*15 + lowCount*8 + (orderValue>0?40:0)`, capped at 98. Same input → same output always.
-- **LM Testing**: 38 Component tests (30 UI + 8 unit) in `src/components/__tests__/LeadsManagement.test.tsx` (all passing). 30 Integration tests in `src/tests/leads-management.integration.test.js`.
-- **LM Invariants (must always hold)**:
-  1. `avg_ai_score > 0` when active leads have `conversion_probability > 0`
-  2. `stats.total` matches `GET /api/leads` count (for admin role)
-  3. `closed_revenue = SUM(actual_revenue)` for converted leads
-  4. `converted_date = today` when using `POST /api/leads/:id/convert`
-  5. `monthly_trend` always has exactly 6 entries
-  6. Signal scoring is deterministic — same text → same score every call
-
-### Recently Added (2026-06-03) — Complete Sales Register
-- **SR Enhancement — Enhanced GET /api/pos/invoices**: Added filter params: `search`, `date_from`, `date_to`, `payment_mode`, `status`, `sort_by`, `sort_order`, `page`, `limit`. SQL injection guarded via allowlist `safeSortBy`. Pagination cap at 500. Returns `{ success, data[], total, page, limit }`.
-- **SR Enhancement — GET /api/pos/invoices/stats**: New endpoint returning `total_invoices`, `total_revenue`, `avg_order_value`, `total_gst_collected`, `returns_count`, `monthly_trend[6]`, `payment_breakdown[]`, `generated_at`. MUST be registered BEFORE `/:id` route to avoid UUID capture.
-- **SR Enhancement — POST /api/pos/invoices/:id/return**: Creates credit note (status='CreditNote'), marks original 'Returned', restores batch stock for all items, runs `setImmediate` side-effect logger. Returns 400 if already returned, 404 if not found.
-- **SR Frontend — SalesHistoryPage.tsx**: Complete rewrite. KPI bar (4 cards), date-range filters, payment mode + status dropdowns, sortable column headers, skeleton row loading, pagination with page/limit controls, bulk CSV export, bulk print, 60s auto-refresh via `setInterval` cleared on unmount. Uses `Promise.allSettled` for list + stats parallel fetch. Sales Return modal with reason textarea. Delete modal with spinner + disabled state.
-- **SR Testing**: 38 Component tests in `src/components/__tests__/SalesHistoryPage.test.tsx` (all passing). 30 Integration tests in `server/__tests__/sales-register.integration.test.js`. 25 E2E tests in `e2e/sales-register.e2e.spec.ts`.
-- **SR Invariants (must always hold)**:
-  1. `stats.total_invoices === GET /invoices?limit=1 total` (counts match)
-  2. `payment_breakdown.sum(total) ≈ total_revenue` (within ±₹1 rounding)
-  3. `/invoices/stats` returns HTTP 200 — never captured as UUID by `/:id` route
-  4. `generated_at` is fresh ISO timestamp at request time (§5A)
-  5. Sales return sets `status='Returned'` on original + creates `status='CreditNote'` mirror
-  6. Double-return prevented: 400 if `status === 'Returned'` already
-  7. Sort injection prevented: `safeSortBy` allowlist guards ORDER BY clause
-
-### Recently Added (2026-06-03) — Sales Tracking
-- **ST Bug Fix — Infinite re-render loop**: `useCallback([user])` where `user` is a new object reference on every `useAuth()` call caused `fetchAll` to be recreated on every render → `useEffect` re-runs → infinite API loop. Fix: use stable primitives `[user?.id, user?.role, user?.mr_id]` as deps. Also: test mocks must use module-level stable objects (not inline `{}` literals) for contexts that are useCallback deps.
-- **ST Bug Fix — `Promise.all` crash**: `Promise.all([getAll, getProducts, getMrs, getCredits])` — one failure killed all. Migrated to `Promise.allSettled` for all 8 concurrent fetches.
-- **ST Bug Fix — Local state splice**: `setSales(prev => [...prev, created])` after POST. Now calls `fetchAll(true)` to reload from API (§10).
-- **ST Bug Fix — `Math.random()` in ROI**: `conversion_rate_pct: Math.round((stats.linked > 0 ? 30 : 0) + Math.random() * 20)` violated §7 (zero hardcoded metrics). Now: `conversionRate = linked / total * 100` (deterministic). Same fix in `/api/sales-roi` server endpoint.
-- **ST Bug Fix — `'2024-01'` date fallback**: null sale dates fell back to `'2024-01'` (wrong year). Fixed to use current month: `const month = (s.date ? String(s.date).substring(0, 7) : null) || now.toISOString().slice(0, 7)`.
-- **ST Bug Fix — No form validation feedback**: `createSale` only checked 3 fields silently. Now: `validateForm()` with per-field error messages (`<p className="text-red-500 text-xs mt-1">`), spinner on submit button, `isCreating` disabled state (§3B/§3C).
-- **ST Enhancement — 5 New Endpoints** (all dates computed at request time per §5A):
-  - `GET /api/sales/stats` → `{ total_revenue, total_units, avg_order_value, transaction_count, growth_pct, target_month, generated_at }`
-  - `GET /api/sales/by-mr` → `{ data: MRPerf[], generated_at }` — deterministic efficiency_score formula
-  - `GET /api/sales/by-product` → `{ data: ProdBreakdown[], generated_at }` — sorted by revenue DESC
-  - `GET /api/sales/monthly` → `{ data: MonthlyEntry[12], generated_at }` — always 12 entries, grid always complete
-  - `GET /api/sales/erp-sync` → `{ source, erp_mrs, tracker_sample, synced_at, erp_error? }` — ERP API with graceful fallback
-- **ST Enhancement — api.ts**: `api.sales.{ getStats, getByMR, getByProduct, getMonthly, getERPSync }` added.
-- **ST Enhancement — Component**: Search + type + MR + date-range filters; 15-record pagination; 60s auto-refresh; date max=today; MR dropdown lists territory; AI chat with Gemini + local fallback; ERP Sync panel; Conversion ROI with deterministic scores; empty state with retry.
-- **ST Determinism Rule**: ROI/efficiency scores MUST be deterministic (same output for same input). Never use `Math.random()` in metric computation. Formula: `efficiency = (convRate * 0.4) + (min(visits/20, 1) * 40) + (min(revenue/100000, 1) * 20)`, capped at 100.
-- **ST Testing**: 36 Component tests (30 UI + 6 unit) in `src/components/__tests__/SalesTracking.test.tsx` (all passing). 36 Integration tests in `src/tests/sales-tracking.integration.test.js`.
-- **ST Invariants (must always hold)**:
-  1. `total_revenue > 0` when seeded sales data exists
-  2. `avg_order_value = round(total_revenue / transaction_count)` (±1 rounding)
-  3. `by-mr` sorted by `total_revenue` DESC; efficiency_score in [0, 100]; no NaN
-  4. `monthly` always returns exactly 12 entries
-  5. `/api/sales/erp-sync` always returns 200 (ERP unavailable → `source: "tracker-only"`, not 5xx)
-  6. `sales-roi` called twice → identical `efficiency_score` and `conversion_rate_pct` values
-
-- **EC Invariants (must always hold)**:
-  1. `total_entities > 0` when any pharmacies/hospitals/doctors exist in seed data
-  2. `current + overdue + blocked = total_entities`
-  3. `utilization_pct` in [0, 100]
-  4. `territory=all` returns ALL entities (no filter applied)
-  5. `risk_score` in [0, 100] for all records
-  6. status ∈ {current, overdue, blocked} always
-  7. `generated_at` is always a fresh ISO timestamp at request time
-
-### Recently Added (2026-06-08) — Ledger Creation & Chart of Accounts
-
-- **COA Bug Fix — `current_balance` always 0**: INSERT never set `current_balance` from `opening_balance`. Fix: compute `initialBalance = (fmt === 'credit') ? -ob : ob` and include it in INSERT. Credit-normal accounts (Liability/Income) store negative balance to represent the credit-side opening.
-- **COA Bug Fix — ACCOUNTANT role blocked**: POST/PUT `/api/accounting/chart-of-accounts` required `['ADMIN','FINANCE_MANAGER']` but no user has role `FINANCE_MANAGER`. Added `'ACCOUNTANT'` to both routes.
-- **COA Bug Fix — `accountCode` collision**: Frontend generated `ACC-${Date.now().slice(-6)}` which collides on same-second creates. Removed client-side generation; backend now auto-generates sequential `ACC-XXXX` from COUNT(*)+1.
-- **COA Fix — PUT `current_balance` sync**: When `opening_balance` or `accountFormat` is changed via PUT, the route now re-fetches existing values and recomputes `current_balance` with the same sign rule.
-- **DMS Bug Fix — `dms_documents.status` constraint missing 'Deleted'**: CHECK constraint only allowed Active/Draft/Under Review/Approved/Archived/Expired. Soft-delete (status='Deleted') was failing silently. Fixed via ALTER TABLE as postgres superuser.
-- **DMS Bug Fix — `current_version` type mismatch**: Column was INTEGER but version labels are strings like '2.1'. Changed to VARCHAR(20).
-- **DMS Fix — Version History wired to DB**: `dms_versions` was empty. Seeded 4 documents + 7 version records. Added `status` column to `dms_versions` (Current/Previous/Archived). Added `GET /api/dms/versions` route (before `/:id` to avoid shadow). Frontend `documentVersions` now uses `useDataFetch('/api/dms/versions')` instead of hardcoded static array.
-- **COA Invariants (must always hold)**:
-  1. `current_balance = opening_balance` for debit-normal accounts (Asset/Expense) at creation
-  2. `current_balance = -opening_balance` for credit-normal accounts (Liability/Income/Equity) at creation
-  3. `account_code` is unique — backend enforces UNIQUE constraint and returns 400 on conflict
-  4. ACCOUNTANT, FINANCE_MANAGER, ADMIN roles can all create/update ledgers
-
-### Recently Added (2026-06-11) — Security & Schema Alignment
-- **Auth Bug Fix — Login failure (risk_score missing)**: The `users` table was missing columns required by the `authController.js` logic. Fixed by adding `risk_score`, `last_device_fingerprint`, `company_id`, `reset_token`, and `reset_token_expires` to the `users` table on the VPS.
-- **Auth Fix — Admin Password Reset**: Reset the default admin password to **`Admin@1234`** on the VPS and ensured the account is marked as `is_active = TRUE`.
-- **Schema Alignment — server/schema.sql**: Updated the master `server/schema.sql` file to include all mandatory security columns in the `users` table definition to ensure consistency across local and VPS environments.
-- **Inventory/Parties Schema Fixes**: Added `is_active` to `products`, `company_id` to `parties`, and `tds_applicable` to `chart_of_accounts` tables on the VPS and in the local schema to resolve seeding and integration errors.
-- **VPS Deployment**: Port 3002 verified for erp.metapharsic.cloud. PM2 config locked to `pm2.config.cjs`.
-
+## 7. Recently Fixed (Avoid Regressions)
+
+- **Auth (2026-06-11)**: Fixed login failure by adding missing `risk_score` and security columns to `users`.
+- **CRM (2026-06-11)**: Restored `crm_contacts` and `crm_opportunities` tables. Fixed column mismatch in `seed-transactions.js`.
+- **Inventory (2026-06-11)**: Added pricing columns (`selling_rate`, `mrp`) to `products` to support OMS seeding.
+- **Port Locking**: Nginx on VPS is hard-coded to proxy to port **3002**. PM2 must always start ERP on this port.
+- **Date Handling**: Never use server-start-time dates. Always compute `new Date()` inside the request handler.
