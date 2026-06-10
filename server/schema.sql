@@ -11,10 +11,20 @@ CREATE TABLE users (
     name VARCHAR(100) NOT NULL,
     role VARCHAR(50) NOT NULL, -- ADMIN, PHARMACIST, etc.
     phone VARCHAR(15),
+    company_id INTEGER DEFAULT 1,
     two_factor_enabled BOOLEAN DEFAULT FALSE,
     totp_secret VARCHAR(255),
+    last_device_fingerprint VARCHAR(255),
+    risk_score NUMERIC(5, 2) DEFAULT 0.0,
+    login_attempts INTEGER DEFAULT 0,
+    locked_until TIMESTAMP,
+    otp_code VARCHAR(10),
+    otp_expires_at TIMESTAMP,
+    reset_token VARCHAR(255),
+    reset_token_expires TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
     last_login TIMESTAMP,
+    last_login_ip VARCHAR(45),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -56,6 +66,12 @@ CREATE TABLE products (
     schedule_type VARCHAR(20) DEFAULT 'OTC',
     is_narcotic BOOLEAN DEFAULT FALSE,
     is_temperature_sensitive BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
+    maintain_batches BOOLEAN DEFAULT TRUE,
+    track_expiry BOOLEAN DEFAULT TRUE,
+    current_stock INTEGER DEFAULT 0,
+    opening_stock INTEGER DEFAULT 0,
+    company_id INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -79,6 +95,7 @@ CREATE TABLE batches (
 -- 4. Parties (Suppliers & Customers / Distributors)
 CREATE TABLE parties (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id INTEGER DEFAULT 1,
     name VARCHAR(255) NOT NULL,
     type VARCHAR(20) NOT NULL, -- Debtor (Customer) or Creditor (Supplier)
     gstin VARCHAR(20),
@@ -92,6 +109,87 @@ CREATE TABLE parties (
     current_balance NUMERIC(12, 2) DEFAULT 0, -- +ve Receivable, -ve Payable
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 4a. CRM - Leads
+CREATE TABLE IF NOT EXISTS leads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id INTEGER DEFAULT 1,
+    name VARCHAR(255) NOT NULL,
+    company_name VARCHAR(255),
+    email VARCHAR(255),
+    contact VARCHAR(20) NOT NULL,
+    location VARCHAR(100),
+    status VARCHAR(50) DEFAULT 'New',
+    priority VARCHAR(20) DEFAULT 'Medium',
+    source VARCHAR(100),
+    next_follow_up DATE,
+    estimated_value NUMERIC(15, 2) DEFAULT 0,
+    lead_score INTEGER DEFAULT 0,
+    ai_sentiment VARCHAR(20) DEFAULT 'Neutral',
+    industry_type VARCHAR(100),
+    assigned_to UUID REFERENCES users(id),
+    converted_party_id UUID REFERENCES parties(id) ON DELETE SET NULL,
+    last_activity_at TIMESTAMP,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4b. CRM - Lead Activities
+CREATE TABLE IF NOT EXISTS lead_activities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    lead_id UUID REFERENCES leads(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    description TEXT,
+    performed_by UUID REFERENCES users(id),
+    performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    duration INTEGER,
+    outcome TEXT,
+    follow_up_required BOOLEAN DEFAULT FALSE,
+    follow_up_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4c. CRM - Contacts
+CREATE TABLE IF NOT EXISTS crm_contacts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100),
+    designation VARCHAR(100),
+    department VARCHAR(100),
+    email VARCHAR(255),
+    phone VARCHAR(20),
+    whatsapp VARCHAR(20),
+    preferred_channel VARCHAR(50),
+    is_decision_maker BOOLEAN DEFAULT FALSE,
+    company_id INTEGER DEFAULT 1,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4d. CRM - Opportunities
+CREATE TABLE IF NOT EXISTS crm_opportunities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    stage VARCHAR(50) DEFAULT 'DISCOVERY',
+    value NUMERIC(15, 2) DEFAULT 0,
+    probability INTEGER DEFAULT 0,
+    expected_close_date DATE,
+    source VARCHAR(100),
+    company_id INTEGER DEFAULT 1,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CRM Views
+CREATE OR REPLACE VIEW crm_leads AS SELECT * FROM leads;
+CREATE OR REPLACE VIEW crm_activities AS 
+SELECT id, lead_id, type as activity_type, description, performed_by, 
+       performed_at as scheduled_at, performed_at as completed_at, 
+       outcome, duration as duration_minutes, created_at, NULL::UUID as created_by 
+FROM lead_activities;
 
 -- 5. Sales Invoices
 CREATE TABLE sales_invoices (
@@ -132,6 +230,111 @@ CREATE TABLE sales_invoice_items (
     sgst_amount NUMERIC(10, 2) DEFAULT 0,
     igst_amount NUMERIC(10, 2) DEFAULT 0,
     total_amount NUMERIC(12, 2) NOT NULL
+);
+
+-- 6a. OMS - Orders
+CREATE TABLE IF NOT EXISTS orders (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id INTEGER DEFAULT 1,
+    order_number VARCHAR(50) UNIQUE,
+    distributor_id UUID REFERENCES parties(id),
+    distributor_name VARCHAR(255),
+    order_date DATE NOT NULL,
+    subtotal NUMERIC(15, 2) DEFAULT 0,
+    tax_amount NUMERIC(15, 2) DEFAULT 0,
+    discount_amount NUMERIC(15, 2) DEFAULT 0,
+    total_amount NUMERIC(15, 2) NOT NULL,
+    status VARCHAR(50) DEFAULT 'Pending Approval',
+    priority VARCHAR(20) DEFAULT 'Normal',
+    fulfillment_status VARCHAR(50) DEFAULT 'Unfulfilled',
+    expected_delivery_date DATE,
+    shipped_at TIMESTAMP,
+    delivered_at TIMESTAMP,
+    approved_at TIMESTAMP,
+    sales_invoice_id UUID REFERENCES sales_invoices(id),
+    total_shipped_value NUMERIC(15, 2) DEFAULT 0,
+    credit_status VARCHAR(50),
+    ai_risk_score INTEGER,
+    ai_risk_level VARCHAR(50),
+    ai_recommendation TEXT,
+    ai_insight TEXT,
+    packing_specs TEXT,
+    labeling_specs TEXT,
+    remarks TEXT,
+    created_by UUID REFERENCES users(id),
+    updated_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6b. OMS - Order Items
+CREATE TABLE IF NOT EXISTS order_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+    product_id UUID REFERENCES products(id),
+    product_name VARCHAR(255),
+    batch_id UUID REFERENCES batches(id),
+    quantity INTEGER NOT NULL,
+    free_quantity INTEGER DEFAULT 0,
+    approved_quantity INTEGER,
+    shipped_quantity INTEGER DEFAULT 0,
+    rate NUMERIC(15, 2) NOT NULL,
+    gst_percent NUMERIC(5, 2) DEFAULT 12.00,
+    amount NUMERIC(15, 2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6c. OMS - Order Status History
+CREATE TABLE IF NOT EXISTS order_status_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+    from_status VARCHAR(50),
+    to_status VARCHAR(50) NOT NULL,
+    note TEXT,
+    changed_by UUID REFERENCES users(id),
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6d. OMS - Reserved Stock
+CREATE TABLE IF NOT EXISTS reserved_stock (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    batch_id UUID REFERENCES batches(id) ON DELETE CASCADE,
+    order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+    order_type VARCHAR(50) DEFAULT 'SalesOrder',
+    order_number VARCHAR(50),
+    qty_reserved INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(batch_id, order_id, order_type)
+);
+
+-- 6e. OMS - Order Returns
+CREATE TABLE IF NOT EXISTS order_returns (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+    return_number VARCHAR(50) UNIQUE,
+    return_date DATE NOT NULL,
+    reason TEXT,
+    status VARCHAR(50) DEFAULT 'Pending',
+    total_amount NUMERIC(15, 2) DEFAULT 0,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6f. OMS - Order Return Items
+CREATE TABLE IF NOT EXISTS order_return_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    return_id UUID REFERENCES order_returns(id) ON DELETE CASCADE,
+    order_item_id UUID REFERENCES order_items(id),
+    product_id UUID REFERENCES products(id),
+    product_name VARCHAR(255),
+    quantity INTEGER NOT NULL,
+    rate NUMERIC(15, 2) NOT NULL,
+    amount NUMERIC(15, 2) NOT NULL,
+    reason TEXT,
+    condition VARCHAR(50), -- Good, Damaged, Expired
+    restock BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 7. Purchases
@@ -219,6 +422,8 @@ CREATE TABLE IF NOT EXISTS chart_of_accounts (
     description TEXT,
     status VARCHAR(50) DEFAULT 'Active', -- Active, Inactive
     gst_applicable BOOLEAN DEFAULT FALSE,
+    tds_applicable BOOLEAN DEFAULT FALSE,
+    is_bank_or_cash BOOLEAN DEFAULT FALSE,
     account_format VARCHAR(20) DEFAULT 'debit', -- debit or credit
     reconciliation_status VARCHAR(50) DEFAULT 'Pending',
     cost_center_id UUID,

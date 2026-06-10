@@ -748,3 +748,11 @@ This file is the SINGLE SOURCE OF TRUTH for all architectural decisions.
   2. `current_balance = -opening_balance` for credit-normal accounts (Liability/Income/Equity) at creation
   3. `account_code` is unique — backend enforces UNIQUE constraint and returns 400 on conflict
   4. ACCOUNTANT, FINANCE_MANAGER, ADMIN roles can all create/update ledgers
+
+### Recently Added (2026-06-11) — Security & Schema Alignment
+- **Auth Bug Fix — Login failure (risk_score missing)**: The `users` table was missing columns required by the `authController.js` logic. Fixed by adding `risk_score`, `last_device_fingerprint`, `company_id`, `reset_token`, and `reset_token_expires` to the `users` table on the VPS.
+- **Auth Fix — Admin Password Reset**: Reset the default admin password to **`Admin@1234`** on the VPS and ensured the account is marked as `is_active = TRUE`.
+- **Schema Alignment — server/schema.sql**: Updated the master `server/schema.sql` file to include all mandatory security columns in the `users` table definition to ensure consistency across local and VPS environments.
+- **Inventory/Parties Schema Fixes**: Added `is_active` to `products`, `company_id` to `parties`, and `tds_applicable` to `chart_of_accounts` tables on the VPS and in the local schema to resolve seeding and integration errors.
+- **VPS Deployment**: Port 3002 verified for erp.metapharsic.cloud. PM2 config locked to `pm2.config.cjs`.
+

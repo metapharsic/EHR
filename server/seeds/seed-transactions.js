@@ -375,7 +375,7 @@ async function main() {
           await safeRun(`PO ${pi + 1} item`, async () => {
             await client.query(
               `INSERT INTO purchase_order_items
-                 (po_id, product_id, quantity, unit_price, total_amount)
+                 (purchase_order_id, product_id, quantity, unit_price, total_amount)
                VALUES ($1,$2,$3,$4,$5)`,
               [poId, line.prod.id, line.qty, line.unitPrice, line.total]
             );
@@ -392,25 +392,28 @@ async function main() {
     console.log('  D. Seeding CRM Data');
     console.log('═══════════════════════════════════════');
 
-    // D1. crm_leads (15)
-    const leadStatuses = ['NEW','NEW','NEW','CONTACTED','CONTACTED','QUALIFIED','QUALIFIED','QUALIFIED','PROPOSAL','PROPOSAL','NEGOTIATION','WON','WON','LOST','LOST'];
+    // D1. leads (15)
+    const leadStatuses = ['New','New','New','Contacted','Contacted','Qualified','Qualified','Qualified','Proposal','Proposal','Negotiation','Converted','Converted','Lost','Lost'];
     const leadSources = ['Website','Referral','Cold Call','Trade Show','Social Media','Email Campaign'];
     const territories = ['North Delhi','South Delhi','Mumbai West','Pune Central','Bangalore East','Hyderabad','Chennai North','Kolkata','Ahmedabad','Jaipur'];
     const firstNames = ['Rajesh','Priya','Amit','Sunita','Vikram','Neha','Arun','Deepa','Sanjay','Meena','Kiran','Rahul','Anjali','Mohan','Lakshmi'];
     const lastNames = ['Sharma','Patel','Gupta','Singh','Verma','Kumar','Joshi','Mehta','Nair','Rao','Iyer','Reddy','Chauhan','Bose','Pillai'];
     const companies = ['MedPlus Dist','HealthFirst Co','Apollo Rx','Sunrise Pharma','CureMax','LifeSpring','Wellness Depot','MediCare Dist','PharmaBridge','SciMed Solutions'];
 
+    const insertedLeads = [];
+
     for (let li = 0; li < 15; li++) {
       const firstName = firstNames[li % firstNames.length];
       const lastName = lastNames[(li + 3) % lastNames.length];
       const status = leadStatuses[li];
-      await safeRun(`CRM Lead ${li + 1}`, async () => {
-        await client.query(
-          `INSERT INTO crm_leads
-             (first_name, last_name, company, email, phone, territory, lead_source, status, score, notes, created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      await safeRun(`Lead ${li + 1}`, async () => {
+        const res = await client.query(
+          `INSERT INTO leads
+             (name, company_name, email, contact, location, source, status, lead_score, notes, assigned_to, company_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, 1)
+           RETURNING id`,
           [
-            firstName, lastName,
+            `${firstName} ${lastName}`,
             companies[li % companies.length],
             `${firstName.toLowerCase()}.${lastName.toLowerCase()}${li}@example.com`,
             `98${rand(10000000, 99999999)}`,
@@ -422,12 +425,14 @@ async function main() {
             userId,
           ]
         );
-        track('crm_leads');
+        insertedLeads.push(res.rows[0].id);
+        track('leads');
         console.log(`  ✅ Lead ${li + 1}: ${firstName} ${lastName} [${status}]`);
       });
     }
 
     // D2. crm_contacts (10)
+    // Note: crm_contacts table will be created via migration
     const channels = ['WHATSAPP','EMAIL','PHONE','IN_PERSON'];
     const designations = ['Pharmacist','Doctor','Hospital Admin','Purchase Manager','Medical Officer','Director','CEO','Partner'];
     const departments = ['Procurement','Medical','Operations','Sales','Management'];
@@ -458,7 +463,8 @@ async function main() {
       });
     }
 
-    // D3. crm_opportunities (5) – no account/contact FK required
+    // D3. crm_opportunities (5)
+    // Note: crm_opportunities table will be created via migration
     const oppStages = ['DISCOVERY','PROPOSAL','NEGOTIATION','CLOSED_WON','CLOSED_LOST'];
     const oppNames = [
       'Q3 Hospital Supply Contract','Bulk Pharma Distribution Deal','Annual Drug Procurement',
@@ -489,8 +495,8 @@ async function main() {
       });
     }
 
-    // D4. crm_activities (8)
-    const actTypes = ['CALL','CALL','EMAIL','EMAIL','MEETING','MEETING','VISIT','CALL'];
+    // D4. lead_activities (8)
+    const actTypes = ['Call','Call','Email','Email','Meeting','Meeting','Visit','Call'];
     const subjects = [
       'Initial product introduction call','Follow-up on quotation','Send product catalogue via email',
       'Q3 pricing email campaign','Quarterly business review meeting','Demo meeting at client office',
@@ -499,28 +505,27 @@ async function main() {
     const outcomes = ['Interested','Needs Follow-up','Proposal Requested','No Response','Meeting Scheduled','Demo Completed','Order Placed','Call Back Later'];
 
     for (let ai = 0; ai < 8; ai++) {
-      await safeRun(`CRM Activity ${ai + 1}`, async () => {
-        const scheduledAt = new Date();
-        scheduledAt.setDate(scheduledAt.getDate() - rand(1, 30));
-        const completedAt = new Date(scheduledAt.getTime() + rand(15, 90) * 60000);
+      await safeRun(`Lead Activity ${ai + 1}`, async () => {
+        const leadId = pick(insertedLeads);
+        const performedAt = new Date();
+        performedAt.setDate(performedAt.getDate() - rand(1, 30));
         await client.query(
-          `INSERT INTO crm_activities
-             (activity_type, subject, description, performed_by, scheduled_at, completed_at, outcome, duration_minutes, created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          `INSERT INTO lead_activities
+             (lead_id, type, description, performed_by, performed_at, outcome, duration, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
           [
+            leadId,
             actTypes[ai],
             subjects[ai],
-            `Activity ${ai + 1}: ${subjects[ai]}. Outcome: ${outcomes[ai]}.`,
             userId,
-            scheduledAt.toISOString(),
-            completedAt.toISOString(),
+            performedAt.toISOString(),
             outcomes[ai],
             rand(10, 90),
-            userId,
+            performedAt.toISOString()
           ]
         );
-        track('crm_activities');
-        console.log(`  ✅ Activity ${ai + 1}: [${actTypes[ai]}] ${subjects[ai]}`);
+        track('lead_activities');
+        console.log(`  ✅ Lead Activity ${ai + 1}: [${actTypes[ai]}] ${subjects[ai]}`);
       });
     }
 
