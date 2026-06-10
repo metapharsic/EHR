@@ -111,9 +111,9 @@ async function login(req, res) {
     // Generate a basic fingerprint from headers if none provided
     const deviceFingerprint = fingerprint || crypto.createHash('sha256').update(req.headers['user-agent'] || 'unknown').digest('hex');
 
-    // Get user
+    // Get user by username or email
     const { rows } = await db.query(
-      'SELECT * FROM users WHERE LOWER(username) = LOWER($1)',
+      'SELECT * FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1)',
       [username]
     );
 
