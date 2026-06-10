@@ -1,4 +1,4 @@
-# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v8.0
+# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v9.0
 # MAXIMUM AUTOMATION | PRODUCTION-GRADE LOGIC | AGENTIC AI STANDARDS
 # Last updated: 2026-06-11
 
@@ -35,16 +35,31 @@ You are an expert full-stack developer managing the Metapharsic pharmaceutical e
 - **Finance**: Authoritative tables are `chart_of_accounts`, `journal_vouchers`, `journal_voucher_entries`, `general_ledger`.
 
 ### C. Module-Specific Invariants (STRICT)
-1. **Accounting**: 
-   - Debit-normal (Asset, Expense): `Balance = Dr - Cr`. 
-   - Credit-normal (Liability, Income, Equity): `Balance = Cr - Dr` (Stored as negative in sum columns).
-   - `current_balance` MUST be initialized from `opening_balance` at account creation.
-2. **Inventory**: 
-   - `selling_rate` and `mrp` MUST exist on both `products` (default) and `batches` (actual).
-   - `stock_ledger_entries` must be updated on every movement (IN/OUT).
-3. **Users**: 
-   - MUST have `risk_score`, `last_device_fingerprint`, and `company_id`.
-   - Admin bypass: `admin` / `Admin@1234`.
+
+#### 1. PCD (Partner & MR Management)
+- **Commissions**: Must be auto-calculated upon Order Invoicing. Base rate + scheme bonus logic resides in `pcdService.js`.
+- **MR Sync**: Performance stats MUST be pulled from ERP `pcd_transactions` for financials and MR Tracker for activity.
+- **Targets**: Monthly/Quarterly targets tracked via `pcd_targets`. Status: `PENDING` -> `ON_TRACK` -> `ACHIEVED`.
+
+#### 2. OMS (Order Management System)
+- **Lifecycle**: `Pending Approval` -> `Approved` -> `Processing` -> `Shipped` -> `Delivered` -> `Invoiced`.
+- **Stock Reservation**: `reserved_stock` MUST be created when an order is `Approved` and cleared when `Shipped`.
+- **AI Risk**: `ai_risk_score` MUST evaluate distributor credit utilization + aging + order volume.
+
+#### 3. HRMS (Human Resources)
+- **Payroll**: Processing MUST trigger Ledger entries via `ledgerHelper.processVoucher()`.
+- **Exit Clearance**: Triggers auto-reassignment of CRM leads and OMS distributors to the reporting manager.
+- **Attendance**: Anomalies (e.g., multiple misses) MUST be logged to `compliance_logs`.
+
+#### 4. Compliance & Regulatory
+- **Narcotics/H1**: All sales of `is_narcotic` or `schedule_type='H1'` products MUST be logged to `h1_register`.
+- **License Tracking**: `drug_licenses` expiry MUST be checked during Party creation and Order placement.
+- **Cold Chain**: Temperature-sensitive products MUST have `temperature_logs` linked to their batches.
+
+#### 5. POS & Billing
+- **Real-time Stock**: Prevent billing if `batches.stock` is insufficient. No "negative stock" allowed.
+- **GST Logic**: Automated SGST/CGST (Intra-state) vs IGST (Inter-state) calculation based on Party and Company state.
+- **Retail/Wholesale**: Support both "Quick Cash" checkout and "Credit Bill" with distributor selection.
 
 ---
 
