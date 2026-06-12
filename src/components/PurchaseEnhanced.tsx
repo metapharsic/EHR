@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
  Truck, Plus, Search, Filter, Calendar, FileText, CheckCircle, AlertCircle, 
  Clock, X, RefreshCw, ArrowRight, Save, Trash2, CreditCard, 
@@ -98,6 +98,7 @@ const PurchaseEnhanced: React.FC = () => {
  const [isNewPurchaseModalOpen, setIsNewPurchaseModalOpen] = useState(false);
  const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
  const [newOrderForm, setNewOrderForm] = useState({
+ id: crypto.randomUUID(),
  invoice_no: `PO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
  supplier_id: '',
  order_date: new Date().toISOString().split('T')[0],
@@ -136,6 +137,7 @@ const PurchaseEnhanced: React.FC = () => {
  success('Purchase Order Created & Budget Validated!');
  setIsNewPurchaseModalOpen(false);
  setNewOrderForm({
+ id: crypto.randomUUID(),
  invoice_no: `PO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
  supplier_id: '',
  order_date: new Date().toISOString().split('T')[0],
@@ -197,13 +199,17 @@ const PurchaseEnhanced: React.FC = () => {
  expected_delivery_date: editForm.expected_delivery_date || null,
  payment_terms: editForm.payment_terms || null,
  delivery_mode: editForm.delivery_mode || null,
+ category_id: editForm.category_id || null,
+ priority: editForm.priority || null,
  notes: editForm.notes || null,
  status: editForm.status || null,
  items: editItems.map(item => ({
  ...item,
  product_id: item.product_id || null,
  batch_no: item.batch_no || null,
- expiry_date: item.expiry_date || null
+ expiry_date: item.expiry_date || null,
+ mrp: item.mrp || 0,
+ gst_rate: item.gst_rate || 0
  }))
  };
  break;
@@ -319,7 +325,7 @@ const PurchaseEnhanced: React.FC = () => {
  const totalSpent = (purchases as any[] || []).reduce((acc, curr) => acc + (Number(curr.total_amount) || 0), 0);
  const pendingApprovals = (approvals as any[] || []).length;
  const criticalReorders = (reorderAlerts as any[] || []).length;
- const mismatchCount = (matches as any[] || []).filter(m => m.status === 'Mismatch').length;
+ const mismatchCount = (matches as any[] || []).filter(m => m.match_status === 'Mismatch').length;
  const trend = poResponse?.trend || 0;
 
  return { totalSpent, pendingApprovals, criticalReorders, mismatchCount, trend };
@@ -377,7 +383,7 @@ const PurchaseEnhanced: React.FC = () => {
  <div className="flex gap-4">
  <AlertCircle className="w-7 h-7 text-red-600 flex-shrink-0" />
  <div>
- <h3 className="font-bold text-red-900 text-lg">⚠️ Database Connection Failed</h3>
+ <h3 className="font-bold text-red-900 text-lg">⚠️  Database Connection Failed</h3>
  <p className="text-red-700 text-sm mt-1">{dbStatus.error || 'Unable to connect to database'}</p>
  <p className="text-red-600 text-xs mt-2">
  Ensure PostgreSQL is running and backend server is active on port 5005
@@ -602,7 +608,7 @@ const PurchaseEnhanced: React.FC = () => {
  render: (v) => v ? formatCurrency(v) : <span className="text-slate-300">N/A</span>
  },
  { 
- key: 'variance', 
+ key: 'variance_amount', 
  label: 'Variance', 
  width: '12%', 
  align: 'right',
@@ -613,7 +619,7 @@ const PurchaseEnhanced: React.FC = () => {
  )
  },
  { 
- key: 'status', 
+ key: 'match_status', 
  label: 'Match Status', 
  width: '15%', 
  align: 'center',

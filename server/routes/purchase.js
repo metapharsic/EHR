@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT po.id, po.company_id, po.supplier_id, po.po_number, po.date, po.total_amount, po.status, po.created_by, po.created_at, po.updated_at,
+      SELECT po.id, po.company_id, po.supplier_id, po.po_number as invoice_no, po.date as order_date, po.total_amount, po.status, po.created_by, po.created_at, po.updated_at,
              s.name as supplier_name, NULL as supplier_code,
              COUNT(poi.id)::int as item_count,
              COALESCE(SUM(poi.total_amount), 0)::numeric as total_amount
@@ -148,10 +148,13 @@ router.post('/', async (req, res) => {
   const client = await db.getClient();
   try {
     const {
+      id,
       invoice_no,
       supplier_id,
       order_date,
       category_id = 'GENERAL',
+      priority,
+      notes,
       items = []
     } = req.body;
 
@@ -188,23 +191,45 @@ router.post('/', async (req, res) => {
     }
 
     // 3. Insert purchase order
+    const generatedId = id || uuidv4();
     const { rows: poResult } = await client.query(
       `INSERT INTO purchase_orders 
-       (po_number, supplier_id, date, status, created_by)
-       VALUES ($1, $2, $3, 'Draft', $4)
+       (id, po_number, supplier_id, date, status, created_by, total_amount, category_id, priority, notes)
+       VALUES ($1, $2, $3, $4, 'Pending Approval', $5, $6, $7, $8, $9)
+       ON CONFLICT (id) DO NOTHING
        RETURNING id`,
-      [invoice_no, supplier_id, order_date, req.user.userId]
+      [generatedId, invoice_no, supplier_id, order_date, req.user.userId, totalAmount, category_id, priority || null, notes || null]
     );
 
-    const poId = poResult[0].id;
+    let poId = generatedId;
+    
+    if (poResult.length > 0) {
+      // 4. Insert line items
+      for (const item of items) {
+        await client.query(
+          `INSERT INTO purchase_order_items 
+           (po_id, product_id, quantity, unit_price, total_amount, mrp, gst_rate, batch_no, expiry_date)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            poId, 
+            item.product_id, 
+            item.quantity, 
+            item.purchase_rate, 
+            (item.quantity * item.purchase_rate),
+            item.mrp || 0,
+            item.gst_rate || 0,
+            item.batch_no || null,
+            item.expiry_date || null
+          ]
+        );
+      }
 
-    // 4. Insert line items
-    for (const item of items) {
+      // 5. Initiate Approval Workflow
       await client.query(
-        `INSERT INTO purchase_order_items 
-         (po_id, product_id, quantity, unit_price, total_amount)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [poId, item.product_id, item.quantity, item.purchase_rate, (item.quantity * item.purchase_rate)]
+        `INSERT INTO approval_workflows
+         (document_type, document_id, current_level, total_levels, status)
+         VALUES ('PO', $1, 1, 2, 'Pending')`,
+        [poId]
       );
     }
 
@@ -236,8 +261,9 @@ router.get('/3-way-match', async (req, res) => {
         COALESCE((SELECT SUM(quantity * unit_price) FROM purchase_order_items WHERE po_id = po.id), 0) as "poAmount",
         COALESCE((SELECT SUM(accepted_qty * unit_price) FROM grn_items gi JOIN goods_received_notes g ON gi.grn_id = g.id WHERE g.purchase_order_id = po.id), 0) as "grnAmount",
         COALESCE(si.total_amount, 0) as "invoiceAmount",
-        COALESCE(twm.match_status, 'Pending') as "status",
-        COALESCE(twm.variance_amount, 0) as "variance",
+        COALESCE(twm.match_status, 'Pending') as "match_status",
+        COALESCE(twm.variance_amount, 0) as "variance_amount",
+        twm.remarks as "remarks",
         twm.id as "id"
       FROM purchase_orders po
       LEFT JOIN suppliers s ON po.supplier_id = s.id
@@ -458,7 +484,8 @@ router.get('/:id', async (req, res, next) => {
   }
   try {
     const { rows: purchase } = await db.query(
-      `SELECT po.id, po.company_id, po.supplier_id, po.po_number, po.date, po.total_amount, po.status, po.created_by, po.created_at, po.updated_at,
+      `SELECT po.id, po.company_id, po.supplier_id, po.po_number as invoice_no, po.date as order_date, po.total_amount, po.status, po.created_by, po.created_at, po.updated_at,
+              po.category_id, po.priority, po.notes,
               s.name as supplier_name, NULL as supplier_code, s.gstin, s.mobile, s.email, s.address, s.city
        FROM purchase_orders po
        LEFT JOIN parties s ON po.supplier_id = s.id
@@ -471,7 +498,8 @@ router.get('/:id', async (req, res, next) => {
     }
 
     const { rows: items } = await db.query(
-      `SELECT poi.id, poi.po_id, poi.product_id, poi.quantity, poi.unit_price, poi.total_amount, poi.created_at,
+      `SELECT poi.id, poi.po_id, poi.product_id, poi.quantity, poi.unit_price as purchase_rate, poi.total_amount, poi.created_at,
+              poi.mrp, poi.gst_rate, poi.batch_no, poi.expiry_date,
               p.name as product_name, p.code as product_code
        FROM purchase_order_items poi
        LEFT JOIN products p ON poi.product_id = p.id
@@ -510,6 +538,8 @@ router.put('/:id', async (req, res) => {
       expected_delivery_date, 
       payment_terms, 
       delivery_mode, 
+      category_id,
+      priority,
       notes, 
       status,
       items = [] 
@@ -524,14 +554,20 @@ router.put('/:id', async (req, res) => {
            supplier_id = COALESCE($2, supplier_id),
            date = COALESCE($3, date),
            status = COALESCE($4, status),
+           category_id = COALESCE($5, category_id),
+           priority = COALESCE($6, priority),
+           notes = COALESCE($7, notes),
            updated_at = NOW()
-       WHERE id = $5
+       WHERE id = $8
        RETURNING *`,
       [
         invoice_no, 
         supplier_id, 
         order_date, 
         status, 
+        category_id,
+        priority,
+        notes,
         id
       ]
     );
@@ -550,14 +586,18 @@ router.put('/:id', async (req, res) => {
       for (const item of items) {
         await client.query(
           `INSERT INTO purchase_order_items 
-           (po_id, product_id, quantity, unit_price, total_amount)
-           VALUES ($1, $2, $3, $4, $5)`,
+           (po_id, product_id, quantity, unit_price, total_amount, mrp, gst_rate, batch_no, expiry_date)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [
             id, 
             item.product_id, 
             item.quantity, 
             item.purchase_rate,
-            (item.quantity * item.purchase_rate)
+            (item.quantity * item.purchase_rate),
+            item.mrp || 0,
+            item.gst_rate || 0,
+            item.batch_no || null,
+            item.expiry_date || null
           ]
         );
       }
@@ -764,7 +804,7 @@ router.delete('/:id', async (req, res) => {
     await client.query('BEGIN');
     
     // 1. Delete items first (FK constraint)
-    await client.query('DELETE FROM purchase_order_items WHERE purchase_order_id = $1', [id]);
+    await client.query('DELETE FROM purchase_order_items WHERE po_id = $1', [id]);
     
     // 2. Delete the PO
     const { rowCount } = await client.query('DELETE FROM purchase_orders WHERE id = $1', [id]);
