@@ -153,7 +153,7 @@ const Accounts: React.FC = () => {
  }
  try {
  setIsSubmitting(true);
- const token = localStorage.getItem('token');
+ const token = localStorage.getItem('accessToken');
  const method = editingAccountId ? 'PUT' : 'POST';
  const url = editingAccountId ? `/api/accounting/chart-of-accounts/${editingAccountId}` : '/api/accounting/chart-of-accounts';
  
@@ -200,7 +200,7 @@ const Accounts: React.FC = () => {
  const handleDeleteAccount = async (id: string) => {
  if (!window.confirm('Are you sure you want to delete this account?')) return;
  try {
- const token = localStorage.getItem('token');
+ const token = localStorage.getItem('accessToken');
  const response = await fetch(`/api/accounting/chart-of-accounts/${id}`, {
  method: 'DELETE',
  headers: { 'Authorization': `Bearer ${token}` }
