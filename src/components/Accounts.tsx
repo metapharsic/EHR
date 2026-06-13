@@ -8,7 +8,7 @@ import React, { useState, useMemo } from 'react';
 import { 
  FileText, User, Plus, TrendingUp, RefreshCcw, BookOpen,
  Grid, Shield, Zap, LayoutDashboard, Package, Scale, Landmark, Calculator,
- ArrowUpRight, ArrowDownLeft, Wallet, PieChart, X, Edit3, Trash2
+ ArrowUpRight, ArrowDownLeft, Wallet, PieChart, X, Pencil, Trash2
 } from 'lucide-react';
 
 // Standardized Layout Components
@@ -335,7 +335,7 @@ const Accounts: React.FC = () => {
  <button onClick={() => { setSelectedPartyId(row.id); openTab('LEDGER', 'General Ledger'); }} className="text-accent hover:underline font-bold text-xs uppercase tracking-widest">Detail</button>
  {canEdit && (
  <>
- <button onClick={() => handleEditAccount(row)} className="text-slate-500 hover:text-blue-600 font-bold text-xs uppercase tracking-widest"><Edit3 size={14} /></button>
+ <button onClick={() => handleEditAccount(row)} className="text-slate-500 hover:text-blue-600 font-bold text-xs uppercase tracking-widest"><Pencil size={14} /></button>
  <button onClick={() => handleDeleteAccount(row.id)} className="text-slate-500 hover:text-red-600 font-bold text-xs uppercase tracking-widest"><Trash2 size={14} /></button>
  </>
  )}

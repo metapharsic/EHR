@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { JournalVoucherService, ChartOfAccountsService } from '../services/accountingService';
-import { Plus, BookOpen, Save, X, AlertCircle, Search, Filter, RotateCcw, Eye, ChevronDown, ChevronRight, Printer, Download, Edit3, Trash2 } from 'lucide-react';
+import { Plus, BookOpen, Save, X, AlertCircle, Search, Filter, RotateCcw, Eye, ChevronDown, ChevronRight, Printer, Download, Pencil, Trash2 } from 'lucide-react';
 import { DenseGrid } from './common/DenseGrid';
 import { useCompany } from '../context/CompanyContext';
 import { printJournalVoucher, exportJournalVouchers } from '../utils/accountingExport';
@@ -482,7 +482,7 @@ export const JournalVoucherManager: React.FC = () => {
  <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
  <button onClick={() => viewVoucher(v)} title="View Detail" className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all"><Eye size={15}/></button>
  {v.status === 'Draft' && (
-   <button onClick={() => handleEdit(v)} title="Edit Draft" className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"><Edit3 size={15}/></button>
+   <button onClick={() => handleEdit(v)} title="Edit Draft" className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"><Pencil size={15}/></button>
  )}
  {v.status === 'Draft' && (
    <button onClick={() => handleDelete(v)} title="Delete Draft" className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={15}/></button>
