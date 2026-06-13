@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Search, Map, Plus, Users, Shield, MapPin, Phone, Mail, FileText, Gift, TrendingUp, Briefcase, X, ArrowLeft, UserPlus, Target, Calendar, DollarSign, BarChart3, PieChart, Award, CheckCircle, AlertCircle, Clock, Edit3, Trash2, Eye, Download, Printer, Filter, RefreshCcw, Building2, CreditCard, Truck, Package, Zap, Activity, MessageCircle } from 'lucide-react';
+import { Search, Map, Plus, Users, Shield, MapPin, Phone, Mail, FileText, Gift, TrendingUp, Briefcase, X, ArrowLeft, UserPlus, Target, Calendar, DollarSign, BarChart3, PieChart, Award, CheckCircle, AlertCircle, Clock, Pencil, Trash2, Eye, Download, Printer, Filter, RefreshCcw, Building2, CreditCard, Truck, Package, Zap, Activity, MessageCircle } from 'lucide-react';
 import apiClient from '../services/apiClient';
 import { PCDPartner, MedicalRepresentative, PCDScheme, PCDTarget, SaleTransaction } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -614,7 +614,7 @@ const StrategicPCD: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-xs text-slate-500 font-bold uppercase mb-1">Financial Terms</p>
-                    <p className="text-sm text-slate-600">Credit Limit: â‚¹{selectedPartner.creditLimit?.toLocaleString() || 'N/A'}</p>
+                    <p className="text-sm text-slate-600">Credit Limit: ₹{selectedPartner.creditLimit?.toLocaleString() || 'N/A'}</p>
                     <p className="text-sm text-slate-600">Payment Terms: {selectedPartner.paymentTerms || '30 Days'}</p>
                   </div>
                 </div>
@@ -651,7 +651,7 @@ const StrategicPCD: React.FC = () => {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-slate-300 text-sm">Suggested Credit Limit</span>
                     <span className="font-bold text-blue-400">
-                      â‚¹{churnRisk > 50 ? Math.floor(selectedPartner.creditLimit * 0.5).toLocaleString() : Math.floor(selectedPartner.creditLimit * 1.5).toLocaleString()}
+                      ₹{churnRisk > 50 ? Math.floor(selectedPartner.creditLimit * 0.5).toLocaleString() : Math.floor(selectedPartner.creditLimit * 1.5).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -690,7 +690,7 @@ const StrategicPCD: React.FC = () => {
                         </div>
                         <div>
                           <p className="font-bold text-slate-800">{mr.name}</p>
-                          <p className="text-xs text-slate-500">{mr.headquarters} â€¢ {mr.contact}</p>
+                          <p className="text-xs text-slate-500">{mr.headquarters} • {mr.contact}</p>
                           <p className="text-xs text-slate-500 mt-1">Area: {mr.assignedArea}</p>
                         </div>
                       </div>
@@ -753,7 +753,7 @@ const StrategicPCD: React.FC = () => {
                             <td className="p-2 font-medium">{transaction.productName}</td>
                             <td className="p-2 text-slate-600">{mr?.name || 'Unknown'}</td>
                             <td className="p-2 text-right">{transaction.quantity}</td>
-                            <td className="p-2 text-right font-bold">â‚¹{transaction.amount.toLocaleString()}</td>
+                            <td className="p-2 text-right font-bold">₹{transaction.amount.toLocaleString()}</td>
                           </tr>
                         );
                       })}
@@ -798,10 +798,10 @@ const StrategicPCD: React.FC = () => {
             {/* Performance Dashboard */}
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-xl shadow-lg text-white">
               <p className="text-slate-400 text-xs font-bold uppercase mb-2">Current Quarter Performance</p>
-              <h3 className="text-3xl font-bold mb-1">â‚¹5,00,000</h3>
-              <p className="text-slate-300 text-sm mb-4">Target: â‚¹7,50,000</p>
+              <h3 className="text-3xl font-bold mb-1">₹5,00,000</h3>
+              <p className="text-slate-300 text-sm mb-4">Target: ₹7,50,000</p>
               <div className="flex justify-between text-xs text-slate-400 mb-4">
-                <span>Achieved: â‚¹3,50,000</span>
+                <span>Achieved: ₹3,50,000</span>
                 <span>46.7%</span>
               </div>
               <div className="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden">
@@ -835,11 +835,11 @@ const StrategicPCD: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Q3 2023 Target</span>
-                  <span className="font-bold">â‚¹5,00,000</span>
+                  <span className="font-bold">₹5,00,000</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Achieved</span>
-                  <span className="font-bold text-green-600">â‚¹3,50,000</span>
+                  <span className="font-bold text-green-600">₹3,50,000</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-slate-600">Incentive Rate</span>
@@ -848,7 +848,7 @@ const StrategicPCD: React.FC = () => {
                 <div className="pt-2 border-t border-slate-100">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-800">Expected Incentive</span>
-                    <span className="font-bold text-green-600">â‚¹7,000</span>
+                    <span className="font-bold text-green-600">₹7,000</span>
                   </div>
                 </div>
               </div>
@@ -1070,7 +1070,7 @@ const StrategicPCD: React.FC = () => {
             <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
               <div>
                 <p className="text-slate-500 text-sm font-medium">Total Sales</p>
-                <h3 className="text-2xl font-bold text-slate-800">â‚¹{totalSales.toLocaleString()}</h3>
+                <h3 className="text-2xl font-bold text-slate-800">₹{totalSales.toLocaleString()}</h3>
                 <p className="text-xs text-green-600 mt-1">+15% from Q2</p>
               </div>
               <div className="p-3 bg-green-50 text-green-600 rounded-lg"><DollarSign size={24} /></div>
@@ -1114,8 +1114,8 @@ const StrategicPCD: React.FC = () => {
                         ></div>
                       </div>
                       <div className="flex justify-between text-xs text-slate-500 mt-1">
-                        <span>â‚¹{target.achievedAmount.toLocaleString()}</span>
-                        <span>Target: â‚¹{target.targetAmount.toLocaleString()}</span>
+                        <span>₹{target.achievedAmount.toLocaleString()}</span>
+                        <span>Target: ₹{target.targetAmount.toLocaleString()}</span>
                       </div>
                     </div>
                   );
@@ -1161,7 +1161,7 @@ const StrategicPCD: React.FC = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-slate-800">â‚¹{partnerSales.toLocaleString()}</p>
+                          <p className="font-bold text-slate-800">₹{partnerSales.toLocaleString()}</p>
                           <p className="text-xs text-slate-500">Sales Volume</p>
                         </div>
                       </div>
@@ -1196,7 +1196,7 @@ const StrategicPCD: React.FC = () => {
                 </div>
                 <h4 className="font-bold text-white mb-1">Vidarbha Region</h4>
                 <p className="text-xs text-slate-400 mb-3">High search volume for cardiovascular range but 0 active PCD partners within a 150km radius.</p>
-                <button className="text-xs font-bold text-blue-400 hover:text-blue-300">Run Acquisition Campaign â†’</button>
+                <button className="text-xs font-bold text-blue-400 hover:text-blue-300">Run Acquisition Campaign →</button>
               </div>
               
               <div className="bg-slate-800/80 p-5 rounded-lg border border-slate-700 hover:border-orange-500/50 transition-colors">
@@ -1206,7 +1206,7 @@ const StrategicPCD: React.FC = () => {
                 </div>
                 <h4 className="font-bold text-white mb-1">Pune Central & PCMC</h4>
                 <p className="text-xs text-slate-400 mb-3">3 partners operating with overlapping monopoly lines. Territory friction detected in recent order drops.</p>
-                <button className="text-xs font-bold text-blue-400 hover:text-blue-300">View Friction Map â†’</button>
+                <button className="text-xs font-bold text-blue-400 hover:text-blue-300">View Friction Map →</button>
               </div>
               
               <div className="bg-slate-800/80 p-5 rounded-lg border border-slate-700 hover:border-purple-500/50 transition-colors">
@@ -1216,7 +1216,7 @@ const StrategicPCD: React.FC = () => {
                 </div>
                 <h4 className="font-bold text-white mb-1">Nashik Corridor</h4>
                 <p className="text-xs text-slate-400 mb-3">Perfect 1:1 distributor-to-retailer density. Partner is capturing 85% of target market share without friction.</p>
-                <button className="text-xs font-bold text-blue-400 hover:text-blue-300">Analyze Strategy â†’</button>
+                <button className="text-xs font-bold text-blue-400 hover:text-blue-300">Analyze Strategy →</button>
               </div>
             </div>
           </div>
@@ -1238,7 +1238,7 @@ const StrategicPCD: React.FC = () => {
             <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                <input type="text" placeholder="Search name, territory, license…"
+                <input type="text" placeholder="Search name, territory, license�"
                   className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
                   value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               </div>
@@ -1263,7 +1263,7 @@ const StrategicPCD: React.FC = () => {
 
           {networkLoading ? (
             <div className="flex items-center justify-center py-16 text-slate-400 bg-white rounded-xl border border-slate-200">
-              <RefreshCcw size={22} className="animate-spin mr-2" /> Loading partners…
+              <RefreshCcw size={22} className="animate-spin mr-2" /> Loading partners�
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -1284,7 +1284,7 @@ const StrategicPCD: React.FC = () => {
                           </div>
                           <div>
                             <h3 className="font-bold text-slate-800 leading-tight">{p.name}</h3>
-                            <p className="text-xs text-slate-500">{p.territory}{p.state ? ` · ${p.state}` : ''}</p>
+                            <p className="text-xs text-slate-500">{p.territory}{p.state ? ` � ${p.state}` : ''}</p>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
@@ -1306,9 +1306,9 @@ const StrategicPCD: React.FC = () => {
                       </div>
 
                       <div className="mt-3 flex gap-3 text-xs text-slate-500">
-                        <span>Credit: <strong className="text-slate-700">₹{Number(p.credit_limit || 0).toLocaleString('en-IN')}</strong></span>
+                        <span>Credit: <strong className="text-slate-700">?{Number(p.credit_limit || 0).toLocaleString('en-IN')}</strong></span>
                         <span>Discount: <strong className="text-slate-700">{p.discount_percentage}%</strong></span>
-                        <span>Business: <strong className="text-sky-700">₹{Number(p.total_business || 0).toLocaleString('en-IN')}</strong></span>
+                        <span>Business: <strong className="text-sky-700">?{Number(p.total_business || 0).toLocaleString('en-IN')}</strong></span>
                       </div>
                     </div>
 
@@ -1316,7 +1316,7 @@ const StrategicPCD: React.FC = () => {
                     <div className="border-t border-slate-100 px-4 py-3 flex gap-2">
                       <button onClick={() => handleEditPartner(p)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium bg-sky-50 text-sky-700 border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors">
-                        <Edit3 size={12} /> Edit
+                        <Pencil size={12} /> Edit
                       </button>
                       <button onClick={() => setSelectedPartner(p as any)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
@@ -1340,7 +1340,7 @@ const StrategicPCD: React.FC = () => {
             <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-auto">
                 <div className="bg-slate-900 text-white px-5 py-4 flex justify-between items-center rounded-t-xl">
-                  <h3 className="font-bold flex items-center gap-2"><Edit3 size={16} /> Edit Partner — {editPartner.name}</h3>
+                  <h3 className="font-bold flex items-center gap-2"><Pencil size={16} /> Edit Partner � {editPartner.name}</h3>
                   <button onClick={() => setEditPartner(null)} className="hover:bg-slate-700 p-1 rounded"><X size={18} /></button>
                 </div>
                 <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
@@ -1358,7 +1358,7 @@ const StrategicPCD: React.FC = () => {
                       { label: 'License Expiry', key: 'drug_license_expiry', type: 'date' },
                       { label: 'GSTIN', key: 'gst_registration' },
                       { label: 'GST Expiry', key: 'gstin_expiry', type: 'date' },
-                      { label: 'Credit Limit (₹)', key: 'credit_limit', type: 'number' },
+                      { label: 'Credit Limit (?)', key: 'credit_limit', type: 'number' },
                       { label: 'Discount %', key: 'discount_percentage', type: 'number' },
                     ].map(f => (
                       <div key={f.key} className={f.span === 2 ? 'col-span-2' : ''}>
@@ -1391,7 +1391,7 @@ const StrategicPCD: React.FC = () => {
                     className="flex-1 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-white">Cancel</button>
                   <button onClick={handleSaveEdit} disabled={editSaving}
                     className="flex-1 py-2 bg-sky-600 text-white rounded-lg text-sm font-medium hover:bg-sky-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                    {editSaving ? <><RefreshCcw size={14} className="animate-spin" /> Saving…</> : <><CheckCircle size={14} /> Save Changes</>}
+                    {editSaving ? <><RefreshCcw size={14} className="animate-spin" /> Saving�</> : <><CheckCircle size={14} /> Save Changes</>}
                   </button>
                 </div>
               </div>
@@ -1408,7 +1408,7 @@ const StrategicPCD: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-800">Remove Partner</h3>
-                    <p className="text-sm text-slate-500">This is a soft delete — data is retained</p>
+                    <p className="text-sm text-slate-500">This is a soft delete � data is retained</p>
                   </div>
                 </div>
                 <p className="text-sm text-slate-700 mb-5 bg-slate-50 rounded-lg p-3 border border-slate-200">
@@ -1419,7 +1419,7 @@ const StrategicPCD: React.FC = () => {
                     className="flex-1 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
                   <button onClick={handleDeletePartner} disabled={deleting}
                     className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                    {deleting ? <><RefreshCcw size={14} className="animate-spin" /> Removing…</> : <><Trash2 size={14} /> Remove</>}
+                    {deleting ? <><RefreshCcw size={14} className="animate-spin" /> Removing�</> : <><Trash2 size={14} /> Remove</>}
                   </button>
                 </div>
               </div>
@@ -1470,7 +1470,7 @@ const StrategicPCD: React.FC = () => {
                           className="p-1 text-blue-600 hover:bg-blue-50 rounded"
                           title="Edit"
                         >
-                          <Edit3 size={14} />
+                          <Pencil size={14} />
                         </button>
                         <button 
                           onClick={() => handleDeleteScheme(scheme.id)}
@@ -1491,7 +1491,7 @@ const StrategicPCD: React.FC = () => {
                     </div>
                     {scheme.minimumOrder && (
                       <div className="flex items-center gap-2 text-slate-500">
-                        <Target size={12} /> <span className="font-medium">Min. Order:</span> â‚¹{scheme.minimumOrder.toLocaleString()}
+                        <Target size={12} /> <span className="font-medium">Min. Order:</span> ₹{scheme.minimumOrder.toLocaleString()}
                       </div>
                     )}
                     {scheme.discountPercentage && (
@@ -1544,7 +1544,7 @@ const StrategicPCD: React.FC = () => {
             <form onSubmit={handleCreateTransaction} className="p-6 space-y-4">
               <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
                 <p className="text-sm text-amber-800 font-bold">Applying: {selectedSchemeForTx?.name}</p>
-                <p className="text-xs text-amber-700 mt-1">Benefit: {selectedSchemeForTx?.discountPercentage}% Discount (Min Order: â‚¹{selectedSchemeForTx?.minimumOrder?.toLocaleString()})</p>
+                <p className="text-xs text-amber-700 mt-1">Benefit: {selectedSchemeForTx?.discountPercentage}% Discount (Min Order: ₹{selectedSchemeForTx?.minimumOrder?.toLocaleString()})</p>
               </div>
 
               <div>
@@ -1609,7 +1609,7 @@ const StrategicPCD: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Order Amount (â‚¹) *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Order Amount (₹) *</label>
                   <input
                     type="number"
                     required
@@ -1692,8 +1692,8 @@ const StrategicPCD: React.FC = () => {
                         </td>
                         <td className="p-4 text-sm text-slate-600">{partner?.territory || 'N/A'}</td>
                         <td className="p-4 text-sm text-slate-600">{target.period}</td>
-                        <td className="p-4 text-right text-sm text-slate-600">â‚¹{target.targetAmount.toLocaleString()}</td>
-                        <td className="p-4 text-right text-sm font-bold text-slate-800">â‚¹{target.achievedAmount.toLocaleString()}</td>
+                        <td className="p-4 text-right text-sm text-slate-600">₹{target.targetAmount.toLocaleString()}</td>
+                        <td className="p-4 text-right text-sm font-bold text-slate-800">₹{target.achievedAmount.toLocaleString()}</td>
                         <td className="p-4">
                           <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
                             <div 
@@ -1724,7 +1724,7 @@ const StrategicPCD: React.FC = () => {
                               className="p-1 text-blue-600 hover:bg-blue-50 rounded" 
                               title="Edit Target"
                             >
-                              <Edit3 size={16} />
+                              <Pencil size={16} />
                             </button>
                             <button 
                               onClick={() => handleDeleteTarget(target.id)}
@@ -1776,7 +1776,7 @@ const StrategicPCD: React.FC = () => {
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
               <p className="text-slate-500 text-sm">Total Incentives</p>
               <h3 className="text-2xl font-bold text-blue-600">
-                â‚¹{targets.reduce((sum, t) => sum + (t.targetAmount * t.incentivePercentage / 100), 0).toLocaleString()}
+                ₹{targets.reduce((sum, t) => sum + (t.targetAmount * t.incentivePercentage / 100), 0).toLocaleString()}
               </h3>
             </div>
           </div>
@@ -2119,7 +2119,7 @@ const StrategicPCD: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h2 className="text-2xl font-bold text-slate-800">PCD Network Reports</h2>
-              <p className="text-slate-500 text-sm">Live data from database â€” filter, analyse, export</p>
+              <p className="text-slate-500 text-sm">Live data from database — filter, analyse, export</p>
             </div>
             <div className="flex flex-wrap gap-2 items-center">
               <input type="date" value={rptDateFrom} onChange={e => setRptDateFrom(e.target.value)}
@@ -2142,7 +2142,7 @@ const StrategicPCD: React.FC = () => {
 
           {rptLoading ? (
             <div className="flex items-center justify-center py-24 text-slate-400">
-              <RefreshCcw size={24} className="animate-spin mr-3" /> Loading report dataâ€¦
+              <RefreshCcw size={24} className="animate-spin mr-3" /> Loading report data…
             </div>
           ) : (
             <>
@@ -2156,7 +2156,7 @@ const StrategicPCD: React.FC = () => {
                   </div>
                   <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                     <div className="text-green-500 mb-2"><DollarSign size={18} /></div>
-                    <div className="text-xl font-bold text-slate-800">â‚¹{Number(rptSummary.totalRevenue).toLocaleString('en-IN')}</div>
+                    <div className="text-xl font-bold text-slate-800">₹{Number(rptSummary.totalRevenue).toLocaleString('en-IN')}</div>
                     <div className="text-xs text-slate-500 mt-0.5">Total Revenue</div>
                   </div>
                   <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
@@ -2176,7 +2176,7 @@ const StrategicPCD: React.FC = () => {
                   </div>
                   <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
                     <div className="text-red-500 mb-2"><CreditCard size={18} /></div>
-                    <div className="text-xl font-bold text-slate-800">â‚¹{Number(rptSummary.outstandingReceivables).toLocaleString('en-IN')}</div>
+                    <div className="text-xl font-bold text-slate-800">₹{Number(rptSummary.outstandingReceivables).toLocaleString('en-IN')}</div>
                     <div className="text-xs text-slate-500 mt-0.5">Receivables</div>
                   </div>
                 </div>
@@ -2203,8 +2203,8 @@ const StrategicPCD: React.FC = () => {
                       <BarChart data={chartData} margin={{ top: 4, right: 16, left: 8, bottom: 40 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                         <XAxis dataKey="territory" tick={{ fontSize: 11 }} angle={-35} textAnchor="end" interval={0} />
-                        <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `â‚¹${(v/1000).toFixed(0)}k`} />
-                        <Tooltip formatter={(v: any) => [`â‚¹${Number(v).toLocaleString('en-IN')}`, 'Revenue']} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
+                        <Tooltip formatter={(v: any) => [`₹${Number(v).toLocaleString('en-IN')}`, 'Revenue']} />
                         <Bar dataKey="revenue" radius={[4,4,0,0]}>
                           {chartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Bar>
@@ -2265,9 +2265,9 @@ const StrategicPCD: React.FC = () => {
                                 <td className="px-3 py-2">
                                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{p.status}</span>
                                 </td>
-                                <td className="px-3 py-2 font-semibold text-slate-800">â‚¹{Number(p.total_business || 0).toLocaleString('en-IN')}</td>
-                                <td className="px-3 py-2 text-slate-600">â‚¹{Number(p.credit_limit || 0).toLocaleString('en-IN')}</td>
-                                <td className="px-3 py-2 text-slate-500 text-xs">{p.drug_license_no || 'â€”'}</td>
+                                <td className="px-3 py-2 font-semibold text-slate-800">₹{Number(p.total_business || 0).toLocaleString('en-IN')}</td>
+                                <td className="px-3 py-2 text-slate-600">₹{Number(p.credit_limit || 0).toLocaleString('en-IN')}</td>
+                                <td className="px-3 py-2 text-slate-500 text-xs">{p.drug_license_no || '—'}</td>
                               </tr>
                             ))}
                             {rptPartners.length === 0 && (
@@ -2293,7 +2293,7 @@ const StrategicPCD: React.FC = () => {
                         <table className="min-w-max w-full text-sm">
                           <thead>
                             <tr className="bg-slate-50 border-b border-slate-200">
-                              {['Partner','Period','Target (â‚¹)','Achieved (â‚¹)','Achievement %','Incentive %','Bonus (â‚¹)','Status'].map(h => (
+                              {['Partner','Period','Target (₹)','Achieved (₹)','Achievement %','Incentive %','Bonus (₹)','Status'].map(h => (
                                 <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-slate-600 whitespace-nowrap">{h}</th>
                               ))}
                             </tr>
@@ -2306,8 +2306,8 @@ const StrategicPCD: React.FC = () => {
                                 <tr key={t.id} className="border-b border-slate-100 hover:bg-slate-50">
                                   <td className="px-3 py-2 font-medium text-slate-800">{t.partner_name || t.partner_id}</td>
                                   <td className="px-3 py-2 text-slate-600">{t.period}</td>
-                                  <td className="px-3 py-2">â‚¹{Number(t.target_amount).toLocaleString('en-IN')}</td>
-                                  <td className="px-3 py-2 font-semibold">â‚¹{Number(t.achieved_amount || 0).toLocaleString('en-IN')}</td>
+                                  <td className="px-3 py-2">₹{Number(t.target_amount).toLocaleString('en-IN')}</td>
+                                  <td className="px-3 py-2 font-semibold">₹{Number(t.achieved_amount || 0).toLocaleString('en-IN')}</td>
                                   <td className="px-3 py-2">
                                     <div className="flex items-center gap-2">
                                       <div className="w-20 bg-slate-200 rounded-full h-1.5">
@@ -2317,7 +2317,7 @@ const StrategicPCD: React.FC = () => {
                                     </div>
                                   </td>
                                   <td className="px-3 py-2 text-slate-600">{t.incentive_percentage}%</td>
-                                  <td className="px-3 py-2 text-slate-600">â‚¹{Number(t.bonus_amount || 0).toLocaleString('en-IN')}</td>
+                                  <td className="px-3 py-2 text-slate-600">₹{Number(t.bonus_amount || 0).toLocaleString('en-IN')}</td>
                                   <td className="px-3 py-2">
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.status === 'ACHIEVED' || t.status === 'EXCEEDED' ? 'bg-green-100 text-green-700' : t.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>{t.status}</span>
                                   </td>
@@ -2347,7 +2347,7 @@ const StrategicPCD: React.FC = () => {
                         <table className="min-w-max w-full text-sm">
                           <thead>
                             <tr className="bg-slate-50 border-b border-slate-200">
-                              {['Date','Partner','Product','Qty','Amount (â‚¹)','Discount','Order Status','Payment'].map(h => (
+                              {['Date','Partner','Product','Qty','Amount (₹)','Discount','Order Status','Payment'].map(h => (
                                 <th key={h} className="text-left px-3 py-2 text-xs font-semibold text-slate-600 whitespace-nowrap">{h}</th>
                               ))}
                             </tr>
@@ -2355,12 +2355,12 @@ const StrategicPCD: React.FC = () => {
                           <tbody>
                             {rptTransactions.slice(0, 200).map((tx: any) => (
                               <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{tx.order_date ? new Date(tx.order_date).toLocaleDateString('en-IN') : 'â€”'}</td>
+                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{tx.order_date ? new Date(tx.order_date).toLocaleDateString('en-IN') : '—'}</td>
                                 <td className="px-3 py-2 font-medium text-slate-800">{tx.partner_name || tx.partner_id}</td>
-                                <td className="px-3 py-2 text-slate-600">{tx.product_name || 'â€”'}</td>
+                                <td className="px-3 py-2 text-slate-600">{tx.product_name || '—'}</td>
                                 <td className="px-3 py-2 text-slate-600">{tx.quantity}</td>
-                                <td className="px-3 py-2 font-semibold">â‚¹{Number(tx.order_amount).toLocaleString('en-IN')}</td>
-                                <td className="px-3 py-2 text-slate-500">{tx.discount_given ? `${tx.discount_given}%` : 'â€”'}</td>
+                                <td className="px-3 py-2 font-semibold">₹{Number(tx.order_amount).toLocaleString('en-IN')}</td>
+                                <td className="px-3 py-2 text-slate-500">{tx.discount_given ? `${tx.discount_given}%` : '—'}</td>
                                 <td className="px-3 py-2">
                                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tx.order_status === 'VERIFIED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{tx.order_status}</span>
                                 </td>
@@ -2406,8 +2406,8 @@ const StrategicPCD: React.FC = () => {
                                   <td className="px-3 py-2 font-medium text-slate-800">{mr.name}</td>
                                   <td className="px-3 py-2 text-slate-600">{mr.headquarters}</td>
                                   <td className="px-3 py-2 text-slate-600">{mr.assigned_area}</td>
-                                  <td className="px-3 py-2">â‚¹{Number(mr.sales_target || 0).toLocaleString('en-IN')}</td>
-                                  <td className="px-3 py-2 font-semibold">â‚¹{totalSales.toLocaleString('en-IN')}</td>
+                                  <td className="px-3 py-2">₹{Number(mr.sales_target || 0).toLocaleString('en-IN')}</td>
+                                  <td className="px-3 py-2 font-semibold">₹{totalSales.toLocaleString('en-IN')}</td>
                                   <td className="px-3 py-2">
                                     <div className="flex items-center gap-2">
                                       <div className="w-16 bg-slate-200 rounded-full h-1.5">
@@ -2416,7 +2416,7 @@ const StrategicPCD: React.FC = () => {
                                       <span className="text-xs font-semibold text-slate-700">{pct}%</span>
                                     </div>
                                   </td>
-                                  <td className="px-3 py-2">â‚¹{Number(mr.base_salary || 0).toLocaleString('en-IN')}</td>
+                                  <td className="px-3 py-2">₹{Number(mr.base_salary || 0).toLocaleString('en-IN')}</td>
                                   <td className="px-3 py-2">
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${mr.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{mr.status}</span>
                                   </td>
@@ -2457,18 +2457,18 @@ const StrategicPCD: React.FC = () => {
                                 <td className="px-3 py-2 font-medium text-slate-800">{c.partner_name || c.partner_id}</td>
                                 <td className="px-3 py-2">
                                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${c.partner_grade === 'PLATINUM' ? 'bg-purple-100 text-purple-700' : c.partner_grade === 'GOLD' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>
-                                    {c.partner_grade || 'â€”'}
+                                    {c.partner_grade || '—'}
                                   </span>
                                 </td>
                                 <td className="px-3 py-2 text-slate-600">{c.period}</td>
-                                <td className="px-3 py-2">â‚¹{Number(c.base_commission || 0).toLocaleString('en-IN')}</td>
-                                <td className="px-3 py-2 text-green-600">+â‚¹{Number(c.scheme_bonus || 0).toLocaleString('en-IN')}</td>
-                                <td className="px-3 py-2 text-red-500">-â‚¹{Number(c.deductions || 0).toLocaleString('en-IN')}</td>
-                                <td className="px-3 py-2 font-bold text-slate-800">â‚¹{Number(c.net_commission || 0).toLocaleString('en-IN')}</td>
+                                <td className="px-3 py-2">₹{Number(c.base_commission || 0).toLocaleString('en-IN')}</td>
+                                <td className="px-3 py-2 text-green-600">+₹{Number(c.scheme_bonus || 0).toLocaleString('en-IN')}</td>
+                                <td className="px-3 py-2 text-red-500">-₹{Number(c.deductions || 0).toLocaleString('en-IN')}</td>
+                                <td className="px-3 py-2 font-bold text-slate-800">₹{Number(c.net_commission || 0).toLocaleString('en-IN')}</td>
                                 <td className="px-3 py-2">
                                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${c.payment_status === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{c.payment_status}</span>
                                 </td>
-                                <td className="px-3 py-2 text-slate-500">{c.paid_on ? new Date(c.paid_on).toLocaleDateString('en-IN') : 'â€”'}</td>
+                                <td className="px-3 py-2 text-slate-500">{c.paid_on ? new Date(c.paid_on).toLocaleDateString('en-IN') : '—'}</td>
                               </tr>
                             ))}
                             {rptCommissions.length === 0 && (
@@ -2504,15 +2504,15 @@ const StrategicPCD: React.FC = () => {
                               <tr key={r.id} className={`border-b border-slate-100 hover:bg-slate-50 ${r.days_overdue > 0 && r.status !== 'CLEARED' ? 'bg-red-50/40' : ''}`}>
                                 <td className="px-3 py-2 font-medium text-slate-800">{r.partner_name || r.partner_id}</td>
                                 <td className="px-3 py-2 text-slate-600 text-xs font-mono">{r.invoice_id}</td>
-                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.invoice_date ? new Date(r.invoice_date).toLocaleDateString('en-IN') : 'â€”'}</td>
-                                <td className="px-3 py-2">â‚¹{Number(r.invoice_amount).toLocaleString('en-IN')}</td>
-                                <td className="px-3 py-2 text-green-600">â‚¹{Number(r.paid_amount || 0).toLocaleString('en-IN')}</td>
-                                <td className="px-3 py-2 font-bold text-slate-800">â‚¹{Number(r.outstanding_amount || 0).toLocaleString('en-IN')}</td>
-                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.due_date ? new Date(r.due_date).toLocaleDateString('en-IN') : 'â€”'}</td>
+                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.invoice_date ? new Date(r.invoice_date).toLocaleDateString('en-IN') : '—'}</td>
+                                <td className="px-3 py-2">₹{Number(r.invoice_amount).toLocaleString('en-IN')}</td>
+                                <td className="px-3 py-2 text-green-600">₹{Number(r.paid_amount || 0).toLocaleString('en-IN')}</td>
+                                <td className="px-3 py-2 font-bold text-slate-800">₹{Number(r.outstanding_amount || 0).toLocaleString('en-IN')}</td>
+                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.due_date ? new Date(r.due_date).toLocaleDateString('en-IN') : '—'}</td>
                                 <td className="px-3 py-2">
                                   {r.days_overdue > 0 && r.status !== 'CLEARED'
                                     ? <span className="text-red-600 font-semibold">{r.days_overdue}d</span>
-                                    : <span className="text-slate-400">â€”</span>}
+                                    : <span className="text-slate-400">—</span>}
                                 </td>
                                 <td className="px-3 py-2">
                                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.status === 'CLEARED' ? 'bg-green-100 text-green-700' : r.status === 'PARTIAL' ? 'bg-yellow-100 text-yellow-700' : r.days_overdue > 0 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{r.status}</span>
@@ -2680,7 +2680,7 @@ const StrategicPCD: React.FC = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Credit Limit (â‚¹)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Credit Limit (₹)</label>
                   <input 
                     type="number" 
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary"

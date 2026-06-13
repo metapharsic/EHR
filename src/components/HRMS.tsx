@@ -104,7 +104,7 @@ const EmployeeSelector: React.FC<{
                     <span className={`text-[9px] uppercase tracking-tighter px-1.5 py-0.5 rounded ${value === e.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>{e.employee_code}</span>
                   </div>
                   <span className={`text-[10px] ${value === e.id ? 'text-indigo-100' : 'text-slate-400 group-hover:text-indigo-400'}`}>
-                    {e.department_name} • {e.designation_name} • <Badge value={e.status || 'Active'} variant={e.status === 'Active' ? 'success' : 'default'} />
+                    {e.department_name} • {e.designation_name} • <Badge value={e.status || 'Active'} variant={e.status?.toLowerCase() === 'active' ? 'success' : 'default'} />
                   </span>
                 </div>
               )) : (
@@ -1281,7 +1281,7 @@ const HRMS: React.FC = () => {
   // ─── filtered employees ───────────────────────────────────────────────────
   const filteredEmps = useMemo(() => employees.filter(e => {
     const q = empSearch.toLowerCase();
-    const matchSearch = !q || `${e.first_name} ${e.last_name} ${e.employee_code}`.toLowerCase().includes(q);
+    const matchSearch = !q || `${e.name} ${e.employee_code}`.toLowerCase().includes(q);
     const matchStatus = !empStatusFilter || e.status === empStatusFilter;
     const matchDept = !empDeptFilter || e.department_id === empDeptFilter;
     return matchSearch && matchStatus && matchDept;
@@ -1396,7 +1396,7 @@ const HRMS: React.FC = () => {
           { key: 'designation_name', label: 'Designation' },
           { key: 'grade', label: 'Grade', width: 70 },
           { key: 'status', label: 'Status', render: (_, r: HrEmployee) => (
-            <Badge value={r.status || 'Active'} variant={r.status === 'Active' ? 'success' : r.status === 'On Leave' ? 'warning' : 'default'} />
+            <Badge value={r.status || 'Active'} variant={r.status?.toLowerCase() === 'active' ? 'success' : r.status?.toLowerCase() === 'on leave' ? 'warning' : 'default'} />
           )},
           { key: 'join_date', label: 'Join Date', width: 100, render: (v) => v ? new Date(v).toLocaleDateString() : '—' },
            { key: 'actions', label: 'Actions', render: (_, r: HrEmployee) => (
@@ -2542,7 +2542,7 @@ const HRMS: React.FC = () => {
               <select value={newIncident.involved_employee_id || ''} onChange={e => setNewIncident(n => ({ ...n, involved_employee_id: e.target.value }))}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2">
                 <option value="">— Select Employee —</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
+                {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.employee_code})</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -2622,7 +2622,7 @@ const HRMS: React.FC = () => {
               <select value={newReward.receiver_id || ''} onChange={e => setNewReward(n => ({ ...n, receiver_id: e.target.value }))}
                 className="w-full border border-slate-200 rounded-lg px-3 py-2">
                 <option value="">— Select Employee —</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
+                {employees.map(e => <option key={e.id} value={e.id}>{e.name} ({e.employee_code})</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-3">

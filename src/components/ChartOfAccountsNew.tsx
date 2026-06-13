@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
  Plus, Filter, Download, Eye, Edit, Trash2, Save, XCircle, Check, X,
  BookOpen, TrendingUp, Layers, DollarSign, Printer, LayoutGrid
@@ -81,13 +81,13 @@ const ChartOfAccountsNew: React.FC<ChartOfAccountsProps> = ({ onNavigate }) => {
  const loadChartOfAccounts = async () => {
  try {
  setAccountsLoading(true);
- console.log('📨 Fetching Chart of Accounts...');
+ console.log('?? Fetching Chart of Accounts...');
  const accounts = await ChartOfAccountsService.getAllAccounts();
- console.log('✅ Chart of Accounts loaded:', accounts);
+ console.log('? Chart of Accounts loaded:', accounts);
  setChartOfAccounts(Array.isArray(accounts) ? accounts : []);
  setAccountsLoading(false);
  } catch (error) {
- console.log('⚠️ API Error or No Data - Using Tally ERP Demo Data fallback');
+ console.log('??� API Error or No Data - Using Tally ERP Demo Data fallback');
  const demoAccounts: Account[] = [
  { id: 'A001', accountCode: '1010', accountName: 'Cash & Bank', accountType: 'Asset', openingBalance: 500000, group: 'Current Assets', status: 'Active', gstApplicable: false, createdDate: '2026-01-01', createdTime: '09:00:00', accountFormat: 'debit' },
  { id: 'A002', accountCode: '1020', accountName: 'Bank Account HDFC', accountType: 'Asset', openingBalance: 2500000, group: 'Current Assets', status: 'Active', gstApplicable: false, createdDate: '2026-01-01', createdTime: '09:15:00', accountFormat: 'debit' },
@@ -115,9 +115,9 @@ const ChartOfAccountsNew: React.FC<ChartOfAccountsProps> = ({ onNavigate }) => {
  setAccountForm({ accountCode: '', accountName: '', accountType: 'Asset', openingBalance: 0, group: '', description: '', status: 'Active', gstApplicable: false, tdsApplicable: false, isBankOrCash: false, parentAccountId: '', accountFormat: 'debit' });
  setShowAccountForm(false);
  await loadChartOfAccounts();
- alert('✅ Account created and saved!');
+ alert('? Account created and saved!');
  } catch (error) {
- alert(`❌ Error: ${error instanceof Error ? error.message : 'Failed to save account'}`);
+ alert(`? Error: ${error instanceof Error ? error.message : 'Failed to save account'}`);
  }
  };
 
@@ -145,7 +145,7 @@ const ChartOfAccountsNew: React.FC<ChartOfAccountsProps> = ({ onNavigate }) => {
  const exportAccounts = () => {
  const rows = filteredAccounts.map(a => ({
  'Code': a.accountCode, 'Name': a.accountName, 'Type': a.accountType,
- 'Group': a.group || '', 'Opening Balance (₹)': a.openingBalance || 0,
+ 'Group': a.group || '', 'Opening Balance (?)': a.openingBalance || 0,
  'GST Applicable': a.gstApplicable ? 'Yes' : 'No', 'Status': a.status || 'Active',
  'Description': a.description || ''
  }));
@@ -351,7 +351,7 @@ const ChartOfAccountsNew: React.FC<ChartOfAccountsProps> = ({ onNavigate }) => {
  )}
  <div className="pt-4 border-t">
  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Opening Balance</label>
- <p className="text-2xl font-bold text-green-600">₹{acc?.openingBalance?.toLocaleString()}</p>
+ <p className="text-2xl font-bold text-green-600">?{acc?.openingBalance?.toLocaleString()}</p>
  </div>
  </div>
  );

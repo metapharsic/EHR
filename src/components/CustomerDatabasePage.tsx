@@ -2,7 +2,7 @@ import React, {
   useState, useEffect, useCallback, useMemo, useRef, useId,
 } from 'react';
 import {
-  Plus, Search, X, Edit3, Trash2, Eye, Download, Upload, RefreshCw,
+  Plus, Search, X, Pencil, Trash2, Eye, Download, Upload, RefreshCw,
   AlertCircle, Users, Building2, Phone, Mail, MapPin, CreditCard,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid,
   List, FileText, CheckCircle2, Loader2, XCircle, MoreHorizontal,
@@ -312,7 +312,7 @@ const ProfileDrawer = ({
           </button>
           <button onClick={onEdit}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors">
-            <Edit3 size={15}/> Edit Profile
+            <Pencil size={15}/> Edit Profile
           </button>
         </div>
       </div>
@@ -510,7 +510,7 @@ const CustomerFormModal = ({
           <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-400 to-teal-500 flex items-center justify-center">
-                {isEdit ? <Edit3 size={16} className="text-white"/> : <Plus size={16} className="text-white"/>}
+                {isEdit ? <Pencil size={16} className="text-white"/> : <Plus size={16} className="text-white"/>}
               </div>
               <div>
                 <h2 id="form-title" className="text-base font-bold text-slate-900">
@@ -1194,7 +1194,7 @@ const CustomerDatabasePage: React.FC = () => {
                             </button>
                             <button onClick={() => setFormParty(c)} title="Edit"
                               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-amber-700 transition-colors">
-                              <Edit3 size={14}/>
+                              <Pencil size={14}/>
                             </button>
                             <button onClick={() => setConfirmDelete(c)} disabled={isDeleting} title="Deactivate"
                               className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-700 disabled:opacity-40 transition-colors">
@@ -1310,7 +1310,7 @@ const CustomerDatabasePage: React.FC = () => {
                     </button>
                     <button onClick={() => setFormParty(c)} title="Edit"
                       className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors border border-slate-200">
-                      <Edit3 size={13}/>
+                      <Pencil size={13}/>
                     </button>
                     <button onClick={() => setConfirmDelete(c)} disabled={isDeleting} title="Deactivate"
                       className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors border border-slate-200 disabled:opacity-40">

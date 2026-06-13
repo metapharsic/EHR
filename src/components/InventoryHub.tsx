@@ -7,7 +7,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Archive, TrendingUp, AlertTriangle, Clock, Activity, 
   ArrowUpRight, BarChart3, Target, Wallet, BrainCircuit,
-  Zap, Search, Filter, Plus, RefreshCw, Edit3, Trash2,
+  Zap, Search, Filter, Plus, RefreshCw, Pencil, Trash2,
   ChevronDown, ChevronRight, CheckCircle2, ShoppingCart,
   Layers, Package, ShieldAlert, Download, Printer, Info,
   Eye, EyeOff, LayoutGrid, List as ListIcon, Maximize2, 
@@ -551,7 +551,7 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
       { key: 'actions', label: 'Actions', width: '14%', align: 'center' as const, render: (_: any, row: any) => (
         <div className="flex flex-col gap-[4px] items-center">
           <button onClick={(e) => { e.stopPropagation(); handleEditSku(row); }} className="flex items-center gap-[5px] px-[10px] py-[5px] bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-[5px] text-[11px] font-[700] transition-all w-full justify-center">
-            <Edit3 size={12}/> Edit
+            <Pencil size={12}/> Edit
           </button>
           <button onClick={(e) => { e.stopPropagation(); handleDeleteSku(row.id); }} className="flex items-center gap-[5px] px-[10px] py-[5px] bg-red-50 text-red-500 hover:bg-red-100 rounded-[5px] text-[11px] font-[700] transition-all w-full justify-center">
             <Trash2 size={12}/> Delete
@@ -574,7 +574,7 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
       { key: 'actions', label: 'Actions', width: '15%', align: 'center' as const, render: (_: any, row: any) => (
         <div className="flex gap-[6px] justify-center">
           <button onClick={(e) => { e.stopPropagation(); handleEditSku(row); }} className="flex items-center gap-[4px] px-[8px] py-[4px] bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-[10px] font-bold transition-all">
-            <Edit3 size={11}/> Edit
+            <Pencil size={11}/> Edit
           </button>
           <button onClick={(e) => { e.stopPropagation(); handleDeleteSku(row.id); }} className="flex items-center gap-[4px] px-[8px] py-[4px] bg-red-50 text-red-500 hover:bg-red-100 rounded text-[10px] font-bold transition-all">
             <Trash2 size={11}/> Del

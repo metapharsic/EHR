@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Save, Search, Plus, CreditCard, RefreshCw, Printer, Download } from 'lucide-react';
 import { DenseGrid, ColumnDef } from './common/DenseGrid';
 import { useCompany } from '../context/CompanyContext';
@@ -47,7 +47,7 @@ export const PdcManagement: React.FC = () => {
  </select>
  </div>
  <div className="col-span-6">
- <label className="block text-[10px] font-bold text-slate-500 uppercase">Amount (₹)</label>
+ <label className="block text-[10px] font-bold text-slate-500 uppercase">Amount (?)</label>
  <input type="number" className="w-full text-lg font-bold border-b border-slate-300 p-1 outline-none text-green-700 bg-yellow-50" placeholder="0.00"/>
  </div>
  
@@ -95,7 +95,7 @@ export const PdcManagement: React.FC = () => {
  <div className="flex gap-2">
  <button 
  onClick={() => {
- const rows = pdcs.map(p => `<tr><td>${p.type}</td><td>${p.pdcDate}</td><td>${p.party}</td><td>${p.chqNo}</td><td>${p.bank}</td><td>${p.status}</td><td class="text-right">₹${p.amount.toLocaleString()}</td></tr>`).join('');
+ const rows = pdcs.map(p => `<tr><td>${p.type}</td><td>${p.pdcDate}</td><td>${p.party}</td><td>${p.chqNo}</td><td>${p.bank}</td><td>${p.status}</td><td class="text-right">?${p.amount.toLocaleString()}</td></tr>`).join('');
  printReport('Post-Dated Cheques Register', `<table><thead><tr><th>Type</th><th>PDC Date</th><th>Party</th><th>Chq No</th><th>Bank</th><th>Status</th><th class="text-right">Amount</th></tr></thead><tbody>${rows}</tbody></table>`, company);
  }}
  className="flex items-center gap-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-sm font-bold shadow-sm transition-colors"
@@ -133,7 +133,7 @@ export const PdcManagement: React.FC = () => {
  <th className="p-3 font-bold border-r border-white/50 w-32">Chq No.</th>
  <th className="p-3 font-bold border-r border-white/50 w-32">Target Bank</th>
  <th className="p-3 font-bold border-r border-white/50 w-32 text-center">Status</th>
- <th className="p-3 font-bold text-right w-32">Amount (₹)</th>
+ <th className="p-3 font-bold text-right w-32">Amount (?)</th>
  </tr>
  </thead>
  <tbody className="divide-y divide-slate-100">
@@ -147,7 +147,7 @@ export const PdcManagement: React.FC = () => {
  <td className="p-3 border-r border-slate-100">{p.chqNo}</td>
  <td className="p-3 border-r border-slate-100 text-xs">{p.bank}</td>
  <td className="p-3 border-r border-slate-100 text-center text-xs font-bold text-slate-500">{p.status}</td>
- <td className="p-3 text-right font-bold text-slate-800">₹ {p.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+ <td className="p-3 text-right font-bold text-slate-800">? {p.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
  </tr>
  ))}
  </tbody>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Save, Search, Plus, MapPin, Download, Printer, Edit3, Trash, AlertCircle, RefreshCw, Warehouse } from 'lucide-react';
+import { Save, Search, Plus, MapPin, Download, Printer, Pencil, Trash, AlertCircle, RefreshCw, Warehouse } from 'lucide-react';
 import { GodownService } from '../services/accountingService';
 import { utils, writeFile } from 'xlsx';
 import { printReport, addExcelBranding } from '../utils/accountingExport';
@@ -204,7 +204,7 @@ export const GodownMaster: React.FC = () => {
  : <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded">Own</span>}
  </td>
  <td className="p-3 text-center opacity-0 group-hover:opacity-100 transition-opacity flex justify-center gap-1">
- <button onClick={(e) => { e.stopPropagation(); setEditingId(g.id); setForm({ ...defaultForm, ...g }); setView('FORM'); }} className="p-1 text-amber-600 hover:bg-amber-50 rounded" title="Edit"><Edit3 size={13}/></button>
+ <button onClick={(e) => { e.stopPropagation(); setEditingId(g.id); setForm({ ...defaultForm, ...g }); setView('FORM'); }} className="p-1 text-amber-600 hover:bg-amber-50 rounded" title="Edit"><Pencil size={13}/></button>
  <button onClick={(e) => { e.stopPropagation(); handleDelete(g.id, g.name); }} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Delete"><Trash size={13}/></button>
  </td>
  </tr>

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PREMIUM FINANCIAL INTELLIGENCE DASHBOARD
  * Real-time Ratios, Revenue Trends, and Liquidity Analysis
  */
@@ -68,7 +68,7 @@ const FinancialIntelligence: React.FC = () => {
  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
  <StatCard 
  title="Working Capital" 
- value={`₹${(data?.kpis?.workingCapital / 100000).toFixed(2)}L`} 
+ value={`?${(data?.kpis?.workingCapital / 100000).toFixed(2)}L`} 
  color="blue" 
  icon={<Wallet size={20}/>} 
  />
@@ -86,7 +86,7 @@ const FinancialIntelligence: React.FC = () => {
  />
  <StatCard 
  title="Accounts Receivable" 
- value="₹12.4L" 
+ value="?12.4L" 
  color="warning" 
  icon={<DollarSign size={20}/>} 
  />
@@ -115,7 +115,7 @@ const FinancialIntelligence: React.FC = () => {
  </defs>
  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
  <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 600, fill: '#94A3B8'}} dy={10} />
- <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 600, fill: '#94A3B8'}} tickFormatter={(v) => `₹${v/1000}k`} />
+ <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 600, fill: '#94A3B8'}} tickFormatter={(v) => `?${v/1000}k`} />
  <Tooltip 
  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
  />
@@ -170,7 +170,7 @@ const FinancialIntelligence: React.FC = () => {
  { key: 'date', label: 'Date', width: '15%' },
  { key: 'entity', label: 'Particulars', width: '40%' },
  { key: 'type', label: 'Type', width: '15%', render: (v) => <Badge text={v} variant={v === 'CREDIT' ? 'success' : 'danger'} /> },
- { key: 'amount', label: 'Amount', width: '20%', align: 'right', render: (v) => `₹${v.toLocaleString()}` },
+ { key: 'amount', label: 'Amount', width: '20%', align: 'right', render: (v) => `?${v.toLocaleString()}` },
  { key: 'status', label: 'Risk', width: '10%', render: () => <div className="w-2 h-2 rounded-full bg-emerald-500 mx-auto"></div> }
  ]}
  data={[

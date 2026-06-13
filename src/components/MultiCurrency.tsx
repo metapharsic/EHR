@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
  DollarSign, Euro, PoundSterling, JapaneseYen, RefreshCw,
  TrendingUp, TrendingDown, Calendar, Download, Calculator,
@@ -42,16 +42,16 @@ interface CurrencyExposure {
 }
 
 const SUPPORTED_CURRENCIES: Currency[] = [
- { code: 'USD', name: 'US Dollar', symbol: '$', flag: '🇺🇸', exchangeRate: 83.25, inverseRate: 0.012, lastUpdated: '2024-05-15 14:30', trend: 'up', changePercent: 0.15 },
- { code: 'EUR', name: 'Euro', symbol: '€', flag: '🇪🇺', exchangeRate: 90.45, inverseRate: 0.011, lastUpdated: '2024-05-15 14:30', trend: 'down', changePercent: -0.08 },
- { code: 'GBP', name: 'British Pound', symbol: '£', flag: '🇬🇧', exchangeRate: 105.20, inverseRate: 0.0095, lastUpdated: '2024-05-15 14:30', trend: 'stable', changePercent: 0.02 },
- { code: 'JPY', name: 'Japanese Yen', symbol: '¥', flag: '🇯🇵', exchangeRate: 0.55, inverseRate: 1.82, lastUpdated: '2024-05-15 14:30', trend: 'down', changePercent: -0.25 },
- { code: 'AUD', name: 'Australian Dollar', symbol: 'A$', flag: '🇦🇺', exchangeRate: 55.30, inverseRate: 0.018, lastUpdated: '2024-05-15 14:30', trend: 'up', changePercent: 0.35 },
- { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$', flag: '🇨🇦', exchangeRate: 61.15, inverseRate: 0.016, lastUpdated: '2024-05-15 14:30', trend: 'stable', changePercent: 0.05 },
- { code: 'CHF', name: 'Swiss Franc', symbol: 'Fr', flag: '🇨🇭', exchangeRate: 92.80, inverseRate: 0.0108, lastUpdated: '2024-05-15 14:30', trend: 'up', changePercent: 0.12 },
- { code: 'CNY', name: 'Chinese Yuan', symbol: '¥', flag: '🇨🇳', exchangeRate: 11.55, inverseRate: 0.0866, lastUpdated: '2024-05-15 14:30', trend: 'down', changePercent: -0.18 },
- { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$', flag: '🇸🇬', exchangeRate: 61.85, inverseRate: 0.0162, lastUpdated: '2024-05-15 14:30', trend: 'up', changePercent: 0.22 },
- { code: 'AED', name: 'UAE Dirham', symbol: 'د.إ', flag: '🇦🇪', exchangeRate: 22.67, inverseRate: 0.0441, lastUpdated: '2024-05-15 14:30', trend: 'stable', changePercent: 0.01 },
+ { code: 'USD', name: 'US Dollar', symbol: '$', flag: '????', exchangeRate: 83.25, inverseRate: 0.012, lastUpdated: '2024-05-15 14:30', trend: 'up', changePercent: 0.15 },
+ { code: 'EUR', name: 'Euro', symbol: '�', flag: '????', exchangeRate: 90.45, inverseRate: 0.011, lastUpdated: '2024-05-15 14:30', trend: 'down', changePercent: -0.08 },
+ { code: 'GBP', name: 'British Pound', symbol: '�', flag: '????', exchangeRate: 105.20, inverseRate: 0.0095, lastUpdated: '2024-05-15 14:30', trend: 'stable', changePercent: 0.02 },
+ { code: 'JPY', name: 'Japanese Yen', symbol: '�', flag: '????', exchangeRate: 0.55, inverseRate: 1.82, lastUpdated: '2024-05-15 14:30', trend: 'down', changePercent: -0.25 },
+ { code: 'AUD', name: 'Australian Dollar', symbol: 'A$', flag: '????', exchangeRate: 55.30, inverseRate: 0.018, lastUpdated: '2024-05-15 14:30', trend: 'up', changePercent: 0.35 },
+ { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$', flag: '????', exchangeRate: 61.15, inverseRate: 0.016, lastUpdated: '2024-05-15 14:30', trend: 'stable', changePercent: 0.05 },
+ { code: 'CHF', name: 'Swiss Franc', symbol: 'Fr', flag: '????', exchangeRate: 92.80, inverseRate: 0.0108, lastUpdated: '2024-05-15 14:30', trend: 'up', changePercent: 0.12 },
+ { code: 'CNY', name: 'Chinese Yuan', symbol: '�', flag: '????', exchangeRate: 11.55, inverseRate: 0.0866, lastUpdated: '2024-05-15 14:30', trend: 'down', changePercent: -0.18 },
+ { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$', flag: '????', exchangeRate: 61.85, inverseRate: 0.0162, lastUpdated: '2024-05-15 14:30', trend: 'up', changePercent: 0.22 },
+ { code: 'AED', name: 'UAE Dirham', symbol: '?.?', flag: '????', exchangeRate: 22.67, inverseRate: 0.0441, lastUpdated: '2024-05-15 14:30', trend: 'stable', changePercent: 0.01 },
 ];
 
 const MultiCurrency: React.FC = () => {
@@ -161,11 +161,11 @@ const MultiCurrency: React.FC = () => {
  <div className="flex gap-4">
  <div className="text-right">
  <div className="text-sm text-green-100">Forex Receivables</div>
- <div className="font-semibold">₹{totalForexReceivables.toLocaleString()}</div>
+ <div className="font-semibold">?{totalForexReceivables.toLocaleString()}</div>
  </div>
  <div className="text-right">
  <div className="text-sm text-green-100">Forex Payables</div>
- <div className="font-semibold">₹{totalForexPayables.toLocaleString()}</div>
+ <div className="font-semibold">?{totalForexPayables.toLocaleString()}</div>
  </div>
  </div>
  </div>
@@ -286,12 +286,12 @@ const MultiCurrency: React.FC = () => {
  <td className="px-4 py-3 font-medium">{tx.foreignCurrency}</td>
  <td className="px-4 py-3 text-right">
  {tx.foreignCurrency === 'USD' && '$'}
- {tx.foreignCurrency === 'EUR' && '€'}
- {tx.foreignCurrency === 'GBP' && '£'}
+ {tx.foreignCurrency === 'EUR' && '�'}
+ {tx.foreignCurrency === 'GBP' && '�'}
  {tx.foreignAmount.toLocaleString()}
  </td>
  <td className="px-4 py-3 text-right">{tx.exchangeRate.toFixed(2)}</td>
- <td className="px-4 py-3 text-right font-medium">₹{tx.inrAmount.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right font-medium">?{tx.inrAmount.toLocaleString()}</td>
  <td className="px-4 py-3 text-center">
  <span className={`px-2 py-1 rounded text-xs ${
  tx.status === 'Completed' ? 'bg-green-100 text-green-700' :
@@ -317,15 +317,15 @@ const MultiCurrency: React.FC = () => {
  <div className="grid grid-cols-3 gap-4 mb-6">
  <div className="bg-green-50 rounded-xl p-4 border border-green-200">
  <div className="text-sm text-green-600 font-medium">Total Receivables</div>
- <div className="text-2xl font-bold text-slate-800">₹{exposures.reduce((sum, e) => sum + (e.netExposure > 0 ? e.inrValue : 0), 0).toLocaleString()}</div>
+ <div className="text-2xl font-bold text-slate-800">?{exposures.reduce((sum, e) => sum + (e.netExposure > 0 ? e.inrValue : 0), 0).toLocaleString()}</div>
  </div>
  <div className="bg-red-50 rounded-xl p-4 border border-red-200">
  <div className="text-sm text-red-600 font-medium">Total Payables</div>
- <div className="text-2xl font-bold text-slate-800">₹{Math.abs(exposures.reduce((sum, e) => sum + (e.netExposure < 0 ? e.inrValue : 0), 0)).toLocaleString()}</div>
+ <div className="text-2xl font-bold text-slate-800">?{Math.abs(exposures.reduce((sum, e) => sum + (e.netExposure < 0 ? e.inrValue : 0), 0)).toLocaleString()}</div>
  </div>
  <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
  <div className="text-sm text-accent font-medium">Net Exposure</div>
- <div className="text-2xl font-bold text-slate-800">₹{exposures.reduce((sum, e) => sum + e.inrValue, 0).toLocaleString()}</div>
+ <div className="text-2xl font-bold text-slate-800">?{exposures.reduce((sum, e) => sum + e.inrValue, 0).toLocaleString()}</div>
  </div>
  </div>
  </div>
@@ -349,7 +349,7 @@ const MultiCurrency: React.FC = () => {
  <td className="px-4 py-3 text-right text-green-600">{exp.receivables.toLocaleString()}</td>
  <td className="px-4 py-3 text-right text-red-600">{exp.payables.toLocaleString()}</td>
  <td className="px-4 py-3 text-right font-medium">{exp.netExposure.toLocaleString()}</td>
- <td className="px-4 py-3 text-right font-bold">₹{exp.inrValue.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right font-bold">?{exp.inrValue.toLocaleString()}</td>
  <td className="px-4 py-3 text-center">
  <span className={`px-2 py-1 rounded text-xs ${
  exp.riskLevel === 'High' ? 'bg-red-100 text-red-700' :
@@ -399,7 +399,7 @@ const MultiCurrency: React.FC = () => {
  : 'bg-slate-200 text-slate-700'
  }`}
  >
- {selectedCurrency} → INR
+ {selectedCurrency} ? INR
  </button>
  <button
  onClick={() => setConversionDirection('fromINR')}
@@ -409,7 +409,7 @@ const MultiCurrency: React.FC = () => {
  : 'bg-slate-200 text-slate-700'
  }`}
  >
- INR → {selectedCurrency}
+ INR ? {selectedCurrency}
  </button>
  </div>
  </div>
@@ -428,13 +428,13 @@ const MultiCurrency: React.FC = () => {
  <div className="pt-4 border-t border-slate-200">
  <div className="text-sm text-slate-500 mb-1">Converted Amount</div>
  <div className="text-3xl font-bold text-green-600">
- {conversionDirection === 'toINR' ? '₹' : selectedCurrencyData?.symbol}
+ {conversionDirection === 'toINR' ? '?' : selectedCurrencyData?.symbol}
  {convertedAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
  </div>
  <div className="text-sm text-slate-400 mt-1">
  Rate: 1 {conversionDirection === 'toINR' ? selectedCurrency : 'INR'} = 
  {' '}{conversionDirection === 'toINR' 
- ? `₹${selectedCurrencyData?.exchangeRate}` 
+ ? `?${selectedCurrencyData?.exchangeRate}` 
  : `${selectedCurrencyData?.symbol}${selectedCurrencyData?.inverseRate.toFixed(4)}`}
  </div>
  </div>

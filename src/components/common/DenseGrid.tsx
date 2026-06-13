@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 
 export interface ColumnDef<T> {
  key: keyof T | string;
@@ -149,7 +149,7 @@ export function DenseGrid<T extends Record<string, any>>({
  tabIndex={-1}
  className="text-slate-400 hover:text-red-600 focus:outline-none w-full h-full text-xs font-bold leading-none p-1"
  >
- ×
+ �
  </button>
  </td>
  )}

@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 
 type HotkeyMap = {
  [key: string]: (e: KeyboardEvent) => void;

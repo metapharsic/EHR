@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ERPLayout, FilterBar, StatCard, DataTable, Badge } from './UniversalLayout';
 import { Clock, AlertTriangle, FileText, Send } from 'lucide-react';
 import { AgingAnalysisService } from '../services/accountingService';
@@ -43,26 +43,26 @@ const AgingAnalysis: React.FC = () => {
  { key: 'name', label: 'Party Name', width: '25%' },
  { 
  key: 'current_balance', 
- label: 'Outstanding (₹)', 
+ label: 'Outstanding (?)', 
  width: '15%', 
  align: 'right' as const,
- format: (v: number) => `₹${Number(v).toLocaleString('en-IN')}` 
+ format: (v: number) => `?${Number(v).toLocaleString('en-IN')}` 
  },
- { key: 'bucket_0_30', label: '0-30 Days', width: '12%', align: 'right' as const, format: (v: number) => v > 0 ? `₹${v.toLocaleString('en-IN')}` : '-' },
- { key: 'bucket_31_60', label: '31-60 Days', width: '12%', align: 'right' as const, format: (v: number) => v > 0 ? `₹${v.toLocaleString('en-IN')}` : '-' },
+ { key: 'bucket_0_30', label: '0-30 Days', width: '12%', align: 'right' as const, format: (v: number) => v > 0 ? `?${v.toLocaleString('en-IN')}` : '-' },
+ { key: 'bucket_31_60', label: '31-60 Days', width: '12%', align: 'right' as const, format: (v: number) => v > 0 ? `?${v.toLocaleString('en-IN')}` : '-' },
  { 
  key: 'bucket_61_90', 
  label: '61-90 Days', 
  width: '12%', 
  align: 'right' as const, 
- format: (v: number) => v > 0 ? <span className="text-amber-600 font-bold">₹{v.toLocaleString('en-IN')}</span> : '-' 
+ format: (v: number) => v > 0 ? <span className="text-amber-600 font-bold">?{v.toLocaleString('en-IN')}</span> : '-' 
  },
  { 
  key: 'bucket_90_plus', 
  label: '> 90 Days', 
  width: '12%', 
  align: 'right' as const, 
- format: (v: number) => v > 0 ? <span className="text-red-600 font-bold bg-red-50 p-1 rounded">₹{v.toLocaleString('en-IN')}</span> : '-' 
+ format: (v: number) => v > 0 ? <span className="text-red-600 font-bold bg-red-50 p-1 rounded">?{v.toLocaleString('en-IN')}</span> : '-' 
  },
  {
  key: 'actions',
@@ -92,13 +92,13 @@ const AgingAnalysis: React.FC = () => {
  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
  <StatCard
  label="Total Outstanding"
- value={`₹${data.reduce((sum, r) => sum + Number(r.current_balance), 0).toLocaleString('en-IN')}`}
+ value={`?${data.reduce((sum, r) => sum + Number(r.current_balance), 0).toLocaleString('en-IN')}`}
  icon={<FileText className="text-accent" />}
  color="blue"
  />
  <StatCard
  label="Critical (> 90 Days)"
- value={`₹${data.reduce((sum, r) => sum + Number(r.bucket_90_plus), 0).toLocaleString('en-IN')}`}
+ value={`?${data.reduce((sum, r) => sum + Number(r.bucket_90_plus), 0).toLocaleString('en-IN')}`}
  icon={<AlertTriangle className="text-rose-600" />}
  color="danger"
  />

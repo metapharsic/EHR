@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
  Shield, Clock, User, Download, Eye, Filter, Calendar, AlertTriangle, 
  CheckCircle, X, Server, Globe, RefreshCw, AlertCircle
@@ -97,9 +97,9 @@ const AuditLog: React.FC = () => {
  <div className="flex gap-3">
  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
  <div>
- <h3 className="font-semibold text-red-900">⚠️ Database Connection Failed</h3>
+ <h3 className="font-semibold text-red-900">??� Database Connection Failed</h3>
  <p className="text-red-700 text-sm mt-1">{dbStatus.error}</p>
- <button onClick={handleRefresh} className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">🔄 Retry</button>
+ <button onClick={handleRefresh} className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">?? Retry</button>
  </div>
  </div>
  </div>

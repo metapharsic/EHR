@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
  FileText, Download, Calendar, Calculator, CheckCircle, 
  AlertCircle, Building2, Percent, TrendingUp, AlertTriangle,
@@ -476,15 +476,15 @@ const GSTReturnFiling: React.FC = () => {
  </div>
  <div className="bg-green-50 rounded-xl p-4 border border-green-200">
  <div className="text-sm text-green-600 font-medium">Taxable Value</div>
- <div className="text-2xl font-bold text-slate-800">₹{gstr1Summary.total.taxableValue.toLocaleString()}</div>
+ <div className="text-2xl font-bold text-slate-800">?{gstr1Summary.total.taxableValue.toLocaleString()}</div>
  </div>
  <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
  <div className="text-sm text-purple-600 font-medium">CGST + SGST</div>
- <div className="text-2xl font-bold text-slate-800">₹{(gstr1Summary.total.cgst + gstr1Summary.total.sgst).toLocaleString()}</div>
+ <div className="text-2xl font-bold text-slate-800">?{(gstr1Summary.total.cgst + gstr1Summary.total.sgst).toLocaleString()}</div>
  </div>
  <div className="bg-orange-50 rounded-xl p-4 border border-orange-200">
  <div className="text-sm text-orange-600 font-medium">IGST</div>
- <div className="text-2xl font-bold text-slate-800">₹{gstr1Summary.total.igst.toLocaleString()}</div>
+ <div className="text-2xl font-bold text-slate-800">?{gstr1Summary.total.igst.toLocaleString()}</div>
  </div>
  </div>
 
@@ -498,7 +498,7 @@ const GSTReturnFiling: React.FC = () => {
  <Building2 size={20} className="text-accent" />
  <div>
  <h4 className="font-semibold text-slate-800">4A - B2B Invoices (Registered)</h4>
- <p className="text-sm text-slate-500">{gstr1Summary.b2b.count} invoices • ₹{gstr1Summary.b2b.taxableValue.toLocaleString()}</p>
+ <p className="text-sm text-slate-500">{gstr1Summary.b2b.count} invoices � ?{gstr1Summary.b2b.taxableValue.toLocaleString()}</p>
  </div>
  </div>
  {expandedSections.includes('b2b') ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
@@ -527,10 +527,10 @@ const GSTReturnFiling: React.FC = () => {
  <td className="px-4 py-3">{inv.invoiceDate}</td>
  <td className="px-4 py-3">{inv.customerName}</td>
  <td className="px-4 py-3 font-mono text-xs">{inv.customerGSTIN}</td>
- <td className="px-4 py-3 text-right">₹{inv.taxableValue.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{inv.cgstAmount.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{inv.sgstAmount.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{inv.igstAmount.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{inv.taxableValue.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{inv.cgstAmount.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{inv.sgstAmount.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{inv.igstAmount.toLocaleString()}</td>
  <td className="px-4 py-3 text-center">
  <span className={`px-2 py-1 rounded text-xs ${
  inv.eInvoiceStatus === 'Generated' 
@@ -558,7 +558,7 @@ const GSTReturnFiling: React.FC = () => {
  <Receipt size={20} className="text-green-600" />
  <div>
  <h4 className="font-semibold text-slate-800">4B - B2C (Large) Invoices</h4>
- <p className="text-sm text-slate-500">{gstr1Summary.b2c.count} invoices • ₹{gstr1Summary.b2c.taxableValue.toLocaleString()}</p>
+ <p className="text-sm text-slate-500">{gstr1Summary.b2c.count} invoices � ?{gstr1Summary.b2c.taxableValue.toLocaleString()}</p>
  </div>
  </div>
  {expandedSections.includes('b2c') ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
@@ -575,7 +575,7 @@ const GSTReturnFiling: React.FC = () => {
  <Package size={20} className="text-purple-600" />
  <div>
  <h4 className="font-semibold text-slate-800">6 - Exports</h4>
- <p className="text-sm text-slate-500">{gstr1Summary.exports.count} invoices • ₹{gstr1Summary.exports.taxableValue.toLocaleString()}</p>
+ <p className="text-sm text-slate-500">{gstr1Summary.exports.count} invoices � ?{gstr1Summary.exports.taxableValue.toLocaleString()}</p>
  </div>
  </div>
  {expandedSections.includes('exports') ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
@@ -637,17 +637,17 @@ const GSTReturnFiling: React.FC = () => {
  <tbody className="divide-y divide-slate-200">
  <tr>
  <td className="px-4 py-3">(a) Outward taxable supplies (other than zero rated, nil rated and exempted)</td>
- <td className="px-4 py-3 text-right font-medium">₹{gstr3bData.outwardSupplies.taxableValue.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{gstr3bData.outwardSupplies.integratedTax.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{gstr3bData.outwardSupplies.centralTax.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{gstr3bData.outwardSupplies.stateTax.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right font-medium">?{gstr3bData.outwardSupplies.taxableValue.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{gstr3bData.outwardSupplies.integratedTax.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{gstr3bData.outwardSupplies.centralTax.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{gstr3bData.outwardSupplies.stateTax.toLocaleString()}</td>
  </tr>
  <tr className="bg-slate-50 font-semibold">
  <td className="px-4 py-3">Total</td>
- <td className="px-4 py-3 text-right">₹{gstr3bData.outwardSupplies.taxableValue.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{gstr3bData.outwardSupplies.integratedTax.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{gstr3bData.outwardSupplies.centralTax.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{gstr3bData.outwardSupplies.stateTax.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{gstr3bData.outwardSupplies.taxableValue.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{gstr3bData.outwardSupplies.integratedTax.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{gstr3bData.outwardSupplies.centralTax.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{gstr3bData.outwardSupplies.stateTax.toLocaleString()}</td>
  </tr>
  </tbody>
  </table>
@@ -671,9 +671,9 @@ const GSTReturnFiling: React.FC = () => {
  <tbody className="divide-y divide-slate-200">
  <tr>
  <td className="px-4 py-3">(A) ITC Available</td>
- <td className="px-4 py-3 text-right">₹{gstr3bData.eligibleITC.integratedTax.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{gstr3bData.eligibleITC.centralTax.toLocaleString()}</td>
- <td className="px-4 py-3 text-right">₹{gstr3bData.eligibleITC.stateTax.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{gstr3bData.eligibleITC.integratedTax.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{gstr3bData.eligibleITC.centralTax.toLocaleString()}</td>
+ <td className="px-4 py-3 text-right">?{gstr3bData.eligibleITC.stateTax.toLocaleString()}</td>
  </tr>
  </tbody>
  </table>
@@ -686,28 +686,28 @@ const GSTReturnFiling: React.FC = () => {
  <div className="bg-white rounded-lg p-4 border border-orange-200">
  <div className="text-sm text-slate-500">Integrated Tax</div>
  <div className={`text-xl font-bold ${gstr3bData.netTaxPayable.integratedTax >= 0 ? 'text-red-600' : 'text-green-600'}`}>
- ₹{Math.abs(gstr3bData.netTaxPayable.integratedTax).toLocaleString()}
+ ?{Math.abs(gstr3bData.netTaxPayable.integratedTax).toLocaleString()}
  {gstr3bData.netTaxPayable.integratedTax >= 0 ? ' (Pay)' : ' (Refund)'}
  </div>
  </div>
  <div className="bg-white rounded-lg p-4 border border-orange-200">
  <div className="text-sm text-slate-500">Central Tax</div>
  <div className={`text-xl font-bold ${gstr3bData.netTaxPayable.centralTax >= 0 ? 'text-red-600' : 'text-green-600'}`}>
- ₹{Math.abs(gstr3bData.netTaxPayable.centralTax).toLocaleString()}
+ ?{Math.abs(gstr3bData.netTaxPayable.centralTax).toLocaleString()}
  {gstr3bData.netTaxPayable.centralTax >= 0 ? ' (Pay)' : ' (Refund)'}
  </div>
  </div>
  <div className="bg-white rounded-lg p-4 border border-orange-200">
  <div className="text-sm text-slate-500">State/UT Tax</div>
  <div className={`text-xl font-bold ${gstr3bData.netTaxPayable.stateTax >= 0 ? 'text-red-600' : 'text-green-600'}`}>
- ₹{Math.abs(gstr3bData.netTaxPayable.stateTax).toLocaleString()}
+ ?{Math.abs(gstr3bData.netTaxPayable.stateTax).toLocaleString()}
  {gstr3bData.netTaxPayable.stateTax >= 0 ? ' (Pay)' : ' (Refund)'}
  </div>
  </div>
  <div className="bg-white rounded-lg p-4 border border-orange-200">
  <div className="text-sm text-slate-500">Total Payable</div>
  <div className="text-xl font-bold text-red-600">
- ₹{(gstr3bData.netTaxPayable.integratedTax + gstr3bData.netTaxPayable.centralTax + gstr3bData.netTaxPayable.stateTax).toLocaleString()}
+ ?{(gstr3bData.netTaxPayable.integratedTax + gstr3bData.netTaxPayable.centralTax + gstr3bData.netTaxPayable.stateTax).toLocaleString()}
  </div>
  </div>
  </div>

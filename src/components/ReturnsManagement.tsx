@@ -1,4 +1,4 @@
-﻿// ============================================
+// ============================================
 // RETURNS MANAGEMENT UI COMPONENT
 // Path: components/ReturnsManagement.tsx
 // Purpose: Create and manage supplier and customer return notes
@@ -44,7 +44,7 @@ const ReturnsManagement: React.FC = () => {
  });
  setReturnNotes(response.notes);
  } catch (error) {
- console.error('❌ Error loading return notes:', error);
+ console.error('? Error loading return notes:', error);
  } finally {
  setIsLoading(false);
  }
@@ -73,7 +73,7 @@ const ReturnsManagement: React.FC = () => {
  // For now, we'll create a new return note (edit would need separate logic)
  const created = await ReturnNotesService.createReturnNote(submitData);
  setReturnNotes([created, ...returnNotes]);
- alert('✅ Return note created successfully');
+ alert('? Return note created successfully');
 
  // Reset form
  setFormData({
@@ -89,7 +89,7 @@ const ReturnsManagement: React.FC = () => {
  setEditingReturn(null);
  setShowForm(false);
  } catch (error) {
- console.error('❌ Error saving return note:', error);
+ console.error('? Error saving return note:', error);
  alert('Failed to save return note');
  }
  };
@@ -226,7 +226,7 @@ const ReturnsManagement: React.FC = () => {
  {returnNote.total_value && (
  <div className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-700">
  <DollarSign size={16} />
- ₹{returnNote.total_value.toLocaleString()}
+ ?{returnNote.total_value.toLocaleString()}
  </div>
  )}
  </div>

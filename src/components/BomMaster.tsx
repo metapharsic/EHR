@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
-import { Save, Search, Plus, Wrench, PackagePlus, Download, Printer, Edit3 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Save, Search, Plus, Wrench, PackagePlus, Download, Printer, Pencil } from 'lucide-react';
 import { DenseGrid, ColumnDef } from './common/DenseGrid';
 import { BOMService } from '../services/accountingService';
 import { utils, writeFile } from 'xlsx';
@@ -80,7 +80,7 @@ export const BomMaster: React.FC = () => {
  // Summary sheet
  const summary = filtered.map(b => ({
  'BOM Name': b.bomName, 'Target Item': b.targetItem, 'Batch Yield': b.batchYield,
- 'Std Cost (₹)': b.stdCost, 'Materials Count': (b.materials || []).length, 'Status': b.isActive ? 'Active' : 'Inactive'
+ 'Std Cost (?)': b.stdCost, 'Materials Count': (b.materials || []).length, 'Status': b.isActive ? 'Active' : 'Inactive'
  }));
  const ws1 = utils.aoa_to_sheet([[]]);
  addExcelBranding(ws1, 'BOM Master Summary', company);
@@ -105,7 +105,7 @@ export const BomMaster: React.FC = () => {
  const handlePrint = () => {
  const rows = filtered.map(b => `<tr>
  <td>${b.bomName}</td><td>${b.targetItem}</td><td class="text-right">${b.batchYield}</td>
- <td class="text-right">₹${(b.stdCost || 0).toLocaleString()}</td><td><span class="badge ${b.isActive ? 'badge-green' : ''}">${b.isActive ? 'Active' : 'Inactive'}</span></td>
+ <td class="text-right">?${(b.stdCost || 0).toLocaleString()}</td><td><span class="badge ${b.isActive ? 'badge-green' : ''}">${b.isActive ? 'Active' : 'Inactive'}</span></td>
  </tr>`).join('');
  printReport('Bill of Materials (BOM)', `<table><thead><tr><th>BOM Name</th><th>Target Item</th><th class="text-right">Yield</th><th class="text-right">Std. Cost</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`, company);
  };
@@ -115,7 +115,7 @@ export const BomMaster: React.FC = () => {
  { key: 'qty', header: 'Quantity', type: 'number', align: 'right', width: '100px' },
  { key: 'uom', header: 'UOM', type: 'select', align: 'center', width: '80px', options: ['Nos','Kg','Litre','Strip','Box','Sheet','Gm'].map(v=>({value:v,label:v})) },
  { key: 'scrap', header: 'Scrap %', type: 'number', align: 'right', width: '80px' },
- { key: 'cost', header: 'Cost/Unit (₹)', type: 'number', align: 'right', width: '110px' }
+ { key: 'cost', header: 'Cost/Unit (?)', type: 'number', align: 'right', width: '110px' }
  ];
 
  const filtered = boms.filter(b => {
@@ -141,7 +141,7 @@ export const BomMaster: React.FC = () => {
  <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Batch Yield Qty</label>
  <input type="number" value={form.batchYield} onChange={e => setForm({...form, batchYield: Number(e.target.value)})} min={1} className="w-full text-sm font-bold border-b border-slate-300 p-1 text-center text-green-700 outline-none"/></div>
  <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Total Std Cost (Auto)</label>
- <div className="w-full text-sm border-b border-slate-300 p-1 text-right font-bold text-[#1D3557] bg-slate-50">₹{stdCost.toFixed(2)}</div></div>
+ <div className="w-full text-sm border-b border-slate-300 p-1 text-right font-bold text-[#1D3557] bg-slate-50">?{stdCost.toFixed(2)}</div></div>
  </div>
  </div>
  <div className="bg-white border flex-1 border-slate-200 shadow-sm flex flex-col min-h-[280px]">
@@ -199,7 +199,7 @@ export const BomMaster: React.FC = () => {
  <th className="p-3 font-bold border-r border-white/50 w-60">Target Item</th>
  <th className="p-3 font-bold border-r border-white/50 w-16 text-center">Yield</th>
  <th className="p-3 font-bold border-r border-white/50 w-16 text-center">Materials</th>
- <th className="p-3 font-bold border-r border-white/50 w-32 text-right">Std Cost (₹)</th>
+ <th className="p-3 font-bold border-r border-white/50 w-32 text-right">Std Cost (?)</th>
  <th className="p-3 font-bold w-20 text-center">Actions</th>
  </tr>
  </thead>
@@ -210,9 +210,9 @@ export const BomMaster: React.FC = () => {
  <td className="p-3 border-r border-slate-100 text-xs text-slate-600">{b.targetItem}</td>
  <td className="p-3 border-r border-slate-100 text-center text-xs font-bold text-green-700">{b.batchYield}</td>
  <td className="p-3 border-r border-slate-100 text-center text-xs font-bold text-slate-500">{(b.materials || []).length}</td>
- <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-800">₹{(b.stdCost || 0).toFixed(2)}</td>
+ <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-800">?{(b.stdCost || 0).toFixed(2)}</td>
  <td className="p-3 text-center opacity-0 group-hover:opacity-100 transition-opacity">
- <button onClick={() => { setEditingId(b.id); setForm({ bomName: b.bomName, targetItem: b.targetItem, batchYield: b.batchYield, isActive: b.isActive }); setMaterials(b.materials || defaultMaterials); setView('FORM'); }} className="p-1 text-amber-600 hover:bg-amber-50 rounded"><Edit3 size={13}/></button>
+ <button onClick={() => { setEditingId(b.id); setForm({ bomName: b.bomName, targetItem: b.targetItem, batchYield: b.batchYield, isActive: b.isActive }); setMaterials(b.materials || defaultMaterials); setView('FORM'); }} className="p-1 text-amber-600 hover:bg-amber-50 rounded"><Pencil size={13}/></button>
  </td>
  </tr>
  ))}
@@ -222,7 +222,7 @@ export const BomMaster: React.FC = () => {
  </div>
  <div className="bg-[#1D3557] text-white flex text-xs font-bold shrink-0 px-4 py-2">
  <div className="flex-1">{filtered.length} BOMs</div>
- <div className="text-slate-300">Avg Std Cost: ₹{filtered.length ? (filtered.reduce((s,b) => s+(b.stdCost||0), 0)/filtered.length).toFixed(2) : '0.00'}</div>
+ <div className="text-slate-300">Avg Std Cost: ?{filtered.length ? (filtered.reduce((s,b) => s+(b.stdCost||0), 0)/filtered.length).toFixed(2) : '0.00'}</div>
  </div>
  </div>
  );

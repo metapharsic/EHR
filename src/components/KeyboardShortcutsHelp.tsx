@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { X } from 'lucide-react';
 import { ERP_SHORTCUTS, GLOBAL_SHORTCUTS } from '../constants/shortcuts';
 import { Tab } from '../types';

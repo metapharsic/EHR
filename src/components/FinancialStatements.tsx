@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TrialBalanceService, BalanceSheetService, ProfitLossService } from '../services/accountingService';
 import { Download, Printer, RefreshCw, AlertCircle, ChevronDown, ChevronRight, Folder, FileText, CheckCircle, XCircle, TrendingUp, TrendingDown } from 'lucide-react';
 
@@ -124,7 +124,9 @@ export const FinancialStatements: React.FC<{ type: StatementType }> = ({ type })
  <div><label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">As on Date</label>
  <input type="date" value={selectedAsOn} onChange={e => setSelectedAsOn(e.target.value)} className="border border-slate-300 rounded px-2 py-1 text-sm font-bold outline-none"/></div>
  <button onClick={loadData} className="h-[30px] mt-4 flex items-center gap-1 bg-[#1D3557] text-white px-3 py-1 rounded text-xs font-bold"><RefreshCw size={12}/> Refresh</button>
- <button className="h-[30px] mt-4 flex items-center gap-1 bg-white border border-slate-300 text-slate-700 px-3 py-1 rounded text-xs font-bold"><Download size={12}/> Export</button>
+ <button onClick={() => {
+   import('../utils/accountingExport').then(m => m.exportTrialBalance(`As on ${selectedAsOn}`, rows));
+ }} className="h-[30px] mt-4 flex items-center gap-1 bg-white border border-slate-300 text-slate-700 px-3 py-1 rounded text-xs font-bold"><Download size={12}/> Export</button>
  </div>
  </div>
  <div className="flex-1 overflow-auto">
@@ -222,7 +224,13 @@ export const FinancialStatements: React.FC<{ type: StatementType }> = ({ type })
  </label>
  <button onClick={loadData} className="flex items-center gap-1 bg-[#1D3557] text-white px-3 py-1.5 rounded text-xs font-bold"><RefreshCw size={12}/> Refresh</button>
  <button onClick={() => setExpandedNodes({})} className="flex items-center gap-1 bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs font-bold">Collapse All</button>
- <button className="flex items-center gap-1 bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs font-bold"><Download size={12}/> Export</button>
+ <button onClick={() => {
+   if (type === 'BALANCE_SHEET' && data) {
+     import('../utils/accountingExport').then(m => m.exportBalanceSheet(data.liabilities?.items || [], data.assets?.items || [], selectedAsOn));
+   } else if (type === 'PROFIT_LOSS' && data) {
+     import('../utils/accountingExport').then(m => m.exportProfitLoss(data, `${periodStart} to ${selectedAsOn}`));
+   }
+ }} className="flex items-center gap-1 bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs font-bold"><Download size={12}/> Export</button>
  </div>
  </div>
 

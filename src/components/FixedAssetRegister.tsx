@@ -1,6 +1,6 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
- Building2, Calculator, Calendar, Download, Plus, Edit3, Trash2,
+ Building2, Calculator, Calendar, Download, Plus, Pencil, Trash2,
  TrendingDown, FileSpreadsheet, AlertCircle, CheckCircle, Search,
  Filter, DollarSign, Clock, Package, Truck, Computer, Factory,
  ChevronDown, ChevronUp, PieChart, BarChart3
@@ -332,7 +332,7 @@ const FixedAssetRegister: React.FC = () => {
  </span>
  </td>
  <td className="px-4 py-3 text-center">
- <button className="text-accent hover:text-blue-800 mr-2"><Edit3 size={16} /></button>
+ <button className="text-accent hover:text-blue-800 mr-2"><Pencil size={16} /></button>
  <button className="text-red-600 hover:text-red-800"><Trash2 size={16} /></button>
  </td>
  </tr>

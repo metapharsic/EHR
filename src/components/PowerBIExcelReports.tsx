@@ -1,11 +1,11 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
  FileSpreadsheet, Download, Settings, Filter, Calendar,
  BarChart3, PieChart, TrendingUp, DollarSign, Users,
  Building2, Receipt, Activity, Wallet, Percent,
  ChevronDown, ChevronUp, Plus, X, Check, RefreshCw,
  Eye, FileBarChart, Table, LayoutGrid, Save,
- Trash2, Edit3, Copy, CheckCircle2, AlertCircle,
+ Trash2, Pencil, Copy, CheckCircle2, AlertCircle,
  LineChart, TrendingDown, Target, Zap, Brain,
  ArrowUpRight, ArrowDownRight, Clock, Gauge,
  Lightbulb, Sparkles, BarChart4, AreaChart,
@@ -761,7 +761,7 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  results.push({
  type: 'trend',
  title: 'Revenue Trend Analysis',
- content: `Revenue is trending ${trend.trend} with a ${Math.abs(trend.changePercent).toFixed(1)}% change. Current: ₹${trend.currentValue.toLocaleString()}. Forecasted next month: ₹${trend.forecastNextMonth.toLocaleString()}`,
+ content: `Revenue is trending ${trend.trend} with a ${Math.abs(trend.changePercent).toFixed(1)}% change. Current: ?${trend.currentValue.toLocaleString()}. Forecasted next month: ?${trend.forecastNextMonth.toLocaleString()}`,
  data: trend,
  confidence: 88,
  relatedMetrics: ['Growth Rate', 'Sales Performance', 'Top Line']
@@ -775,7 +775,7 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  results.push({
  type: 'trend',
  title: 'Expense Trend Analysis',
- content: `Expenses are ${trend.trend === 'up' ? 'increasing' : 'decreasing'} by ${Math.abs(trend.changePercent).toFixed(1)}%. Current: ₹${trend.currentValue.toLocaleString()}. Budget forecast: ₹${trend.forecastNextMonth.toLocaleString()}`,
+ content: `Expenses are ${trend.trend === 'up' ? 'increasing' : 'decreasing'} by ${Math.abs(trend.changePercent).toFixed(1)}%. Current: ?${trend.currentValue.toLocaleString()}. Budget forecast: ?${trend.forecastNextMonth.toLocaleString()}`,
  data: trend,
  confidence: 87,
  relatedMetrics: ['Cost Control', 'Operational Efficiency', 'Burn Rate']
@@ -789,7 +789,7 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  results.push({
  type: 'trend',
  title: 'Cash Flow Analysis',
- content: `Net cash flow is ${trend.trend === 'up' ? 'positive and growing' : trend.trend === 'down' ? 'declining' : 'stable'} at ₹${trend.currentValue.toLocaleString()}. Next month projection: ₹${trend.forecastNextMonth.toLocaleString()}`,
+ content: `Net cash flow is ${trend.trend === 'up' ? 'positive and growing' : trend.trend === 'down' ? 'declining' : 'stable'} at ?${trend.currentValue.toLocaleString()}. Next month projection: ?${trend.forecastNextMonth.toLocaleString()}`,
  data: trend,
  confidence: 85,
  relatedMetrics: ['Free Cash Flow', 'Operating Cash', 'Cash Position']
@@ -803,7 +803,7 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  results.push({
  type: 'forecast',
  title: '12-Month Financial Forecast',
- content: `Based on historical trends and seasonality, the forecast shows ${forecastData.filter(f => f.trend === 'up').length} months of growth. Next month projection: ₹${forecastData[0]?.forecast.toLocaleString() || 'N/A'} with ${forecastData[0]?.confidence}% confidence.`,
+ content: `Based on historical trends and seasonality, the forecast shows ${forecastData.filter(f => f.trend === 'up').length} months of growth. Next month projection: ?${forecastData[0]?.forecast.toLocaleString() || 'N/A'} with ${forecastData[0]?.confidence}% confidence.`,
  data: forecastData,
  confidence: 82,
  relatedMetrics: ['Predictive Analytics', 'Seasonality', 'Growth Trajectory']
@@ -839,7 +839,7 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  results.push({
  type: 'projection',
  title: `${forecastScenario.charAt(0).toUpperCase() + forecastScenario.slice(1)} Scenario Projection`,
- content: `Under ${forecastScenario} conditions: Revenue ₹${scenario.revenue.toLocaleString()}, Expenses ₹${scenario.expenses.toLocaleString()}, Net Profit ₹${scenario.netProfit.toLocaleString()}. Profit margin: ${scenario.revenue > 0 ? ((scenario.netProfit / scenario.revenue) * 100).toFixed(1) : 0}%`,
+ content: `Under ${forecastScenario} conditions: Revenue ?${scenario.revenue.toLocaleString()}, Expenses ?${scenario.expenses.toLocaleString()}, Net Profit ?${scenario.netProfit.toLocaleString()}. Profit margin: ${scenario.revenue > 0 ? ((scenario.netProfit / scenario.revenue) * 100).toFixed(1) : 0}%`,
  data: scenario,
  confidence: 78,
  relatedMetrics: ['Scenario Planning', 'Budget Forecast', 'Strategic Planning']
@@ -856,7 +856,7 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  results.push({
  type: 'comparison',
  title: 'Revenue vs Expense Comparison',
- content: `Revenue: ₹${revenue.currentValue.toLocaleString()} vs Expenses: ₹${expense.currentValue.toLocaleString()}. Net position: ₹${profit.toLocaleString()} (${profit > 0 ? 'Profit' : 'Loss'}). Revenue covers expenses by ${expense.currentValue > 0 ? ((revenue.currentValue / expense.currentValue) * 100).toFixed(1) : 0}%.`,
+ content: `Revenue: ?${revenue.currentValue.toLocaleString()} vs Expenses: ?${expense.currentValue.toLocaleString()}. Net position: ?${profit.toLocaleString()} (${profit > 0 ? 'Profit' : 'Loss'}). Revenue covers expenses by ${expense.currentValue > 0 ? ((revenue.currentValue / expense.currentValue) * 100).toFixed(1) : 0}%.`,
  data: { revenue, expense, profit },
  confidence: 91,
  relatedMetrics: ['Profitability', 'Break-even Analysis', 'Margin Analysis']
@@ -873,7 +873,7 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  results.push({
  type: 'summary',
  title: 'Financial Health Summary',
- content: `Overall financial health is ${kpiInsights.filter(k => k.status === 'good' || k.status === 'excellent').length >= 2 ? 'GOOD' : 'NEEDS ATTENTION'}. Revenue: ₹${totalRevenue.toLocaleString()}, Expenses: ₹${totalExpense.toLocaleString()}, Net Cash Flow: ₹${cashFlow.toLocaleString()}. ${anomalies.length > 0 ? `⚠️ ${anomalies.length} anomalies require review.` : '✓ No critical issues detected.'}`,
+ content: `Overall financial health is ${kpiInsights.filter(k => k.status === 'good' || k.status === 'excellent').length >= 2 ? 'GOOD' : 'NEEDS ATTENTION'}. Revenue: ?${totalRevenue.toLocaleString()}, Expenses: ?${totalExpense.toLocaleString()}, Net Cash Flow: ?${cashFlow.toLocaleString()}. ${anomalies.length > 0 ? `??� ${anomalies.length} anomalies require review.` : '? No critical issues detected.'}`,
  data: { kpiInsights, trendAnalysis, anomalies },
  confidence: 89,
  relatedMetrics: ['Financial Health', 'Performance Score', 'Executive Summary']
@@ -1324,10 +1324,10 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  <div>
  <h5 className="font-semibold text-slate-800">{report.name}</h5>
  <p className="text-sm text-slate-500">
- Generated {new Date(report.generatedAt).toLocaleString()} • {report.rowCount} records
+ Generated {new Date(report.generatedAt).toLocaleString()} � {report.rowCount} records
  </p>
  <div className="flex gap-4 mt-1 text-xs text-slate-400">
- <span>Total: ₹{report.summary.totalAmount.toLocaleString()}</span>
+ <span>Total: ?{report.summary.totalAmount.toLocaleString()}</span>
  <span>Filters: {report.summary.filtersApplied}</span>
  </div>
  </div>
@@ -1512,9 +1512,9 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  
  {result.type === 'trend' && (
  <div className="grid grid-cols-4 gap-4 text-sm">
- <div><span className="text-slate-500">Current:</span> <strong>₹{result.data.currentValue?.toLocaleString()}</strong></div>
+ <div><span className="text-slate-500">Current:</span> <strong>?{result.data.currentValue?.toLocaleString()}</strong></div>
  <div><span className="text-slate-500">Change:</span> <strong className={result.data.changePercent > 0 ? 'text-green-600' : 'text-red-600'}>{result.data.changePercent > 0 ? '+' : ''}{result.data.changePercent?.toFixed(1)}%</strong></div>
- <div><span className="text-slate-500">Next Month:</span> <strong>₹{result.data.forecastNextMonth?.toLocaleString()}</strong></div>
+ <div><span className="text-slate-500">Next Month:</span> <strong>?{result.data.forecastNextMonth?.toLocaleString()}</strong></div>
  <div><span className="text-slate-500">Trend:</span> <strong className={
  result.data.trend === 'up' ? 'text-green-600' :
  result.data.trend === 'down' ? 'text-red-600' :
@@ -1525,9 +1525,9 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  
  {result.type === 'projection' && (
  <div className="grid grid-cols-4 gap-4 text-sm">
- <div><span className="text-slate-500">Revenue:</span> <strong className="text-green-600">₹{result.data.revenue?.toLocaleString()}</strong></div>
- <div><span className="text-slate-500">Expenses:</span> <strong className="text-red-600">₹{result.data.expenses?.toLocaleString()}</strong></div>
- <div><span className="text-slate-500">Net Profit:</span> <strong className={result.data.netProfit >= 0 ? 'text-accent' : 'text-red-600'}>₹{result.data.netProfit?.toLocaleString()}</strong></div>
+ <div><span className="text-slate-500">Revenue:</span> <strong className="text-green-600">?{result.data.revenue?.toLocaleString()}</strong></div>
+ <div><span className="text-slate-500">Expenses:</span> <strong className="text-red-600">?{result.data.expenses?.toLocaleString()}</strong></div>
+ <div><span className="text-slate-500">Net Profit:</span> <strong className={result.data.netProfit >= 0 ? 'text-accent' : 'text-red-600'}>?{result.data.netProfit?.toLocaleString()}</strong></div>
  <div><span className="text-slate-500">Margin:</span> <strong>{result.data.revenue > 0 ? ((result.data.netProfit / result.data.revenue) * 100).toFixed(1) : 0}%</strong></div>
  </div>
  )}
@@ -1602,20 +1602,20 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  </span>
  </div>
  <div className="text-2xl font-bold text-slate-800 mb-3">
- ₹{trend.currentValue.toLocaleString()}
+ ?{trend.currentValue.toLocaleString()}
  </div>
  <div className="grid grid-cols-3 gap-2 text-sm">
  <div className="bg-white p-2 rounded border border-slate-200">
  <div className="text-slate-500 text-xs">Next Month</div>
- <div className="font-semibold text-slate-700">₹{trend.forecastNextMonth.toLocaleString()}</div>
+ <div className="font-semibold text-slate-700">?{trend.forecastNextMonth.toLocaleString()}</div>
  </div>
  <div className="bg-white p-2 rounded border border-slate-200">
  <div className="text-slate-500 text-xs">Next Quarter</div>
- <div className="font-semibold text-slate-700">₹{trend.forecastNextQuarter.toLocaleString()}</div>
+ <div className="font-semibold text-slate-700">?{trend.forecastNextQuarter.toLocaleString()}</div>
  </div>
  <div className="bg-white p-2 rounded border border-slate-200">
  <div className="text-slate-500 text-xs">Next Year</div>
- <div className="font-semibold text-slate-700">₹{trend.forecastNextYear.toLocaleString()}</div>
+ <div className="font-semibold text-slate-700">?{trend.forecastNextYear.toLocaleString()}</div>
  </div>
  </div>
  </div>
@@ -1637,14 +1637,14 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  <TrendingUp size={16} />
  <span className="text-sm font-medium">Projected Revenue</span>
  </div>
- <div className="text-2xl font-bold text-green-800">₹{proj.revenue.toLocaleString()}</div>
+ <div className="text-2xl font-bold text-green-800">?{proj.revenue.toLocaleString()}</div>
  </div>
  <div className="p-4 bg-red-50 rounded-lg border border-red-200">
  <div className="flex items-center gap-2 text-red-700 mb-1">
  <TrendingDown size={16} />
  <span className="text-sm font-medium">Projected Expenses</span>
  </div>
- <div className="text-2xl font-bold text-red-800">₹{proj.expenses.toLocaleString()}</div>
+ <div className="text-2xl font-bold text-red-800">?{proj.expenses.toLocaleString()}</div>
  </div>
  </div>
  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -1653,7 +1653,7 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  <span className="text-sm font-medium">Net Profit Projection</span>
  </div>
  <div className={`text-3xl font-bold ${proj.netProfit >= 0 ? 'text-blue-800' : 'text-red-600'}`}>
- ₹{proj.netProfit.toLocaleString()}
+ ?{proj.netProfit.toLocaleString()}
  </div>
  <div className="text-sm text-accent mt-1">
  Margin: {proj.revenue > 0 ? ((proj.netProfit / proj.revenue) * 100).toFixed(1) : 0}%
@@ -1664,7 +1664,7 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  <Wallet size={16} />
  <span className="text-sm font-medium">Cash Flow Projection</span>
  </div>
- <div className="text-xl font-bold text-purple-800">₹{proj.cashFlow.toLocaleString()}</div>
+ <div className="text-xl font-bold text-purple-800">?{proj.cashFlow.toLocaleString()}</div>
  </div>
  <div>
  <h6 className="text-sm font-medium text-slate-700 mb-2">Key Assumptions:</h6>
@@ -1719,7 +1719,7 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  </div>
  </div>
  <span className="text-xs text-slate-600 mt-2 font-medium">{data.period}</span>
- <span className="text-xs text-slate-400">₹{(data.forecast / 1000).toFixed(0)}K</span>
+ <span className="text-xs text-slate-400">?{(data.forecast / 1000).toFixed(0)}K</span>
  </div>
  ))}
  </div>
@@ -1773,8 +1773,8 @@ const PowerBIExcelReports: React.FC<PowerBIExcelReportsProps> = (props) => {
  </div>
  <p className="text-slate-700 mt-2">{anomaly.description}</p>
  <div className="flex gap-4 mt-2 text-sm">
- <span className="text-slate-600">Detected: <strong>₹{anomaly.value.toLocaleString()}</strong></span>
- <span className="text-slate-600">Expected: <strong>₹{anomaly.expectedValue.toLocaleString()}</strong></span>
+ <span className="text-slate-600">Detected: <strong>?{anomaly.value.toLocaleString()}</strong></span>
+ <span className="text-slate-600">Expected: <strong>?{anomaly.expectedValue.toLocaleString()}</strong></span>
  <span className={`font-medium ${
  anomaly.value > anomaly.expectedValue ? 'text-red-600' : 'text-green-600'
  }`}>

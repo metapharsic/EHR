@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { User, Building2, RotateCcw, Settings, Lock, Package, Archive, LogOut, UserCog, Shield, X, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -368,7 +368,7 @@ const SecurityModal: React.FC<SecurityModalProps> = ({ onClose }) => {
  <CheckCircle size={16} className="text-green-500" />
  <span className="text-sm text-slate-700">Current Session - Windows Chrome</span>
  </div>
- <p className="text-xs text-slate-500 mt-1 ml-6">IP: 192.168.1.1 • Active now</p>
+ <p className="text-xs text-slate-500 mt-1 ml-6">IP: 192.168.1.1 � Active now</p>
  </div>
  </div>
  </div>

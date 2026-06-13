@@ -3,7 +3,7 @@ import {
   Search, CreditCard, ArrowUpRight, ArrowDownLeft, FileText, Calendar, 
   Wallet, Check, X, Plus, PieChart, TrendingUp, DollarSign, RefreshCcw, 
   Filter, User, MapPin, Briefcase, Printer, 
-  Download, Eye, Edit3, Trash2, Save, XCircle, Package, Layers, 
+  Download, Eye, Pencil, Trash2, Save, XCircle, Package, Layers, 
   AlertCircle, ShoppingCart, History, Calculator,
   Receipt, Users, Clock, Database, BarChart3, ShieldCheck
 } from 'lucide-react';
@@ -390,7 +390,7 @@ const StrategicPOS: React.FC = () => {
                           className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
                           title="Edit Invoice"
                         >
-                          <Edit3 size={14} />
+                          <Pencil size={14} />
                         </button>
                         <button 
                           onClick={async () => {

@@ -1,4 +1,4 @@
-ï»¿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { FileText, Folder, Upload, Search, Filter, Download, Trash2, Eye, File, Clock, AlertCircle, CheckCircle, Plus, X, FileCheck, HardDrive, History, Workflow, BarChart3, FileSpreadsheet, Users, Calendar, Tag, Shield, Grid } from 'lucide-react';
 import { DocRecord, Document, DocumentVersion, DocumentWorkflow, DocumentAuditTrail, DocumentTag } from '../types';
 import { 
@@ -39,8 +39,8 @@ const Documents: React.FC = () => {
    version: (v.version || '').replace(/^v/, ''),
    fileUrl: '',
    fileSize: Number(v.fileSize) || 0,
-   uploadedBy: v.uploadedBy || 'â€”',
-   uploadDate: v.uploadDate ? new Date(v.uploadDate).toISOString().slice(0, 10) : 'â€”',
+   uploadedBy: v.uploadedBy || '—',
+   uploadDate: v.uploadDate ? new Date(v.uploadDate).toISOString().slice(0, 10) : '—',
    changeLog: v.changeLog || '',
    approvedBy: v.approvedBy || '',
    approvalDate: v.approvalDate || '',
@@ -310,7 +310,7 @@ const Documents: React.FC = () => {
 
  const getSortIcon = (field: string) => {
  if (sortBy !== field) return null;
- return sortOrder === 'asc' ? 'â†‘' : 'â†“';
+ return sortOrder === 'asc' ? '?' : '?';
  };
 
  const getStatusColor = (status: string) => {
@@ -462,9 +462,9 @@ const Documents: React.FC = () => {
  </p>
  <div className="flex items-center gap-2 mt-1 flex-wrap">
  <span className="text-xs text-slate-500">{doc.id}</span>
- <span className="text-xs text-slate-400">â€¢</span>
+ <span className="text-xs text-slate-400">•</span>
  <span className="text-xs text-slate-500">{getDocumentSize(doc.size)}</span>
- <span className="text-xs text-slate-400">â€¢</span>
+ <span className="text-xs text-slate-400">•</span>
  <span className="text-xs text-slate-500">{getDocumentAge(doc.uploadDate)}</span>
  </div>
  </div>
@@ -515,9 +515,9 @@ const Documents: React.FC = () => {
  </h3>
  <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">
  <span>{doc.id}</span>
- <span>â€¢</span>
+ <span>•</span>
  <span>{getDocumentSize(doc.size)}</span>
- <span>â€¢</span>
+ <span>•</span>
  <span>{getDocumentAge(doc.uploadDate)}</span>
  </div>
  </div>
@@ -684,7 +684,7 @@ const Documents: React.FC = () => {
  className="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors flex items-center gap-1"
  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
  >
- {sortOrder === 'asc' ? 'â†‘' : 'â†“'} {sortOrder === 'asc' ? 'Asc' : 'Desc'}
+ {sortOrder === 'asc' ? '?' : '?'} {sortOrder === 'asc' ? 'Asc' : 'Desc'}
  </button>
  </div>
  );
@@ -767,7 +767,7 @@ const Documents: React.FC = () => {
  {getDocumentTypeIcon(selectedDocument.type)}
  <div>
  <h3 className="font-bold text-lg">{selectedDocument.title}</h3>
- <p className="text-slate-300 text-sm">{selectedDocument.id} â€¢ {getDocumentSize(selectedDocument.size)}</p>
+ <p className="text-slate-300 text-sm">{selectedDocument.id} • {getDocumentSize(selectedDocument.size)}</p>
  </div>
  </div>
  <div className="flex items-center gap-2">
@@ -1462,7 +1462,7 @@ const Documents: React.FC = () => {
  </div>
  <div>
  <p className="font-bold text-slate-800 text-sm group-hover:text-primary transition-colors">{doc.title}</p>
- <p className="text-xs text-slate-500">{doc.id} â€¢ {doc.size}</p>
+ <p className="text-xs text-slate-500">{doc.id} • {doc.size}</p>
  </div>
  </div>
  </td>

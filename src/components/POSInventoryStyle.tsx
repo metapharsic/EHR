@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, CreditCard, ArrowUpRight, ArrowDownLeft, FileText, Calendar, Wallet, Check, X, Plus, PieChart, TrendingUp, DollarSign, RefreshCcw, Filter, User, MapPin, Stethoscope, Pill, MapPinned, Briefcase, Printer, Download, Eye, Edit3, Trash2, Save, XCircle, Package, Layers, AlertCircle, ShoppingCart, Power, Minus, Gift, History, Calculator } from 'lucide-react';
+import { Search, CreditCard, ArrowUpRight, ArrowDownLeft, FileText, Calendar, Wallet, Check, X, Plus, PieChart, TrendingUp, DollarSign, RefreshCcw, Filter, User, MapPin, Stethoscope, Pill, MapPinned, Briefcase, Printer, Download, Eye, Pencil, Trash2, Save, XCircle, Package, Layers, AlertCircle, ShoppingCart, Power, Minus, Gift, History, Calculator } from 'lucide-react';
 import { MOCK_PRODUCTS } from '../constants';
 import { Product, Batch, SalesInvoice, SalesInvoiceItem, Party } from '../types';
 import { useAuth } from '../context/AuthContext';

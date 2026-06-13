@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
  BarChart3, Brain, Zap, Clock, CheckCircle2, 
  AlertCircle, Loader2, Sparkles, TrendingUp, 
@@ -78,7 +78,7 @@ export const IntelligenceDashboard: React.FC = () => {
  fetchIntelligence();
  }, []);
 
- // Batch-poll job status — single request for all pending jobs (fixes N+1)
+ // Batch-poll job status � single request for all pending jobs (fixes N+1)
  useEffect(() => {
  const pendingJobs = activeJobs.filter(j => !['completed', 'failed', 'delayed'].includes(j.status));
  if (pendingJobs.length === 0) return;
@@ -177,7 +177,7 @@ export const IntelligenceDashboard: React.FC = () => {
  <div className="grid grid-cols-4 gap-6">
  <StatCard 
  label="Cash Flow Prediction (30d)" 
- value={`₹${(parseFloat(financials?.kpis?.forecastedCash30d || '0')/1000000).toFixed(1)}M`}
+ value={`?${(parseFloat(financials?.kpis?.forecastedCash30d || '0')/1000000).toFixed(1)}M`}
  icon={<Wallet size={20} />} 
  trend={financials?.intelligence?.status === 'HEALTHY' ? 'Stable' : 'Risk'}
  color="indigo"
@@ -191,7 +191,7 @@ export const IntelligenceDashboard: React.FC = () => {
  />
  <StatCard 
  label="POS Revenue (30d)" 
- value={`₹${((posStats?.monthlyRevenue || 0)/1000).toFixed(1)}k`}
+ value={`?${((posStats?.monthlyRevenue || 0)/1000).toFixed(1)}k`}
  icon={<Activity size={20} />} 
  trend={`+${posStats?.growth || 12}%`}
  color="amber"
@@ -239,7 +239,7 @@ export const IntelligenceDashboard: React.FC = () => {
  <h3 className="font-bold text-xl tracking-tight">V4 Predictive Recommendation</h3>
  </div>
  <p className="text-indigo-100 text-lg mb-8 font-medium leading-relaxed max-w-2xl">
- {financials?.intelligence?.recommendation || 'Syncing data...'}. Based on 12-month data trends, your current burn rate is ₹{financials?.kpis?.burnRate || '0.00'}. 
+ {financials?.intelligence?.recommendation || 'Syncing data...'}. Based on 12-month data trends, your current burn rate is ?{financials?.kpis?.burnRate || '0.00'}. 
  Maintaining current collection velocity will result in healthy liquidity for the next quarter.
  </p>
  <div className="flex gap-4">
@@ -297,18 +297,18 @@ export const IntelligenceDashboard: React.FC = () => {
      const npm = parseFloat((financials.kpis?.netProfitMargin ?? '0').replace('%','')) || 0;
      const wc = financials.kpis?.workingCapital ?? 0;
      const status = financials.intelligence?.status ?? '';
-     // Liquidity (25pts): ratio ≥ 2 = full
+     // Liquidity (25pts): ratio = 2 = full
      score += Math.min(25, Math.round((cr / 2) * 25));
-     // Profitability (25pts): margin ≥ 20% = full
+     // Profitability (25pts): margin = 20% = full
      score += Math.min(25, Math.round((Math.max(0, npm) / 20) * 25));
      // Working capital (25pts): positive = 25, else 0
      score += wc > 0 ? 25 : 0;
      // Status (25pts): HEALTHY = 25, else 0
      score += status === 'HEALTHY' ? 25 : 0;
-     breakdown = `CR: ${cr} · Margin: ${npm.toFixed(1)}% · WC: ${wc > 0 ? 'Positive' : 'Negative'}`;
+     breakdown = `CR: ${cr} � Margin: ${npm.toFixed(1)}% � WC: ${wc > 0 ? 'Positive' : 'Negative'}`;
    } else {
      score = 0;
-     breakdown = 'Loading financial data…';
+     breakdown = 'Loading financial data�';
    }
    const scoreLabel = score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : score >= 40 ? 'Fair' : 'At Risk';
    return (
@@ -321,7 +321,7 @@ export const IntelligenceDashboard: React.FC = () => {
        <p className="text-xs text-indigo-100/70 font-medium leading-relaxed">
          {financials
            ? `${breakdown}. ${financials.intelligence?.recommendation ?? ''}`
-           : 'Fetching live financial metrics…'}
+           : 'Fetching live financial metrics�'}
        </p>
      </>
    );

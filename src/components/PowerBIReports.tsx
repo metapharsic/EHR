@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, Download, ExternalLink, Settings, CheckCircle, AlertTriangle, RefreshCw, FileSpreadsheet, Database, Eye, TrendingUp, Brain, Lightbulb } from 'lucide-react';
 import { 
  getPowerBIConfig, 
@@ -431,16 +431,16 @@ const PowerBIReports: React.FC<PowerBIReportsProps> = ({ data = [], reportType =
  {forecastData.map((row, idx) => (
  <tr key={idx}>
  <td className="p-2 font-medium">{row.period}</td>
- <td className="p-2 text-right font-bold text-accent">₹{row.forecast.toLocaleString()}</td>
- <td className="p-2 text-right text-slate-500">₹{row.lowerBound.toLocaleString()}</td>
- <td className="p-2 text-right text-slate-500">₹{row.upperBound.toLocaleString()}</td>
+ <td className="p-2 text-right font-bold text-accent">?{row.forecast.toLocaleString()}</td>
+ <td className="p-2 text-right text-slate-500">?{row.lowerBound.toLocaleString()}</td>
+ <td className="p-2 text-right text-slate-500">?{row.upperBound.toLocaleString()}</td>
  <td className="p-2 text-center">
  <span className={`px-2 py-0.5 rounded-full text-xs ${
  row.trend === 'up' ? 'bg-green-100 text-green-700' :
  row.trend === 'down' ? 'bg-red-100 text-red-700' :
  'bg-slate-100 text-slate-700'
  }`}>
- {row.trend === 'up' ? '↗️ Up' : row.trend === 'down' ? '↘️ Down' : '➡️ Stable'}
+ {row.trend === 'up' ? '??� Up' : row.trend === 'down' ? '??� Down' : '??� Stable'}
  </span>
  </td>
  </tr>
@@ -510,7 +510,7 @@ const PowerBIReports: React.FC<PowerBIReportsProps> = ({ data = [], reportType =
  <h4 className="font-bold text-slate-800">{insight.title}</h4>
  <p className="text-sm text-slate-600 mt-1">{insight.description}</p>
  <div className="mt-3 p-3 bg-white rounded-lg">
- <p className="text-xs font-medium text-slate-700">💡 Recommendation:</p>
+ <p className="text-xs font-medium text-slate-700">?? Recommendation:</p>
  <p className="text-sm text-slate-600">{insight.recommendation}</p>
  </div>
  <p className="text-xs text-slate-500 mt-2">Impact: {insight.impact}</p>

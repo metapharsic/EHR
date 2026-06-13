@@ -1,4 +1,4 @@
-﻿/**
+/**
  * REFACTORED MANUFACTURING COMPONENT
  * Uses ERPLayout + useDataFetch patterns
  * This provides consistent, professional manufacturing management
@@ -84,13 +84,13 @@ const Manufacturing: React.FC = () => {
  <div className="flex gap-3">
  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
  <div>
- <h3 className="font-semibold text-red-900">⚠️ Database Connection Failed</h3>
+ <h3 className="font-semibold text-red-900">??� Database Connection Failed</h3>
  <p className="text-red-700 text-sm mt-1">{dbStatus.error}</p>
  <button
  onClick={handleRefresh}
  className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
  >
- 🔄 Retry Connection
+ ?? Retry Connection
  </button>
  </div>
  </div>
@@ -106,9 +106,9 @@ const Manufacturing: React.FC = () => {
  isLoading={loadingOrders || loadingBoms || loadingRM}
  actionButtons={
  canManageManufacturing && [
- { label: '➕ New Job Order', onClick: () => setShowOrderModal(true), icon: <Plus size={16}/> },
- { label: '📦 Create BOM', onClick: () => setShowBomModal(true), icon: <Plus size={16}/> },
- { label: '🧪 Add Material', onClick: () => setShowRmModal(true), icon: <Plus size={16}/> }
+ { label: '? New Job Order', onClick: () => setShowOrderModal(true), icon: <Plus size={16}/> },
+ { label: '?? Create BOM', onClick: () => setShowBomModal(true), icon: <Plus size={16}/> },
+ { label: '?? Add Material', onClick: () => setShowRmModal(true), icon: <Plus size={16}/> }
  ]
  }
  >

@@ -1,4 +1,4 @@
-﻿// ============================================
+// ============================================
 // GODOWNS MANAGEMENT UI COMPONENT
 // Path: components/GodownsManagement.tsx
 // Purpose: Create, manage, and organize warehouse locations
@@ -43,7 +43,7 @@ const GodownsManagement: React.FC = () => {
  const data = await getAllGodowns();
  setGodowns(data);
  } catch (error) {
- console.error('❌ Error loading godowns:', error);
+ console.error('? Error loading godowns:', error);
  } finally {
  setIsLoading(false);
  }
@@ -64,19 +64,19 @@ const GodownsManagement: React.FC = () => {
  // Edit mode
  const updated = await updateGodown(editingGodown.id, formData);
  setGodowns(godowns.map(g => g.id === editingGodown.id ? updated : g));
- alert('✅ Godown updated successfully');
+ alert('? Godown updated successfully');
  } else {
  // Create mode
  const created = await createGodown(formData);
  setGodowns([created, ...godowns]);
- alert('✅ Godown created successfully');
+ alert('? Godown created successfully');
  }
 
  setFormData({ name: '', address: '', manager_id: '', is_default: false });
  setEditingGodown(null);
  setShowForm(false);
  } catch (error) {
- console.error('❌ Error saving godown:', error);
+ console.error('? Error saving godown:', error);
  alert('Failed to save godown');
  }
  };
@@ -312,10 +312,10 @@ const GodownsManagement: React.FC = () => {
  <div>
  <h4 className="font-bold text-blue-900 mb-1">Warehouse Management Tips</h4>
  <ul className="text-sm text-blue-800 space-y-1">
- <li>• Set one warehouse as default for automatic stock allocation</li>
- <li>• Assign a manager to each warehouse for accountability</li>
- <li>• Use warehouses to organize stock across multiple locations</li>
- <li>• Stock reconciliation can be done warehouse-by-warehouse</li>
+ <li>� Set one warehouse as default for automatic stock allocation</li>
+ <li>� Assign a manager to each warehouse for accountability</li>
+ <li>� Use warehouses to organize stock across multiple locations</li>
+ <li>� Stock reconciliation can be done warehouse-by-warehouse</li>
  </ul>
  </div>
  </div>

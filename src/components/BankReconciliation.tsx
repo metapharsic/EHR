@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { UploadCloud, CheckCircle2, AlertCircle, RefreshCw, FileText, Printer, Download } from 'lucide-react';
 import { useCompany } from '../context/CompanyContext';
 import { printReport, exportBankRecon } from '../utils/accountingExport';
@@ -34,7 +34,7 @@ export const BankReconciliation: React.FC = () => {
  </select>
  <button 
  onClick={() => {
- const rows = booksEntries.map(e => `<tr><td>${e.date}</td><td>${e.ref}</td><td>${e.details}</td><td class="text-right">${e.amount < 0 ? '₹' + Math.abs(e.amount).toLocaleString() : ''}</td><td class="text-right">${e.amount > 0 ? '₹' + e.amount.toLocaleString() : ''}</td></tr>`).join('');
+ const rows = booksEntries.map(e => `<tr><td>${e.date}</td><td>${e.ref}</td><td>${e.details}</td><td class="text-right">${e.amount < 0 ? '?' + Math.abs(e.amount).toLocaleString() : ''}</td><td class="text-right">${e.amount > 0 ? '?' + e.amount.toLocaleString() : ''}</td></tr>`).join('');
  printReport('Bank Reconciliation Statement', `
  <div style="margin-bottom:15px"><b>Bank:</b> HDFC Current A/c - 110022</div>
  <table><thead><tr><th>Date</th><th>Ref</th><th>Particulars</th><th class="text-right">Withdrawals</th><th class="text-right">Deposits</th></tr></thead><tbody>${rows}</tbody></table>`, company);
@@ -77,19 +77,19 @@ export const BankReconciliation: React.FC = () => {
  <div className="grid grid-cols-2 gap-8 text-sm">
  <div className="flex justify-between items-center border-b border-dashed pb-1">
  <span className="font-bold text-slate-600">Balance as per Company Books:</span>
- <span className="font-bold text-slate-800">₹ 12,45,000.00</span>
+ <span className="font-bold text-slate-800">? 12,45,000.00</span>
  </div>
  <div className="flex justify-between items-center border-b border-dashed pb-1">
  <span className="font-bold text-slate-600">Balance as per Bank Statement:</span>
- <span className="font-bold text-[#1D3557]">₹ 12,29,750.00</span>
+ <span className="font-bold text-[#1D3557]">? 12,29,750.00</span>
  </div>
  <div className="flex justify-between items-center border-b border-dashed pb-1">
  <span className="font-bold text-red-500 text-xs">Amounts not reflected in bank:</span>
- <span className="font-bold text-red-700">- ₹ 45,000.00</span>
+ <span className="font-bold text-red-700">- ? 45,000.00</span>
  </div>
  <div className="flex justify-between items-center border-b border-dashed pb-1">
  <span className="font-bold text-accent text-xs">Amounts not reflected in books:</span>
- <span className="font-bold text-accent">- ₹ 250.00</span>
+ <span className="font-bold text-accent">- ? 250.00</span>
  </div>
  </div>
  {fileUploaded && (
@@ -141,7 +141,7 @@ export const BankReconciliation: React.FC = () => {
  <th className="p-3 w-8"></th>
  <th className="p-3">Book Record</th>
  <th className="p-3">Bank Record</th>
- <th className="p-3 text-right text-green-700">Matched Amt (₹)</th>
+ <th className="p-3 text-right text-green-700">Matched Amt (?)</th>
  </tr>
  )}
  </thead>

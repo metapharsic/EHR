@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Search, FileText, Printer, Download, Eye, Edit3, Trash2, RefreshCcw,
+  Search, FileText, Printer, Download, Eye, Pencil, Trash2, RefreshCcw,
   X, AlertCircle, ChevronUp, ChevronDown, ChevronsLeft, ChevronsRight,
   ChevronLeft, ChevronRight, TrendingUp, Receipt, BarChart2, Percent,
   RotateCcw, CheckCircle2, XCircle, Clock
@@ -475,7 +475,7 @@ const SalesHistoryPage: React.FC = () => {
                       </button>
                       <button onClick={() => setActiveTab(Tab.POS)}
                         className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all" title="Edit in POS">
-                        <Edit3 size={13} />
+                        <Pencil size={13} />
                       </button>
                       {inv.status === 'Completed' && (
                         <button

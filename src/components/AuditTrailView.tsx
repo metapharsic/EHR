@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AuditService } from '../services/accountingService';
 import { Search, Shield, Filter, Download, Printer } from 'lucide-react';
 import { exportAuditLog, printReport } from '../utils/accountingExport';
@@ -36,12 +36,12 @@ export const AuditTrailView: React.FC = () => {
  } catch {
  setLogs([
  { id: '1', timestamp: '2025-04-01T09:32:11Z', user: 'Admin', action: 'CREATE', module: 'Journal Vouchers', entityId: 'JV-2025-00001', description: 'Created Journal Voucher JV-2025-00001 (Dr: 50000, Cr: 50000)', ipAddress: '192.168.1.10' },
- { id: '2', timestamp: '2025-04-01T10:05:42Z', user: 'Admin', action: 'POST', module: 'Sales', entityId: 'SAL-001', description: 'Posted Sales Invoice SAL-001 for Apollo Hospitals — ₹1,25,000', ipAddress: '192.168.1.10' },
- { id: '3', timestamp: '2025-04-02T11:20:10Z', user: 'Manager', action: 'UPDATE', module: 'Party Master', entityId: 'PARTY-001', description: 'Updated credit limit for Apollo Hospitals from ₹5,00,000 to ₹7,50,000', ipAddress: '192.168.1.15' },
+ { id: '2', timestamp: '2025-04-01T10:05:42Z', user: 'Admin', action: 'POST', module: 'Sales', entityId: 'SAL-001', description: 'Posted Sales Invoice SAL-001 for Apollo Hospitals � ?1,25,000', ipAddress: '192.168.1.10' },
+ { id: '3', timestamp: '2025-04-02T11:20:10Z', user: 'Manager', action: 'UPDATE', module: 'Party Master', entityId: 'PARTY-001', description: 'Updated credit limit for Apollo Hospitals from ?5,00,000 to ?7,50,000', ipAddress: '192.168.1.15' },
  { id: '4', timestamp: '2025-04-02T14:10:00Z', user: 'Admin', action: 'DELETE', module: 'Chart of Accounts', entityId: 'ACC-999', description: 'Deleted unused account ACC-999 (Test Account)', ipAddress: '192.168.1.10' },
  { id: '5', timestamp: '2025-04-03T09:00:00Z', user: 'Auditor', action: 'EXPORT', module: 'GST', entityId: 'GSTR-3B-Apr', description: 'Exported GSTR-3B for April 2025 (JSON format)', ipAddress: '192.168.1.22' },
- { id: '6', timestamp: '2025-04-03T12:30:00Z', user: 'Admin', action: 'REVERSE', module: 'Journal Vouchers', entityId: 'JV-2025-00002', description: 'Reversed Journal Voucher JV-2025-00002 — Reason: Entered incorrect account', ipAddress: '192.168.1.10' },
- { id: '7', timestamp: '2025-04-04T08:45:00Z', user: 'Finance', action: 'CREATE', module: 'TDS', entityId: 'TDS-001', description: 'TDS deducted ₹1,500 for BuildTech Contractors under Section 194C', ipAddress: '192.168.1.18' },
+ { id: '6', timestamp: '2025-04-03T12:30:00Z', user: 'Admin', action: 'REVERSE', module: 'Journal Vouchers', entityId: 'JV-2025-00002', description: 'Reversed Journal Voucher JV-2025-00002 � Reason: Entered incorrect account', ipAddress: '192.168.1.10' },
+ { id: '7', timestamp: '2025-04-04T08:45:00Z', user: 'Finance', action: 'CREATE', module: 'TDS', entityId: 'TDS-001', description: 'TDS deducted ?1,500 for BuildTech Contractors under Section 194C', ipAddress: '192.168.1.18' },
  { id: '8', timestamp: '2025-04-05T15:00:00Z', user: 'Admin', action: 'LOGIN', module: 'System', entityId: 'USER-ADMIN', description: 'User Admin logged in from 192.168.1.10', ipAddress: '192.168.1.10' },
  ]);
  } finally { setLoading(false); }
@@ -64,7 +64,7 @@ export const AuditTrailView: React.FC = () => {
  <div className="flex justify-between items-center mb-3">
  <div>
  <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Shield size={20} className="text-[#1D3557]"/> Audit Trail</h3>
- <p className="text-xs text-slate-500">Immutable log of all financial activities — every change is recorded</p>
+ <p className="text-xs text-slate-500">Immutable log of all financial activities � every change is recorded</p>
  </div>
  <div className="flex gap-2">
  <button 
@@ -134,7 +134,7 @@ export const AuditTrailView: React.FC = () => {
  {selectedLog && (
  <div className="w-72 shrink-0 bg-slate-50 p-4 overflow-auto">
  <div className="font-bold text-[#1D3557] text-sm mb-4 flex items-center justify-between">
- Audit Detail<button onClick={() => setSelectedLog(null)} className="text-slate-400 hover:text-slate-600 text-xs">✖</button>
+ Audit Detail<button onClick={() => setSelectedLog(null)} className="text-slate-400 hover:text-slate-600 text-xs">?</button>
  </div>
  <div className="space-y-3 text-xs">
  {[
@@ -155,7 +155,7 @@ export const AuditTrailView: React.FC = () => {
  <div className="text-slate-700 mt-0.5 leading-relaxed">{selectedLog.description}</div>
  </div>
  <div className="bg-blue-50 border border-blue-200 rounded p-2 text-accent text-[10px] font-bold">
- 🔒 This log entry is immutable and cannot be modified.
+ ?? This log entry is immutable and cannot be modified.
  </div>
  </div>
  </div>
@@ -164,7 +164,7 @@ export const AuditTrailView: React.FC = () => {
 
  <div className="bg-[#1D3557] text-white flex items-center text-xs font-bold px-4 py-2 shrink-0">
  <div className="flex-1">{filtered.length} of {logs.length} log entries</div>
- <div className="text-slate-300">Immutable Audit Log — All actions are permanently recorded</div>
+ <div className="text-slate-300">Immutable Audit Log � All actions are permanently recorded</div>
  </div>
  </div>
  );

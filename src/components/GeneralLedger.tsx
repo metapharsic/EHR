@@ -82,8 +82,16 @@ export const GeneralLedger: React.FC<{ accountId?: string }> = ({ accountId }) =
  <p className="text-xs text-slate-500">Account-wise transaction history with running balance</p>
  </div>
  <div className="flex gap-2">
- <button className="flex items-center gap-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-sm font-bold shadow-sm"><Printer size={14}/> Print</button>
- <button className="flex items-center gap-1 bg-[#1D3557] hover:bg-[#2A4B7C] text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm"><Download size={14}/> Export</button>
+ <button onClick={() => {
+   if (selectedAccountDetails) {
+     import('../utils/accountingExport').then(m => m.printGeneralLedger(selectedAccountDetails.accountName, entriesWithBalance, openingBalance));
+   }
+ }} className="flex items-center gap-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-sm font-bold shadow-sm"><Printer size={14}/> Print</button>
+ <button onClick={() => {
+   if (selectedAccountDetails) {
+     import('../utils/accountingExport').then(m => m.exportGeneralLedger(selectedAccountDetails.accountName, entriesWithBalance));
+   }
+ }} className="flex items-center gap-1 bg-[#1D3557] hover:bg-[#2A4B7C] text-white px-3 py-1.5 rounded text-sm font-bold shadow-sm"><Download size={14}/> Export</button>
  </div>
  </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
  Target, TrendingUp, TrendingDown, AlertCircle, CheckCircle,
  Calendar, DollarSign, PieChart, BarChart3, Download,
- Plus, Edit3, Trash2, Save, RefreshCw, Filter, Search,
+ Plus, Pencil, Trash2, Save, RefreshCw, Filter, Search,
  ArrowUpRight, ArrowDownRight, Percent, FileSpreadsheet,
  ChevronDown, ChevronUp, Building2, Layers
 } from 'lucide-react';
@@ -349,7 +349,7 @@ const BudgetingVariance: React.FC = () => {
  </td>
  <td className="px-4 py-3 text-center">
  <button className="text-accent hover:text-blue-800 mr-2">
- <Edit3 size={16} />
+ <Pencil size={16} />
  </button>
  <button className="text-red-600 hover:text-red-800">
  <Trash2 size={16} />

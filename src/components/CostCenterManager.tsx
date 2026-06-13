@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CostCenterService } from '../services/accountingService';
-import { Plus, Save, X, AlertCircle, GitMerge, BarChart2, Edit3, Download, Printer } from 'lucide-react';
+import { Plus, Save, X, AlertCircle, GitMerge, BarChart2, Pencil, Download, Printer } from 'lucide-react';
 import { CostCenter } from '../types';
 import { exportCostCenters, printCostCenterReport } from '../utils/accountingExport';
 import { useCompany } from '../context/CompanyContext';
@@ -100,7 +100,7 @@ export const CostCenterManager: React.FC = () => {
  <input value={formData.manager} onChange={e => setFormData({...formData, manager: e.target.value})} className="w-full text-sm border-b border-slate-300 p-1 outline-none focus:border-accent" placeholder="Name of responsible person"/>
  </div>
  <div>
- <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Annual Budget Allocation (₹)</label>
+ <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Annual Budget Allocation (?)</label>
  <input type="number" min="0" value={formData.budget || ''} onChange={e => setFormData({...formData, budget: Number(e.target.value)})} className="w-full text-sm font-bold border-b border-slate-300 p-1 outline-none focus:border-accent text-right" placeholder="0.00"/>
  </div>
  <div className="flex items-end pb-2">
@@ -151,7 +151,7 @@ export const CostCenterManager: React.FC = () => {
  <th className="p-3 border-r border-slate-300">Name</th>
  <th className="p-3 border-r border-slate-300 w-28">Category</th>
  <th className="p-3 border-r border-slate-300 w-36">Manager</th>
- <th className="p-3 border-r border-slate-300 text-right w-36">Budget (₹)</th>
+ <th className="p-3 border-r border-slate-300 text-right w-36">Budget (?)</th>
  <th className="p-3 border-r border-slate-300 text-center w-24">Status</th>
  <th className="p-3 text-center w-24">Actions</th>
  </tr>
@@ -165,7 +165,7 @@ export const CostCenterManager: React.FC = () => {
  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${CATEGORY_COLORS[cc.category] || 'bg-slate-100 text-slate-500'} border-transparent`}>{cc.category}</span>
  </td>
  <td className="p-3 border-r border-slate-100 text-slate-600">{cc.manager || '-'}</td>
- <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-800">{cc.budget ? `₹${cc.budget.toLocaleString()}` : '-'}</td>
+ <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-800">{cc.budget ? `?${cc.budget.toLocaleString()}` : '-'}</td>
  <td className="p-3 border-r border-slate-100 text-center">
  <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border ${cc.isActive ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
  {cc.isActive ? 'Active' : 'Inactive'}
@@ -174,7 +174,7 @@ export const CostCenterManager: React.FC = () => {
  <td className="p-3 text-center">
  <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
  <button onClick={() => alert('Cost Center Analysis - Coming Soon')} title="Analysis" className="p-1 text-accent hover:bg-blue-50 rounded"><BarChart2 size={14}/></button>
- <button onClick={() => { setEditingId(cc.id); setFormData({...cc}); setView('FORM'); }} title="Edit" className="p-1 text-amber-600 hover:bg-amber-50 rounded"><Edit3 size={14}/></button>
+ <button onClick={() => { setEditingId(cc.id); setFormData({...cc}); setView('FORM'); }} title="Edit" className="p-1 text-amber-600 hover:bg-amber-50 rounded"><Pencil size={14}/></button>
  </div>
  </td>
  </tr>
@@ -186,7 +186,7 @@ export const CostCenterManager: React.FC = () => {
 
  <div className="bg-[#1D3557] text-white flex text-sm font-bold px-4 py-2 shrink-0">
  <div className="flex-1 text-xs uppercase tracking-wider text-slate-300">{costCenters.length} Cost Centers</div>
- <div className="text-right text-xs">Total Budget: ₹{costCenters.reduce((s, cc) => s + (cc.budget || 0), 0).toLocaleString()}</div>
+ <div className="text-right text-xs">Total Budget: ?{costCenters.reduce((s, cc) => s + (cc.budget || 0), 0).toLocaleString()}</div>
  </div>
  </div>
  );

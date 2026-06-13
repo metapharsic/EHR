@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState } from 'react';
 import { Save, Layers, X, Box } from 'lucide-react';
 import { Product } from '../types';
@@ -189,7 +189,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ initialData, onSubmit, onCanc
  onClick={() => removeAlias(index)}
  className="text-slate-500 hover:text-red-600"
  >
- ×
+ �
  </button>
  </div>
  ))}

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ERPLayout, FilterBar, StatCard, DataTable } from './UniversalLayout';
 import { FileText, TrendingUp, TrendingDown, DollarSign, Activity, RefreshCw } from 'lucide-react';
 import { CashFlowService } from '../services/accountingService';
@@ -70,12 +70,12 @@ const CashFlowStatement: React.FC = () => {
  { key: 'category', label: 'Particulars', width: '45%' },
  { 
  key: 'amount', 
- label: 'Amount (₹)', 
+ label: 'Amount (?)', 
  width: '35%', 
  align: 'right' as const,
  format: (v: number) => (
  <span className={v < 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold'}>
- {v < 0 ? `(₹${Math.abs(v).toLocaleString('en-IN')})` : `₹${v.toLocaleString('en-IN')}`}
+ {v < 0 ? `(?${Math.abs(v).toLocaleString('en-IN')})` : `?${v.toLocaleString('en-IN')}`}
  </span>
  )
  }
@@ -93,19 +93,19 @@ const CashFlowStatement: React.FC = () => {
  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
  <StatCard
  label="Total Inflow"
- value={`₹${inflowTotal.toLocaleString('en-IN')}`}
+ value={`?${inflowTotal.toLocaleString('en-IN')}`}
  icon={<TrendingUp className="text-emerald-600" />}
  color="success"
  />
  <StatCard
  label="Total Outflow"
- value={`₹${outflowTotal.toLocaleString('en-IN')}`}
+ value={`?${outflowTotal.toLocaleString('en-IN')}`}
  icon={<TrendingDown className="text-amber-600" />}
  color="warning"
  />
  <StatCard
  label="Net Cash Flow"
- value={`₹${netCashFlow.toLocaleString('en-IN')}`}
+ value={`?${netCashFlow.toLocaleString('en-IN')}`}
  icon={<Activity className="text-indigo-600" />}
  color={netCashFlow >= 0 ? "success" : "danger"}
  trend={netCashFlow >= 0 ? "+ Positive" : "- Negative"}
@@ -136,17 +136,17 @@ const CashFlowStatement: React.FC = () => {
  <div className="mt-8 bg-slate-800 text-white p-6 rounded-xl shadow-none flex justify-between items-center">
  <div>
  <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">Opening Balance</div>
- <div className="text-2xl font-bold">₹{openingBalance.toLocaleString('en-IN')}</div>
+ <div className="text-2xl font-bold">?{openingBalance.toLocaleString('en-IN')}</div>
  </div>
  <div className="text-center">
  <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">Net Change</div>
  <div className={`text-xl font-bold ${netCashFlow >= 0 ? 'text-green-400' : 'text-red-400'}`}>
- {netCashFlow >= 0 ? '+' : ''}₹{netCashFlow.toLocaleString('en-IN')}
+ {netCashFlow >= 0 ? '+' : ''}?{netCashFlow.toLocaleString('en-IN')}
  </div>
  </div>
  <div className="text-right">
  <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">Closing Balance</div>
- <div className="text-3xl font-bold text-blue-400">₹{closingBalance.toLocaleString('en-IN')}</div>
+ <div className="text-3xl font-bold text-blue-400">?{closingBalance.toLocaleString('en-IN')}</div>
  </div>
  </div>
  </ERPLayout>

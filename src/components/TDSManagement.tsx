@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TDSService } from '../services/accountingService';
 import { Plus, Download, Search, AlertCircle, Printer, FileText, Calculator } from 'lucide-react';
 import { exportTDSRegister, printTDSRegister } from '../utils/accountingExport';
@@ -66,7 +66,7 @@ const TDSManagement: React.FC = () => {
  <div className="flex justify-between items-center mb-3">
  <div>
  <h3 className="text-lg font-bold text-slate-800">TDS / TCS Management</h3>
- <p className="text-xs text-slate-500">Tax Deducted at Source — deduction register, Form 26Q, and TDS certificates</p>
+ <p className="text-xs text-slate-500">Tax Deducted at Source � deduction register, Form 26Q, and TDS certificates</p>
  </div>
  <div className="flex gap-2">
  <button onClick={() => printTDSRegister(filtered, `${periodStart} to ${periodEnd}`, company)} className="flex items-center gap-1 bg-white border text-slate-700 px-3 py-1.5 rounded text-sm font-bold shadow-sm self-center"><Printer size={14}/> Print 26Q</button>
@@ -109,9 +109,9 @@ const TDSManagement: React.FC = () => {
  <th className="p-2 border-r border-slate-300 w-28">PAN</th>
  <th className="p-2 border-r border-slate-300 w-20">Section</th>
  <th className="p-2 border-r border-slate-300 w-16 text-center">Rate %</th>
- <th className="p-2 border-r border-slate-300 text-right w-28">Gross Amt (₹)</th>
- <th className="p-2 border-r border-slate-300 text-right w-28">TDS Amt (₹)</th>
- <th className="p-2 border-r border-slate-300 text-right w-28">Net Paid (₹)</th>
+ <th className="p-2 border-r border-slate-300 text-right w-28">Gross Amt (?)</th>
+ <th className="p-2 border-r border-slate-300 text-right w-28">TDS Amt (?)</th>
+ <th className="p-2 border-r border-slate-300 text-right w-28">Net Paid (?)</th>
  <th className="p-2 text-center w-28">Status</th>
  </tr>
  </thead>
@@ -123,9 +123,9 @@ const TDSManagement: React.FC = () => {
  <td className="p-2 border-r border-slate-100 font-mono text-slate-600">{e.pan}</td>
  <td className="p-2 border-r border-slate-100 font-bold text-accent">{e.section}</td>
  <td className="p-2 border-r border-slate-100 text-center font-bold">{e.tdsRate}%</td>
- <td className="p-2 border-r border-slate-100 text-right font-bold">₹{e.grossAmount.toLocaleString()}</td>
- <td className="p-2 border-r border-slate-100 text-right font-bold text-red-700">₹{e.tdsAmount.toLocaleString()}</td>
- <td className="p-2 border-r border-slate-100 text-right font-bold">₹{e.netPaid.toLocaleString()}</td>
+ <td className="p-2 border-r border-slate-100 text-right font-bold">?{e.grossAmount.toLocaleString()}</td>
+ <td className="p-2 border-r border-slate-100 text-right font-bold text-red-700">?{e.tdsAmount.toLocaleString()}</td>
+ <td className="p-2 border-r border-slate-100 text-right font-bold">?{e.netPaid.toLocaleString()}</td>
  <td className="p-2 text-center"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border border-transparent ${STATUS_COLORS[e.status] || 'bg-slate-100 text-slate-500'}`}>{e.status}</span></td>
  </tr>
  ))}
@@ -134,10 +134,10 @@ const TDSManagement: React.FC = () => {
  )}
  </div>
  <div className="bg-[#1D3557] text-white flex text-xs font-bold shrink-0">
- <div className="flex-1 p-2 px-4 text-right border-r border-slate-500 uppercase tracking-wider flex items-center justify-end">{filtered.length} Entries — Gross Total:</div>
- <div className="w-28 p-2 text-right border-r border-slate-500">₹{totalGross.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
- <div className="w-28 p-2 text-right border-r border-slate-500 text-red-300">₹{totalTDS.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
- <div className="w-28 p-2 text-right border-r border-slate-500">₹{(totalGross - totalTDS).toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+ <div className="flex-1 p-2 px-4 text-right border-r border-slate-500 uppercase tracking-wider flex items-center justify-end">{filtered.length} Entries � Gross Total:</div>
+ <div className="w-28 p-2 text-right border-r border-slate-500">?{totalGross.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+ <div className="w-28 p-2 text-right border-r border-slate-500 text-red-300">?{totalTDS.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+ <div className="w-28 p-2 text-right border-r border-slate-500">?{(totalGross - totalTDS).toLocaleString(undefined,{minimumFractionDigits:2})}</div>
  <div className="w-28"></div>
  </div>
  </>
@@ -153,8 +153,8 @@ const TDSManagement: React.FC = () => {
  <th className="p-3 border-r border-slate-300 w-24">Section</th>
  <th className="p-3 border-r border-slate-300">Nature of Payment</th>
  <th className="p-3 border-r border-slate-300 text-center w-20">Rate %</th>
- <th className="p-3 border-r border-slate-300 text-right w-40">Single Txn Limit (₹)</th>
- <th className="p-3 text-right w-40">Annual Limit (₹)</th>
+ <th className="p-3 border-r border-slate-300 text-right w-40">Single Txn Limit (?)</th>
+ <th className="p-3 text-right w-40">Annual Limit (?)</th>
  </tr>
  </thead>
  <tbody className="divide-y divide-slate-100">
@@ -163,8 +163,8 @@ const TDSManagement: React.FC = () => {
  <td className="p-3 border-r border-slate-100 font-bold text-accent">{s.section}</td>
  <td className="p-3 border-r border-slate-100 font-semibold text-slate-700">{s.nature}</td>
  <td className="p-3 border-r border-slate-100 text-center font-bold text-slate-800">{s.rate}%</td>
- <td className="p-3 border-r border-slate-100 text-right text-slate-600">{s.thresholdSingle > 0 ? `₹${s.thresholdSingle.toLocaleString()}` : '-'}</td>
- <td className="p-3 text-right text-slate-600">{s.thresholdYear > 0 ? `₹${s.thresholdYear.toLocaleString()}` : '-'}</td>
+ <td className="p-3 border-r border-slate-100 text-right text-slate-600">{s.thresholdSingle > 0 ? `?${s.thresholdSingle.toLocaleString()}` : '-'}</td>
+ <td className="p-3 text-right text-slate-600">{s.thresholdYear > 0 ? `?${s.thresholdYear.toLocaleString()}` : '-'}</td>
  </tr>
  ))}
  </tbody>
@@ -176,18 +176,18 @@ const TDSManagement: React.FC = () => {
  <div className="mb-3">
  <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">Section</label>
  <select value={calcSection} onChange={e => setCalcSection(e.target.value)} className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm outline-none bg-white">
- {TDS_SECTIONS.map(s => <option key={s.section} value={s.section}>{s.section} — {s.nature}</option>)}
+ {TDS_SECTIONS.map(s => <option key={s.section} value={s.section}>{s.section} � {s.nature}</option>)}
  </select>
  </div>
  <div className="mb-4">
- <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">Payment Amount (₹)</label>
+ <label className="text-[10px] font-bold uppercase text-slate-500 block mb-1">Payment Amount (?)</label>
  <input type="number" value={calcAmount} onChange={e => setCalcAmount(e.target.value)} className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm font-bold text-right outline-none" placeholder="0"/>
  </div>
  <div className="bg-white border border-slate-200 rounded p-3">
  <div className="flex justify-between text-xs mb-2"><span className="text-slate-500">Rate:</span><span className="font-bold text-accent">{selectedSection?.rate}%</span></div>
- <div className="flex justify-between text-xs mb-2"><span className="text-slate-500">Gross Amount:</span><span className="font-bold">₹{Number(calcAmount||0).toLocaleString()}</span></div>
- <div className="flex justify-between text-xs mb-3"><span className="text-slate-500 font-bold">TDS Deduction:</span><span className="font-bold text-red-600">₹{calcTDS.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>
- <div className="flex justify-between text-sm border-t pt-2"><span className="font-bold text-slate-700">Net Payable:</span><span className="font-bold text-green-700">₹{(Number(calcAmount||0) - calcTDS).toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>
+ <div className="flex justify-between text-xs mb-2"><span className="text-slate-500">Gross Amount:</span><span className="font-bold">?{Number(calcAmount||0).toLocaleString()}</span></div>
+ <div className="flex justify-between text-xs mb-3"><span className="text-slate-500 font-bold">TDS Deduction:</span><span className="font-bold text-red-600">?{calcTDS.toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>
+ <div className="flex justify-between text-sm border-t pt-2"><span className="font-bold text-slate-700">Net Payable:</span><span className="font-bold text-green-700">?{(Number(calcAmount||0) - calcTDS).toLocaleString(undefined,{minimumFractionDigits:2})}</span></div>
  </div>
  </div>
  </div>
@@ -206,7 +206,7 @@ const TDSManagement: React.FC = () => {
  <div><span className="font-bold text-slate-600">TAN No.:</span> MUMA12345A</div>
  <div><span className="font-bold text-slate-600">PAN:</span> AAAAA0000A</div>
  <div><span className="font-bold text-slate-600">Financial Year:</span> 2025-26</div>
- <div><span className="font-bold text-slate-600">Quarter:</span> Q1 (Apr–Jun)</div>
+ <div><span className="font-bold text-slate-600">Quarter:</span> Q1 (Apr�Jun)</div>
  <div><span className="font-bold text-slate-600">Due Date:</span> 31-Jul-2025</div>
  </div>
  <table className="w-full text-xs border-collapse mb-4">
@@ -216,8 +216,8 @@ const TDSManagement: React.FC = () => {
  <th className="p-2 border border-slate-300">Deductee Name</th>
  <th className="p-2 border border-slate-300">PAN</th>
  <th className="p-2 border border-slate-300 text-center">Section</th>
- <th className="p-2 border border-slate-300 text-right">Gross (₹)</th>
- <th className="p-2 border border-slate-300 text-right">TDS (₹)</th>
+ <th className="p-2 border border-slate-300 text-right">Gross (?)</th>
+ <th className="p-2 border border-slate-300 text-right">TDS (?)</th>
  </tr>
  </thead>
  <tbody>
@@ -227,8 +227,8 @@ const TDSManagement: React.FC = () => {
  <td className="p-2 border border-slate-200 font-semibold">{e.party}</td>
  <td className="p-2 border border-slate-200 font-mono">{e.pan}</td>
  <td className="p-2 border border-slate-200 text-center font-bold">{e.section}</td>
- <td className="p-2 border border-slate-200 text-right">₹{(e.grossAmount||0).toLocaleString()}</td>
- <td className="p-2 border border-slate-200 text-right font-bold text-red-700">₹{(e.tdsAmount||0).toLocaleString()}</td>
+ <td className="p-2 border border-slate-200 text-right">?{(e.grossAmount||0).toLocaleString()}</td>
+ <td className="p-2 border border-slate-200 text-right font-bold text-red-700">?{(e.tdsAmount||0).toLocaleString()}</td>
  </tr>
  ))}
  </tbody>

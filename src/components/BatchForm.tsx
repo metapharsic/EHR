@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useEffect } from 'react';
 import { Save, X, Box } from 'lucide-react';
 import { Batch } from '../types';

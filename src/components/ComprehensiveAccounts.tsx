@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
  FileText, CreditCard, TrendingUp, BarChart3, BarChart4, PieChart as PieChartIcon, DollarSign,
  Calendar, Wallet, Plus, Filter, Download, Eye, Edit, Trash2, Save, XCircle,
@@ -108,9 +108,9 @@ const ComprehensiveAccounts: React.FC = () => {
  // LOAD DATA
  // ============================================
  useEffect(() => {
- console.log('🟢 ComprehensiveAccounts mounted - starting data load');
- console.log('📦 Token in localStorage:', !!localStorage.getItem('accessToken'));
- console.log('📦 Current state - Accounts:', chartOfAccounts.length, 'Vouchers:', journalVouchers.length);
+ console.log('?? ComprehensiveAccounts mounted - starting data load');
+ console.log('?? Token in localStorage:', !!localStorage.getItem('accessToken'));
+ console.log('?? Current state - Accounts:', chartOfAccounts.length, 'Vouchers:', journalVouchers.length);
  loadChartOfAccounts();
  loadJournalVouchers();
  loadAuditLogs();
@@ -192,21 +192,21 @@ const ComprehensiveAccounts: React.FC = () => {
 
  const loadAuditLogs = async () => {
  try {
- console.log('📨 Fetching Audit Logs...');
+ console.log('?? Fetching Audit Logs...');
  const logs = await AuditService.getAllLogs();
- console.log('✅ Audit Logs loaded:', logs);
+ console.log('? Audit Logs loaded:', logs);
  setAuditLogs(logs);
  } catch (error) {
- console.error('❌ Error loading audit logs:', error);
+ console.error('? Error loading audit logs:', error);
  }
  };
 
  const loadChartOfAccounts = async () => {
  try {
  setAccountsLoading(true);
- console.log('📨 Fetching Chart of Accounts...');
+ console.log('?? Fetching Chart of Accounts...');
  const accounts = await ChartOfAccountsService.getAllAccounts();
- console.log('✅ Chart of Accounts loaded:', accounts.length, 'accounts', accounts);
+ console.log('? Chart of Accounts loaded:', accounts.length, 'accounts', accounts);
  if (accounts && accounts.length > 0) {
  setChartOfAccounts(accounts);
  } else {
@@ -214,7 +214,7 @@ const ComprehensiveAccounts: React.FC = () => {
  }
  setAccountsLoading(false);
  } catch (error) {
- console.error('⚠️ Using demo Chart of Accounts:', error);
+ console.error('??� Using demo Chart of Accounts:', error);
  // Fallback to Tally ERP-like demo data
  const demoAccounts = [
  // ASSET ACCOUNTS
@@ -274,9 +274,9 @@ const ComprehensiveAccounts: React.FC = () => {
  costCenter: ''
  });
  setShowAccountForm(false);
- alert('✅ Account created successfully!');
+ alert('? Account created successfully!');
  } catch (error) {
- console.error('❌ Error creating account:', error);
+ console.error('? Error creating account:', error);
  alert('Failed to create account');
  }
  };
@@ -284,12 +284,12 @@ const ComprehensiveAccounts: React.FC = () => {
  const loadJournalVouchers = async () => {
  try {
  setVouchersLoading(true);
- console.log('📨 Fetching Journal Vouchers...');
+ console.log('?? Fetching Journal Vouchers...');
  const vouchers = await JournalVoucherService.getAllJournalVouchers();
- console.log('✅ Journal Vouchers loaded:', Array.isArray(vouchers) ? vouchers.length + ' vouchers' : 'Not an array!', vouchers);
+ console.log('? Journal Vouchers loaded:', Array.isArray(vouchers) ? vouchers.length + ' vouchers' : 'Not an array!', vouchers);
  
  if (!Array.isArray(vouchers)) {
- console.warn('⚠️ Vouchers is not array, converting:', vouchers);
+ console.warn('??� Vouchers is not array, converting:', vouchers);
  const vouchersArray = Array.isArray(vouchers.value) ? vouchers.value : [];
  setJournalVouchers(vouchersArray);
  } else {
@@ -297,7 +297,7 @@ const ComprehensiveAccounts: React.FC = () => {
  }
  setVouchersLoading(false);
  } catch (error) {
- console.error('❌ Error loading vouchers:', error);
+ console.error('? Error loading vouchers:', error);
  const errorMsg = error instanceof Error ? error.message : String(error);
  alert(`Error loading vouchers: ${errorMsg}`);
  setJournalVouchers([]);
@@ -565,7 +565,7 @@ const ComprehensiveAccounts: React.FC = () => {
  {vouchersLoading ? (
  <div className="flex items-center justify-center h-32 text-slate-500">
  <div className="text-center">
- <div className="animate-spin text-2xl mb-2">⌛</div>
+ <div className="animate-spin text-2xl mb-2">?</div>
  <p>Loading Journal Vouchers...</p>
  </div>
  </div>
@@ -604,7 +604,7 @@ const ComprehensiveAccounts: React.FC = () => {
  onClick={() => handlePostVoucher(voucher.id)}
  className="mt-2 text-accent text-sm font-medium hover:underline"
  >
- Post →
+ Post ?
  </button>
  )}
  </div>
@@ -668,8 +668,8 @@ const ComprehensiveAccounts: React.FC = () => {
  <thead className="bg-slate-800 text-white">
  <tr>
  <th className="p-3">Account</th>
- <th className="p-3 text-right">Debit (₹)</th>
- <th className="p-3 text-right">Credit (₹)</th>
+ <th className="p-3 text-right">Debit (?)</th>
+ <th className="p-3 text-right">Credit (?)</th>
  </tr>
  </thead>
  <tbody className="divide-y divide-slate-200">
@@ -694,7 +694,7 @@ const ComprehensiveAccounts: React.FC = () => {
  </div>
  ) : (
  <div className="flex items-center justify-center p-8 text-slate-500">
- <div className="animate-spin text-2xl mb-2 mr-3">⌛</div>
+ <div className="animate-spin text-2xl mb-2 mr-3">?</div>
  <p>Generating Trial Balance...</p>
  </div>
  )}
@@ -726,7 +726,7 @@ const ComprehensiveAccounts: React.FC = () => {
  <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={false}/>
  <XAxis type="number" hide />
  <YAxis dataKey="name" type="category" hide />
- <RechartsTooltip formatter={(val: any) => `₹${val?.toLocaleString() || 0}`} cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/>
+ <RechartsTooltip formatter={(val: any) => `?${val?.toLocaleString() || 0}`} cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/>
  <Legend iconType="circle" />
  <Bar dataKey="Assets" stackId="a" fill="#10b981" radius={[0,4,4,0]} barSize={24} />
  <Bar dataKey="Liabilities" stackId="b" fill="#f43f5e" radius={[4,0,0,4]} barSize={24} />
@@ -738,10 +738,10 @@ const ComprehensiveAccounts: React.FC = () => {
  <div>
  <h4 className="font-bold text-slate-800 mb-3">Assets</h4>
  <div className="space-y-2 p-3 bg-slate-50 rounded-lg">
- <p className="text-sm">Current: ₹{balanceSheet.assets?.currentItems?.[0]}</p>
- <p className="text-sm">Fixed: ₹{balanceSheet.assets?.fixedItems?.[0]}</p>
+ <p className="text-sm">Current: ?{balanceSheet.assets?.currentItems?.[0]}</p>
+ <p className="text-sm">Fixed: ?{balanceSheet.assets?.fixedItems?.[0]}</p>
  <p className="font-bold border-t pt-2">
- Total: ₹{balanceSheet.totalAssets?.toLocaleString()}
+ Total: ?{balanceSheet.totalAssets?.toLocaleString()}
  </p>
  </div>
  </div>
@@ -749,10 +749,10 @@ const ComprehensiveAccounts: React.FC = () => {
  <div>
  <h4 className="font-bold text-slate-800 mb-3">Liabilities & Equity</h4>
  <div className="space-y-2 p-3 bg-slate-50 rounded-lg">
- <p className="text-sm">Liabilities: ₹{balanceSheet.totalLiabilities?.toLocaleString()}</p>
- <p className="text-sm">Equity: ₹{balanceSheet.totalEquity?.toLocaleString()}</p>
+ <p className="text-sm">Liabilities: ?{balanceSheet.totalLiabilities?.toLocaleString()}</p>
+ <p className="text-sm">Equity: ?{balanceSheet.totalEquity?.toLocaleString()}</p>
  <p className="font-bold border-t pt-2">
- Total: ₹{(balanceSheet.totalLiabilities + balanceSheet.totalEquity)?.toLocaleString()}
+ Total: ?{(balanceSheet.totalLiabilities + balanceSheet.totalEquity)?.toLocaleString()}
  </p>
  </div>
  </div>
@@ -760,7 +760,7 @@ const ComprehensiveAccounts: React.FC = () => {
  </div>
  ) : (
  <div className="flex items-center justify-center p-8 text-slate-500">
- <div className="animate-spin text-2xl mb-2 mr-3">⌛</div>
+ <div className="animate-spin text-2xl mb-2 mr-3">?</div>
  <p>Calculating Balance Sheet...</p>
  </div>
  )}
@@ -787,16 +787,16 @@ const ComprehensiveAccounts: React.FC = () => {
  <div className="space-y-4">
  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
  <p className="text-sm text-slate-600">Revenue</p>
- <p className="text-2xl font-bold text-green-700">₹{profitLoss.revenue?.subtotal?.toLocaleString()}</p>
+ <p className="text-2xl font-bold text-green-700">?{profitLoss.revenue?.subtotal?.toLocaleString()}</p>
  </div>
  <div className="p-4 bg-red-50 rounded-lg border border-red-200">
  <p className="text-sm text-slate-600">Total Expenses</p>
- <p className="text-2xl font-bold text-red-700">₹{profitLoss.expenses?.subtotal?.toLocaleString()}</p>
+ <p className="text-2xl font-bold text-red-700">?{profitLoss.expenses?.subtotal?.toLocaleString()}</p>
  </div>
  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
  <p className="text-sm text-slate-600">Net Profit</p>
  <p className={`text-2xl font-bold ${profitLoss.netProfitAfterTax >= 0 ? 'text-green-700' : 'text-red-700'}`}>
- ₹{profitLoss.netProfitAfterTax?.toLocaleString()}
+ ?{profitLoss.netProfitAfterTax?.toLocaleString()}
  </p>
  </div>
  </div>
@@ -810,8 +810,8 @@ const ComprehensiveAccounts: React.FC = () => {
  ]}>
  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
- <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(val) => `₹${val/1000}k`} />
- <RechartsTooltip cursor={{fill: '#f8fafc'}} formatter={(value: any) => `₹${value.toLocaleString()}`} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+ <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(val) => `?${val/1000}k`} />
+ <RechartsTooltip cursor={{fill: '#f8fafc'}} formatter={(value: any) => `?${value.toLocaleString()}`} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
  <Legend iconType="circle" wrapperStyle={{fontSize: '12px'}} />
  <Bar dataKey="Revenue" fill="#16a34a" radius={[4,4,0,0]} maxBarSize={60} />
  <Bar dataKey="Expenses" fill="#dc2626" radius={[4,4,0,0]} maxBarSize={60} />
@@ -823,7 +823,7 @@ const ComprehensiveAccounts: React.FC = () => {
  </div>
  ) : (
  <div className="flex items-center justify-center p-8 text-slate-500">
- <div className="animate-spin text-2xl mb-2 mr-3">⌛</div>
+ <div className="animate-spin text-2xl mb-2 mr-3">?</div>
  <p>Calculating Profit & Loss Statement...</p>
  </div>
  )}
@@ -904,7 +904,7 @@ const ComprehensiveAccounts: React.FC = () => {
  >
  <div>
  <div className="font-semibold text-slate-800 text-sm">{account.accountName}</div>
- <div className="text-xs text-slate-500">{account.accountCode} • {account.accountType}</div>
+ <div className="text-xs text-slate-500">{account.accountCode} � {account.accountType}</div>
  </div>
  {glAccountId === account.id && <ChevronDown size={14} className="text-accent transform -rotate-90" />}
  </div>
@@ -1026,8 +1026,8 @@ const ComprehensiveAccounts: React.FC = () => {
  <td className="p-4 text-slate-600 font-mono text-xs">{entry.date}</td>
  <td className="p-4 font-medium text-accent cursor-pointer hover:underline">{entry.voucherNo}</td>
  <td className="p-4 text-slate-600 max-w-[200px] truncate" title={entry.narration}>{entry.narration}</td>
- <td className="p-4 text-right font-medium">{entry.debit > 0 ? `₹${entry.debit.toLocaleString()}` : '-'}</td>
- <td className="p-4 text-right font-medium">{entry.credit > 0 ? `₹${entry.credit.toLocaleString()}` : '-'}</td>
+ <td className="p-4 text-right font-medium">{entry.debit > 0 ? `?${entry.debit.toLocaleString()}` : '-'}</td>
+ <td className="p-4 text-right font-medium">{entry.credit > 0 ? `?${entry.credit.toLocaleString()}` : '-'}</td>
  <td className="p-4 text-right font-bold text-slate-800">{entry.runningBalance?.toLocaleString()} {entry.runningBalance >= 0 ? 'Dr' : 'Cr'}</td>
  </tr>
  ))}
@@ -1093,11 +1093,11 @@ const ComprehensiveAccounts: React.FC = () => {
  agingData.map((data, idx) => (
  <tr key={idx} className="hover:bg-slate-50">
  <td className="p-3 font-medium text-slate-800">{data.partyName}</td>
- <td className="p-3 text-right font-bold text-slate-700">₹{data.totalDue.toLocaleString()}</td>
- <td className="p-3 text-right text-green-700">{data.days0_30 > 0 ? `₹${data.days0_30.toLocaleString()}` : '-'}</td>
- <td className="p-3 text-right text-yellow-600">{data.days31_60 > 0 ? `₹${data.days31_60.toLocaleString()}` : '-'}</td>
- <td className="p-3 text-right text-orange-600">{data.days61_90 > 0 ? `₹${data.days61_90.toLocaleString()}` : '-'}</td>
- <td className="p-3 text-right text-red-700 font-bold">{data.days90Plus > 0 ? `₹${data.days90Plus.toLocaleString()}` : '-'}</td>
+ <td className="p-3 text-right font-bold text-slate-700">?{data.totalDue.toLocaleString()}</td>
+ <td className="p-3 text-right text-green-700">{data.days0_30 > 0 ? `?${data.days0_30.toLocaleString()}` : '-'}</td>
+ <td className="p-3 text-right text-yellow-600">{data.days31_60 > 0 ? `?${data.days31_60.toLocaleString()}` : '-'}</td>
+ <td className="p-3 text-right text-orange-600">{data.days61_90 > 0 ? `?${data.days61_90.toLocaleString()}` : '-'}</td>
+ <td className="p-3 text-right text-red-700 font-bold">{data.days90Plus > 0 ? `?${data.days90Plus.toLocaleString()}` : '-'}</td>
  <td className="p-3 text-center">
  {(data.days31_60 > 0 || data.days61_90 > 0 || data.days90Plus > 0) && (
  <button 
@@ -1108,7 +1108,7 @@ const ComprehensiveAccounts: React.FC = () => {
  alert(`Reminder sent to ${data.partyName}`);
  }}
  >
- {dunningStatus[data.partyId] ? 'Sent ✓' : 'Remind'}
+ {dunningStatus[data.partyId] ? 'Sent ?' : 'Remind'}
  </button>
  )}
  </td>
@@ -1184,15 +1184,15 @@ const ComprehensiveAccounts: React.FC = () => {
  <div className="flex justify-between text-sm">
  <div>
  <p className="text-slate-500 text-xs uppercase font-bold">Allocated Budget</p>
- <p className="font-semibold text-slate-800">₹{cc.budget.toLocaleString()}</p>
+ <p className="font-semibold text-slate-800">?{cc.budget.toLocaleString()}</p>
  </div>
  <div className="text-right">
  <p className="text-slate-500 text-xs uppercase font-bold">Consumed (Actuals)</p>
- <p className={`font-semibold ${isOverBudget ? 'text-red-600' : 'text-slate-800'}`}>₹{cc.consumed.toLocaleString()}</p>
+ <p className={`font-semibold ${isOverBudget ? 'text-red-600' : 'text-slate-800'}`}>?{cc.consumed.toLocaleString()}</p>
  </div>
  </div>
  <div className="mt-4 pt-3 border-t border-slate-100 text-right">
- <p className="text-xs text-slate-500">Variance: <span className={`font-bold ${isOverBudget ? 'text-red-500' : 'text-green-500'}`}>₹{Math.abs(cc.budget - cc.consumed).toLocaleString()}</span> {isOverBudget ? 'Over Budget' : 'Remaining'}</p>
+ <p className="text-xs text-slate-500">Variance: <span className={`font-bold ${isOverBudget ? 'text-red-500' : 'text-green-500'}`}>?{Math.abs(cc.budget - cc.consumed).toLocaleString()}</span> {isOverBudget ? 'Over Budget' : 'Remaining'}</p>
  </div>
  </div>
  );
@@ -1275,7 +1275,7 @@ const ComprehensiveAccounts: React.FC = () => {
  ]}>
  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0"/>
  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}}/>
- <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${val/1000}k`} tick={{fill: '#64748b', fontSize: 12}} />
+ <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `?${val/1000}k`} tick={{fill: '#64748b', fontSize: 12}} />
  <RechartsTooltip formatter={(val: any) => formatCurrency(val)} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/>
  <Legend iconType="circle" wrapperStyle={{paddingTop: '10px'}}/>
  <Line type="monotone" dataKey="Cash" stroke="#3b82f6" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} name="Conservative Case" />
@@ -1290,15 +1290,15 @@ const ComprehensiveAccounts: React.FC = () => {
  <div className="space-y-4 flex-1">
  <div className="p-3 bg-red-50 border border-red-100 rounded-lg">
  <p className="text-xs font-bold text-red-600 uppercase tracking-widest mb-1">Cash Crunch Warning</p>
- <p className="text-sm text-slate-700">High probability of deficit on <span className="font-bold">Day 20</span> due to ₹2L recurring rental & payroll outflow vs projected ₹50k inflow.</p>
+ <p className="text-sm text-slate-700">High probability of deficit on <span className="font-bold">Day 20</span> due to ?2L recurring rental & payroll outflow vs projected ?50k inflow.</p>
  </div>
  <div className="p-3 bg-green-50 border border-green-100 rounded-lg">
  <p className="text-xs font-bold text-green-600 uppercase tracking-widest mb-1">Collection Opportunity</p>
- <p className="text-sm text-slate-700">Pushing strictly for the `&lt;30 Days` aging bucket (Current: ₹3.4L) could inject enough liquidity to neutralize the Day 20 deficit.</p>
+ <p className="text-sm text-slate-700">Pushing strictly for the `&lt;30 Days` aging bucket (Current: ?3.4L) could inject enough liquidity to neutralize the Day 20 deficit.</p>
  </div>
  <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
  <p className="text-xs font-bold text-accent uppercase tracking-widest mb-1">AI Recommendation</p>
- <p className="text-sm text-slate-700">Consider enabling early payment discounts of 2% for Apollo Pharmacy to expedite their ₹60,000 pending invoice.</p>
+ <p className="text-sm text-slate-700">Consider enabling early payment discounts of 2% for Apollo Pharmacy to expedite their ?60,000 pending invoice.</p>
  </div>
  </div>
  <button className="w-full mt-4 py-2 border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg font-medium text-sm transition-colors shadow-sm">

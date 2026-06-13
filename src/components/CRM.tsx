@@ -9,7 +9,7 @@ import {
  XCircle, Clock, MessageSquare, Filter, MoreHorizontal, 
  FileText, MapPin, Send, Package, DollarSign, 
  TrendingUp, Users, Target, Zap, Eye, Plus, AlertCircle,
- Activity, ArrowUpRight, Save, Trash2, Edit3, Briefcase,
+ Activity, ArrowUpRight, Save, Trash2, Pencil, Briefcase,
  Sparkles, Brain, Bot, Rocket, ShieldCheck, ChevronRight,
  RefreshCw
 } from 'lucide-react';
@@ -708,7 +708,7 @@ const CRM: React.FC = () => {
                   </div>
                 </div>
                 <button onClick={handleEditLead} className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-blue-600 transition-all">
-                  <Edit3 size={14} /> Edit
+                  <Pencil size={14} /> Edit
                 </button>
               </div>
 
