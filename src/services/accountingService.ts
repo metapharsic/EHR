@@ -229,6 +229,45 @@ export const JournalVoucherService = {
   },
 
   /**
+   * Update existing journal voucher
+   */
+  updateJournalVoucher: async (voucherId: string, voucher: Partial<JournalVoucher>) => {
+    try {
+      if (voucher.totalDebit !== undefined && voucher.totalCredit !== undefined && voucher.totalDebit !== voucher.totalCredit) {
+        throw new Error('Debit and Credit must be equal');
+      }
+
+      const response = await fetch(`/api/accounting/journal-vouchers/${voucherId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(voucher)
+      });
+      if (!response.ok) throw new Error('Failed to update journal voucher');
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating journal voucher:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Delete journal voucher
+   */
+  deleteJournalVoucher: async (voucherId: string) => {
+    try {
+      const response = await fetch(`/api/accounting/journal-vouchers/${voucherId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to delete journal voucher');
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting journal voucher:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Get all journal vouchers
    */
   getAllJournalVouchers: async (filters?: {

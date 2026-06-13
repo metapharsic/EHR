@@ -8,7 +8,7 @@ import React, { useState, useMemo } from 'react';
 import { 
  FileText, User, Plus, TrendingUp, RefreshCcw, BookOpen,
  Grid, Shield, Zap, LayoutDashboard, Package, Scale, Landmark, Calculator,
- ArrowUpRight, ArrowDownLeft, Wallet, PieChart, X
+ ArrowUpRight, ArrowDownLeft, Wallet, PieChart, X, Edit3, Trash2
 } from 'lucide-react';
 
 // Standardized Layout Components

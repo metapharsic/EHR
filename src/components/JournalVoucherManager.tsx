@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { JournalVoucherService, ChartOfAccountsService } from '../services/accountingService';
-import { Plus, BookOpen, Save, X, AlertCircle, Search, Filter, RotateCcw, Eye, ChevronDown, ChevronRight, Printer, Download } from 'lucide-react';
+import { Plus, BookOpen, Save, X, AlertCircle, Search, Filter, RotateCcw, Eye, ChevronDown, ChevronRight, Printer, Download, Edit3, Trash2 } from 'lucide-react';
 import { DenseGrid } from './common/DenseGrid';
 import { useCompany } from '../context/CompanyContext';
 import { printJournalVoucher, exportJournalVouchers } from '../utils/accountingExport';
 import { formatCurrency } from '../utils/formatters';
 
-type VoucherEntry = { accountId: string; type: 'Debit' | 'Credit'; amount: number; costCenter?: string; narration?: string };
+type VoucherEntry = { id?: string; accountId: string; type: 'Debit' | 'Credit'; amount: number; costCenter?: string; narration?: string };
 type ViewMode = 'LIST' | 'FORM' | 'VIEW';
 
 const COST_CENTERS = ['Main HQ', 'Marketing', 'Operations', 'R&D', 'Sales'];
@@ -27,6 +27,7 @@ export const JournalVoucherManager: React.FC = () => {
  const { company } = useCompany();
 
  // Form State
+ const [editingVoucherId, setEditingVoucherId] = useState<string | null>(null);
  const [voucherNo, setVoucherNo] = useState('');
  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
  const [narration, setNarration] = useState('');
@@ -81,16 +82,18 @@ export const JournalVoucherManager: React.FC = () => {
 
  useEffect(() => {
  if (view === 'LIST') loadVouchers();
- }, [view]); // Removed dependency on filters to only load on click 'Apply' or on view change
+ }, [view]);
 
  useEffect(() => {
- if (view === 'FORM') {
- ChartOfAccountsService.getAllAccounts().then(setAccounts).catch(() => setAccounts([]));
- // Auto-generate voucher number
- const auto = `JV-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-4)}`;
- setVoucherNo(auto);
- }
- }, [view]);
+   if (view === 'FORM') {
+     ChartOfAccountsService.getAllAccounts().then(setAccounts).catch(() => setAccounts([]));
+     if (!editingVoucherId) {
+       // Auto-generate voucher number
+       const auto = `JV-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(Date.now()).slice(-4)}`;
+       setVoucherNo(auto);
+     }
+   }
+ }, [view, editingVoucherId]);
 
  const totalDebit = useMemo(() => entries.filter(e => e.type === 'Debit').reduce((a, b) => a + Number(b.amount || 0), 0), [entries]);
  const totalCredit = useMemo(() => entries.filter(e => e.type === 'Credit').reduce((a, b) => a + Number(b.amount || 0), 0), [entries]);
@@ -127,75 +130,118 @@ export const JournalVoucherManager: React.FC = () => {
    }
  };
 
- const handleSubmit = async (saveAsDraft = false) => {
- if (!saveAsDraft && !isBalanced) {
- setError('Total Debit must equal Total Credit to Post.');
- return;
- }
- if (entries.some(e => !e.accountId)) {
- setError('All rows must have an account selected.');
- return;
- }
- setError('');
- setSaving(true);
- try {
- const created = await JournalVoucherService.createJournalVoucher({
- id: crypto.randomUUID(),
- voucherNo,
- date,
- status: 'Draft', // initial creation is always draft
- narration,
- reference,
- totalDebit,
- totalCredit,
- createdBy: 'Admin',
- entries: entries.map((e, idx) => ({
- id: `line-${idx}`,
- accountId: e.accountId,
- accountCode: e.accountId,
- accountName: accounts.find(a => (a.id || a.accountCode) === e.accountId)?.accountName || e.accountId,
- debit: e.type === 'Debit' ? Number(e.amount) : 0,
- credit: e.type === 'Credit' ? Number(e.amount) : 0,
- costCenter: e.costCenter,
- narration: e.narration || narration
- }))
- });
- 
- if (!saveAsDraft && created && created.id) {
- await JournalVoucherService.postJournalVoucher(created.id);
- }
+  const handleSubmit = async (saveAsDraft = false) => {
+    if (!saveAsDraft && !isBalanced) {
+      setError('Total Debit must equal Total Credit to Post.');
+      return;
+    }
+    if (entries.some(e => !e.accountId)) {
+      setError('All rows must have an account selected.');
+      return;
+    }
+    setError('');
+    setSaving(true);
+    try {
+      const payload = {
+        voucherNo,
+        date,
+        status: saveAsDraft ? 'Draft' : 'Draft', // post changes it to Posted next
+        narration,
+        reference,
+        totalDebit,
+        totalCredit,
+        createdBy: 'Admin',
+        entries: entries.map((e, idx) => ({
+          id: e.id || `line-${idx}`,
+          accountId: e.accountId,
+          accountCode: e.accountId,
+          accountName: accounts.find(a => (a.id || a.accountCode) === e.accountId)?.accountName || e.accountId,
+          debit: e.type === 'Debit' ? Number(e.amount) : 0,
+          credit: e.type === 'Credit' ? Number(e.amount) : 0,
+          costCenter: e.costCenter,
+          narration: e.narration || narration
+        }))
+      };
 
- setSuccessMsg(`Voucher ${voucherNo} ${saveAsDraft ? 'saved as Draft' : 'Posted'} successfully!`);
- setTimeout(() => { setSuccessMsg(''); setView('LIST'); }, 1500);
- resetForm();
- } catch (err: any) {
- setError(err.message || 'Failed to save Journal Voucher');
- } finally {
- setSaving(false);
- }
- };
+      let voucherId = editingVoucherId;
+      if (editingVoucherId) {
+        await JournalVoucherService.updateJournalVoucher(editingVoucherId, payload as any);
+      } else {
+        const created = await JournalVoucherService.createJournalVoucher({ id: crypto.randomUUID(), ...payload } as any);
+        voucherId = created.id;
+      }
 
- const handleReverse = async (v: any) => {
- if (!window.confirm(`Reverse voucher ${v.voucherNo}?`)) return;
- try {
- await JournalVoucherService.reverseJournalVoucher(v.id, 'User requested reversal');
- loadVouchers();
- } catch (err: any) {
- alert('Failed to reverse: ' + err.message);
- }
- };
+      if (!saveAsDraft && voucherId) {
+        await JournalVoucherService.postJournalVoucher(voucherId);
+      }
 
- const resetForm = () => {
- setVoucherNo('');
- setDate(new Date().toISOString().split('T')[0]);
- setNarration('');
- setReference('');
- setEntries([
- { accountId: '', type: 'Debit', amount: 0, costCenter: '', narration: '' },
- { accountId: '', type: 'Credit', amount: 0, costCenter: '', narration: '' }
- ]);
- setError('');
- };
+      setSuccessMsg(`Voucher ${voucherNo} ${saveAsDraft ? 'saved as Draft' : 'Posted'} successfully!`);
+      setTimeout(() => { setSuccessMsg(''); setView('LIST'); }, 1500);
+      resetForm();
+    } catch (err: any) {
+      setError(err.message || 'Failed to save Journal Voucher');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReverse = async (v: any) => {
+    if (!window.confirm(`Reverse voucher ${v.voucherNo}?`)) return;
+    try {
+      await JournalVoucherService.reverseJournalVoucher(v.id, 'User requested reversal');
+      loadVouchers();
+    } catch (err: any) {
+      alert('Failed to reverse: ' + err.message);
+    }
+  };
+
+  const handleEdit = (v: any) => {
+    setEditingVoucherId(v.id);
+    setVoucherNo(v.voucherNo);
+    setDate(new Date(v.date || v.voucherDate || new Date()).toISOString().split('T')[0]);
+    setNarration(v.narration || '');
+    setReference(v.reference || '');
+    const mappedEntries = (v.entries || []).map((e: any) => ({
+      id: e.id,
+      accountId: e.accountId,
+      type: e.debit > 0 ? 'Debit' : 'Credit',
+      amount: e.debit > 0 ? e.debit : e.credit,
+      narration: e.narration || '',
+      costCenter: e.costCenter || ''
+    }));
+    if (mappedEntries.length === 0) {
+      setEntries([
+        { accountId: '', type: 'Debit', amount: 0, costCenter: '', narration: '' },
+        { accountId: '', type: 'Credit', amount: 0, costCenter: '', narration: '' }
+      ]);
+    } else {
+      setEntries(mappedEntries);
+    }
+    setView('FORM');
+  };
+
+  const handleDelete = async (v: any) => {
+    if (!window.confirm(`Delete draft voucher ${v.voucherNo}?`)) return;
+    try {
+      await JournalVoucherService.deleteJournalVoucher(v.id);
+      loadVouchers();
+    } catch (err: any) {
+      alert('Failed to delete: ' + err.message);
+    }
+  };
+
+  const resetForm = () => {
+    setEditingVoucherId(null);
+    setVoucherNo('');
+    setDate(new Date().toISOString().split('T')[0]);
+    setNarration('');
+    setReference('');
+    setEntries([
+      { accountId: '', type: 'Debit', amount: 0, costCenter: '', narration: '' },
+      { accountId: '', type: 'Credit', amount: 0, costCenter: '', narration: '' }
+    ]);
+    setError('');
+  };
 
  const viewVoucher = (v: any) => { setSelectedVoucher(v); setView('VIEW'); };
 
@@ -435,6 +481,12 @@ export const JournalVoucherManager: React.FC = () => {
  <td className="p-3 text-center">
  <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
  <button onClick={() => viewVoucher(v)} title="View Detail" className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-all"><Eye size={15}/></button>
+ {v.status === 'Draft' && (
+   <button onClick={() => handleEdit(v)} title="Edit Draft" className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"><Edit3 size={15}/></button>
+ )}
+ {v.status === 'Draft' && (
+   <button onClick={() => handleDelete(v)} title="Delete Draft" className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={15}/></button>
+ )}
  {v.status === 'Posted' && (
  <button onClick={() => handleReverse(v)} title="Reverse Transaction" className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"><RotateCcw size={15}/></button>
  )}

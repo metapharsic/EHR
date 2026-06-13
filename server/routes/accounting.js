@@ -139,7 +139,7 @@ router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['
     try {
         const {
             id, accountCode, accountName, accountType, openingBalance, group, description, status,
-            gstApplicable, accountFormat, costCenter,
+            gstApplicable, accountFormat, costCenter, parentAccountId,
             alias, inventoryAffected, ledgerType, activateInterest,
             mailingName, mailingAddress, mailingCountry, mailingState,
             provideBankDetails, panItNo
@@ -172,15 +172,15 @@ router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['
         const { rows } = await db.query(
             `INSERT INTO chart_of_accounts (
                 id, account_code, account_name, account_type, opening_balance, current_balance, account_group, description, status,
-                gst_applicable, account_format, cost_center_id, company_id, created_by, created_at,
+                gst_applicable, account_format, cost_center_id, parent_account_id, company_id, created_by, created_at,
                 alias, inventory_affected, ledger_type, activate_interest,
                 mailing_name, mailing_address, mailing_country, mailing_state,
                 provide_bank_details, pan_it_no
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) RETURNING *`,
             [
                 finalId, finalCode, accountName, accountType, ob, initialBalance, group || null, description || null, status || 'Active',
-                gstApplicable || false, fmt, costCenter || null, req.user.companyId || 1, req.user.userId,
+                gstApplicable || false, fmt, costCenter || null, parentAccountId || null, req.user.companyId || 1, req.user.userId,
                 alias || null, inventoryAffected || false, ledgerType || null, activateInterest || false,
                 mailingName || accountName, mailingAddress || null, mailingCountry || 'India', mailingState || null,
                 provideBankDetails || false, panItNo || null
@@ -201,7 +201,7 @@ router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['
 router.put('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT']), verify2FAMiddleware, asyncRoute(async (req, res) => {
     try {
         const {
-            accountName, accountType, costCenter,
+            accountName, accountType, costCenter, parentAccountId,
             alias, inventoryAffected, ledgerType, activateInterest,
             mailingName, mailingAddress, mailingCountry, mailingState,
             provideBankDetails, panItNo, status, group, openingBalance, accountFormat, gstApplicable
@@ -227,26 +227,27 @@ router.put('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware
                 account_name = COALESCE($1, account_name),
                 account_type = COALESCE($2, account_type),
                 cost_center_id = COALESCE($3, cost_center_id),
-                alias = COALESCE($4, alias),
-                inventory_affected = COALESCE($5, inventory_affected),
-                ledger_type = COALESCE($6, ledger_type),
-                activate_interest = COALESCE($7, activate_interest),
-                mailing_name = COALESCE($8, mailing_name),
-                mailing_address = COALESCE($9, mailing_address),
-                mailing_country = COALESCE($10, mailing_country),
-                mailing_state = COALESCE($11, mailing_state),
-                provide_bank_details = COALESCE($12, provide_bank_details),
-                pan_it_no = COALESCE($13, pan_it_no),
-                status = COALESCE($14, status),
-                account_group = COALESCE($15, account_group),
-                opening_balance = COALESCE($16, opening_balance),
-                account_format = COALESCE($17, account_format),
-                gst_applicable = COALESCE($18, gst_applicable)
+                parent_account_id = COALESCE($4, parent_account_id),
+                alias = COALESCE($5, alias),
+                inventory_affected = COALESCE($6, inventory_affected),
+                ledger_type = COALESCE($7, ledger_type),
+                activate_interest = COALESCE($8, activate_interest),
+                mailing_name = COALESCE($9, mailing_name),
+                mailing_address = COALESCE($10, mailing_address),
+                mailing_country = COALESCE($11, mailing_country),
+                mailing_state = COALESCE($12, mailing_state),
+                provide_bank_details = COALESCE($13, provide_bank_details),
+                pan_it_no = COALESCE($14, pan_it_no),
+                status = COALESCE($15, status),
+                account_group = COALESCE($16, account_group),
+                opening_balance = COALESCE($17, opening_balance),
+                account_format = COALESCE($18, account_format),
+                gst_applicable = COALESCE($19, gst_applicable)
                 ${balanceClause},
                 updated_at = NOW()
              WHERE id = $19 RETURNING *`,
             [
-                accountName || null, accountType || null, costCenter || null,
+                accountName || null, accountType || null, costCenter || null, parentAccountId || null,
                 alias || null, inventoryAffected === undefined ? null : inventoryAffected,
                 ledgerType || null, activateInterest === undefined ? null : activateInterest,
                 mailingName || null, mailingAddress || null, mailingCountry || null, mailingState || null,
