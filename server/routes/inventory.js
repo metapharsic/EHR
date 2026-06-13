@@ -70,7 +70,7 @@ router.get('/', async (req, res) => {
         p.name,
         p.generic_name as "genericName",
         p.manufacturer,
-        COALESCE((SELECT SUM(b.stock) FROM batches b WHERE b.product_id = p.id), 0) as "currentStock",
+        COALESCE((SELECT SUM(b.stock) FROM batches b WHERE b.product_id = p.id), p.current_stock, 0) as "currentStock",
         p.reorder_level as "reorderLevel",
         p.reorder_qty as "reorderQty",
         p.min_stock_level as "minStockLevel",
@@ -83,7 +83,7 @@ router.get('/', async (req, res) => {
         p.hsn as "hsnCode",
         p.gst as "taxRate",
         p.opening_stock as "openingStock",
-        'N/A' as scheme,
+        p.scheme as scheme,
         p.category,
         p.uom,
         p.maintain_batches as "maintainBatches",
@@ -304,6 +304,7 @@ router.get('/:id/batches', async (req, res, next) => {
  * Create a new product
  */
 router.post('/', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER']), async (req, res) => {
+  const client = await db.pool.connect();
   try {
     const { 
       id,
@@ -321,6 +322,15 @@ router.post('/', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER
       return res.status(400).json({
         success: false,
         error: 'Product name, code, generic name, and manufacturer are required'
+      });
+    }
+
+    // Check unique constraint manually
+    const existCheck = await client.query('SELECT id FROM products WHERE code = $1 AND deleted_at IS NULL', [code]);
+    if (existCheck.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Product with Item Code ${code} already exists.`
       });
     }
 
@@ -345,29 +355,71 @@ router.post('/', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER
 
     const finalId = id || require('crypto').randomUUID();
 
-    const result = await db.query(
+    await client.query('BEGIN');
+
+    const result = await client.query(
       `INSERT INTO products (
         id, name, generic_name, code, manufacturer, category, 
         reorder_level, reorder_qty, mrp, ptr, pts, 
         purchase_rate, selling_rate, hsn, gst, 
         opening_stock, current_stock, uom, min_stock_level,
         maintain_batches, track_expiry, branch_distribution,
-        created_by, updated_at
+        created_by, updated_at, scheme
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16, $17, $18, $19, $20, $21, $22, NOW()) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, NOW(), $24) 
        RETURNING *`,
       [
         finalId, name, genericName, code, manufacturer, category, 
         reorderLevel || 100, reorderQty || 100, mrp || 0, ptr || 0, pts || 0,
         purchaseRate || 0, sellingRate || 0, hsnCode || '', taxRate || 12,
-        openingStock || 0, uom || 'Strip', minStockLevel || 50,
+        openingStock || 0, openingStock || 0, uom || 'Strip', minStockLevel || 50,
         maintainBatches !== undefined ? maintainBatches : true,
         trackExpiry !== undefined ? trackExpiry : true,
         branchDistribution !== undefined ? Boolean(branchDistribution) : false,
-        req.user.userId
+        req.user.userId, scheme || ''
       ]
     );
 
+    // If opening stock > 0, create default batch & stock ledger entry
+    if (parsedOpeningStock > 0) {
+      // 1. Get default godown id
+      const godownResult = await client.query(
+        `SELECT id FROM godowns WHERE company_id = 1 AND status != 'Deleted' ORDER BY is_default DESC, name ASC LIMIT 1`
+      );
+      const godownId = godownResult.rows[0]?.id || null;
+
+      // 2. Create batch
+      const batchId = require('crypto').randomUUID();
+      const batchNo = 'OPB-' + code.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      const expiryInterval = (trackExpiry !== false) ? '24 months' : '120 months';
+      
+      await client.query(
+        `INSERT INTO batches (id, product_id, batch_number, stock, expiry_date, mrp, purchase_rate, selling_rate, status, godown_id)
+         VALUES ($1, $2, $3, $4, CURRENT_DATE + CAST($5 AS INTERVAL), $6, $7, $8, 'Active', $9)`,
+        [
+          batchId, finalId, batchNo, parsedOpeningStock, expiryInterval,
+          mrp || 0, purchaseRate || 0, sellingRate || ptr || mrp || 0, godownId
+        ]
+      );
+
+      // 3. Create stock ledger entry
+      const ledgerId = require('crypto').randomUUID();
+      const totalCost = parsedOpeningStock * (purchaseRate || 0);
+      await client.query(
+        `INSERT INTO stock_ledger_entries (
+          id, company_id, godown_id, product_id, batch_id, movement_type, 
+          reference_type, reference_id, reference_number, in_qty, out_qty,
+          running_balance, cost_per_unit, total_cost, movement_date, narration, created_by
+        )
+         VALUES ($1, 1, $2, $3, $4, 'IN', 'Opening', $3, $5, $6, 0, $6, $7, $8, CURRENT_DATE, 'Opening Stock', $9)`,
+        [
+          ledgerId, godownId, finalId, batchId, batchNo, parsedOpeningStock,
+          purchaseRate || 0, totalCost, req.user.userId
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
     logger.http('POST', '/api/inventory', 201, 0, req.ip, req.user.userId);
 
     return res.status(201).json({
@@ -376,10 +428,14 @@ router.post('/', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER
       message: 'Product created successfully'
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error('Failed to create product', { error: error.message, userId: req.user.userId });
     return res.status(500).json({ success: false, error: error.message });
+  } finally {
+    client.release();
   }
 });
+
 
 /**
  * PUT /api/inventory/:id
@@ -448,8 +504,9 @@ router.put('/:id', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAG
         track_expiry = COALESCE($20, track_expiry),
         branch_distribution = COALESCE($21, branch_distribution),
         is_active = COALESCE($22, is_active),
+        scheme = COALESCE($23, scheme),
         updated_at = NOW()
-       WHERE id = $23 RETURNING *`,
+       WHERE id = $24 RETURNING *`,
       [
         name, genericName, code, manufacturer, category, 
         reorderLevel, reorderQty, mrp, ptr, pts,
@@ -457,7 +514,7 @@ router.put('/:id', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAG
         openingStock, newCurrentStock, uom, minStockLevel,
         maintainBatches, trackExpiry, 
         branchDistribution !== undefined ? Boolean(branchDistribution) : null,
-        isActive, id
+        isActive, scheme, id
       ]
     );
 

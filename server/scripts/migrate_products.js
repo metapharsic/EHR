@@ -3,7 +3,7 @@
  * Target: products table
  */
 
-const db = require('./db');
+const db = require('../db');
 
 async function runMigration() {
     console.log('🚀 Starting Products Master Migration...');

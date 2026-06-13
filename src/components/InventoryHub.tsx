@@ -343,6 +343,20 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
     }
   };
 
+  // F2 Shortcut for Save to Master
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        if (showSkuModal && !savingSku) {
+          e.preventDefault();
+          handleSaveSku();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showSkuModal, savingSku, handleSaveSku]);
+
   // --- 6. RENDER HELPERS ---
   const renderIntelligenceSummary = () => {
     // Use unwrapped analytics — not raw analyticsData which has a { success, data } wrapper
