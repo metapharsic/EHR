@@ -138,7 +138,7 @@ router.get('/chart-of-accounts', verifyTokenMiddleware, asyncRoute(async (req, r
 router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT']), verify2FAMiddleware, asyncRoute(async (req, res) => {
     try {
         const {
-            accountCode, accountName, accountType, openingBalance, group, description, status,
+            id, accountCode, accountName, accountType, openingBalance, group, description, status,
             gstApplicable, accountFormat, costCenter,
             alias, inventoryAffected, ledgerType, activateInterest,
             mailingName, mailingAddress, mailingCountry, mailingState,
@@ -167,17 +167,19 @@ router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['
         // Credit-normal accounts: opening balance Cr means positive balance stored as negative debit offset
         const initialBalance = fmt === 'credit' ? -ob : ob;
 
+        const finalId = id || require('crypto').randomUUID();
+
         const { rows } = await db.query(
             `INSERT INTO chart_of_accounts (
-                account_code, account_name, account_type, opening_balance, current_balance, account_group, description, status,
+                id, account_code, account_name, account_type, opening_balance, current_balance, account_group, description, status,
                 gst_applicable, account_format, cost_center_id, company_id, created_by, created_at,
                 alias, inventory_affected, ledger_type, activate_interest,
                 mailing_name, mailing_address, mailing_country, mailing_state,
                 provide_bank_details, pan_it_no
              )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) RETURNING *`,
             [
-                finalCode, accountName, accountType, ob, initialBalance, group || null, description || null, status || 'Active',
+                finalId, finalCode, accountName, accountType, ob, initialBalance, group || null, description || null, status || 'Active',
                 gstApplicable || false, fmt, costCenter || null, req.user.companyId || 1, req.user.userId,
                 alias || null, inventoryAffected || false, ledgerType || null, activateInterest || false,
                 mailingName || accountName, mailingAddress || null, mailingCountry || 'India', mailingState || null,
@@ -260,6 +262,20 @@ router.put('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware
     } catch (error) {
         logger.error('Failed to update account', { error: error.message });
         res.status(500).json({ error: 'Failed to update account' });
+    }
+}));
+
+router.delete('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT']), verify2FAMiddleware, asyncRoute(async (req, res) => {
+    try {
+        const { rows } = await db.query('DELETE FROM chart_of_accounts WHERE id = $1 RETURNING *', [req.params.id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Account not found' });
+        res.json({ success: true, message: 'Account deleted successfully' });
+    } catch (error) {
+        if (error.code === '23503') { // Foreign key violation
+            return res.status(400).json({ error: 'Cannot delete account because it is referenced in transactions.' });
+        }
+        logger.error('Failed to delete account', { error: error.message });
+        res.status(500).json({ error: 'Failed to delete account' });
     }
 }));
 
@@ -379,12 +395,13 @@ router.post('/journal-vouchers', verifyTokenMiddleware, verifyRoleMiddleware(['A
     const client = await db.getClient();
     try {
         await client.query('BEGIN');
+        const voucherId = req.body.id || require('crypto').randomUUID();
         const { rows } = await client.query(
-            `INSERT INTO journal_vouchers (voucher_no, voucher_date, narration, total_debit, total_credit, status, company_id, created_by, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW()) RETURNING *`,
-            [voucherNo, voucherDate, narration, totalDebit, totalCredit, req.body.status || 'Draft', companyId, req.user.userId || req.user.id]
+            `INSERT INTO journal_vouchers (id, voucher_no, voucher_date, narration, total_debit, total_credit, status, company_id, created_by, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) RETURNING *`,
+            [voucherId, voucherNo, voucherDate, narration, totalDebit, totalCredit, req.body.status || 'Draft', companyId, req.user.userId || req.user.id]
         );
-        const voucherId = rows[0].id;
+        // voucherId is now explicitly tracked
 
         for (const entry of entries) {
             let finalAccountId = entry.accountId;
@@ -635,7 +652,12 @@ router.get('/general-ledger/:accountId', verifyTokenMiddleware, verify2FAMiddlew
         const openingBalance = masterOb + parseFloat(priorRes.rows[0].net);
 
         // 3. Fetch period transactions with optional voucherType filter
-        let query = `SELECT gl.*, coa.account_name AS particulars
+        let query = `SELECT gl.id, gl.company_id, gl.account_id, gl.party_id, gl.voucher_id, 
+                            gl.transaction_date AS date, 
+                            gl.voucher_type AS "voucherType", 
+                            gl.voucher_no AS "voucherNo", 
+                            gl.debit, gl.credit, gl.narration, gl.running_balance,
+                            coa.account_name AS particulars
                      FROM general_ledger gl
                      LEFT JOIN chart_of_accounts coa ON coa.id = gl.account_id
                      WHERE gl.account_id = $1
@@ -943,6 +965,108 @@ router.post('/profit-loss', verifyTokenMiddleware, verify2FAMiddleware, asyncRou
     } catch (error) {
         console.error('P&L Error:', error);
         res.status(500).json({ error: 'Failed to generate P&L' });
+    }
+}));
+
+// ============================================
+// CASH FLOW & AGING ANALYSIS
+// ============================================
+
+router.post('/cash-flow', verifyTokenMiddleware, verify2FAMiddleware, asyncRoute(async (req, res) => {
+    try {
+        const { startDate, endDate } = req.body;
+        const sDate = startDate || '2000-01-01';
+        const eDate = endDate || new Date().toISOString().split('T')[0];
+        const companyId = req.user.companyId || req.user.company_id || 1;
+
+        // Cash flow is the change in cash and bank balances
+        const { rows } = await db.query(
+            `SELECT
+                gl.transaction_date as date,
+                gl.narration as category,
+                COALESCE(gl.debit, 0) as in,
+                COALESCE(gl.credit, 0) as out,
+                v.voucher_type as voucherType
+            FROM general_ledger gl
+            JOIN chart_of_accounts coa ON gl.account_id = coa.id
+            LEFT JOIN journal_vouchers v ON gl.voucher_id = v.id
+            WHERE coa.company_id = $1
+              AND coa.account_group IN ('Cash-in-hand', 'Bank Accounts')
+              AND gl.transaction_date BETWEEN $2 AND $3
+            ORDER BY gl.transaction_date`,
+            [companyId, sDate, eDate]
+        );
+
+        let totalInflow = 0;
+        let totalOutflow = 0;
+
+        rows.forEach(r => {
+            totalInflow += parseFloat(r.in || 0);
+            totalOutflow += parseFloat(r.out || 0);
+        });
+
+        res.json({
+            data: rows,
+            summary: {
+                totalInflow,
+                totalOutflow,
+                netCashFlow: totalInflow - totalOutflow
+            }
+        });
+    } catch (error) {
+        console.error('Cash Flow Error:', error);
+        res.status(500).json({ error: 'Failed to generate cash flow statement' });
+    }
+}));
+
+router.post('/aging-analysis', verifyTokenMiddleware, verify2FAMiddleware, asyncRoute(async (req, res) => {
+    try {
+        const { asOnDate, type } = req.body; // type: 'Debtor' | 'Creditor'
+        const date = asOnDate || new Date().toISOString().split('T')[0];
+        const companyId = req.user.companyId || req.user.company_id || 1;
+        const targetGroup = type === 'Debtor' ? 'Sundry Debtors' : 'Sundry Creditors';
+
+        // Calculate days overdue based on transaction date
+        const { rows } = await db.query(
+            `SELECT 
+                coa.account_name as party_name,
+                coa.id as account_id,
+                SUM(gl.debit - gl.credit) as balance_amount,
+                ($1::date - gl.transaction_date::date) as days_overdue
+            FROM chart_of_accounts coa
+            JOIN general_ledger gl ON coa.id = gl.account_id
+            WHERE coa.company_id = $2
+              AND coa.account_group = $3
+              AND gl.transaction_date <= $1
+            GROUP BY coa.account_name, coa.id, gl.transaction_date
+            HAVING SUM(gl.debit - gl.credit) != 0`,
+            [date, companyId, targetGroup]
+        );
+
+        // Map into buckets
+        const data = rows.map(r => {
+            const days = parseInt(r.days_overdue || 0);
+            const balance = parseFloat(r.balance_amount || 0);
+            // Flip sign for creditors so balances appear positive
+            const finalBalance = type === 'Creditor' ? -balance : balance;
+            
+            let bucket = 'current_balance';
+            if (days > 0 && days <= 30) bucket = 'bucket_0_30';
+            else if (days > 30 && days <= 60) bucket = 'bucket_31_60';
+            else if (days > 60 && days <= 90) bucket = 'bucket_61_90';
+            else if (days > 90) bucket = 'bucket_90_plus';
+
+            return {
+                party_name: r.party_name,
+                balance_amount: finalBalance,
+                bucket
+            };
+        });
+
+        res.json({ data });
+    } catch (error) {
+        console.error('Aging Analysis Error:', error);
+        res.status(500).json({ error: 'Failed to generate aging analysis' });
     }
 }));
 

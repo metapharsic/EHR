@@ -514,18 +514,16 @@ export const getAllPurchases = async (): Promise<any[]> => {
 
 export const saveInvoice = async (invoice: any): Promise<boolean> => {
   try {
-    const method = invoice.id ? 'PUT' : 'POST';
-    const url = invoice.id ? '/api/pos/invoices/' + invoice.id : '/api/pos/invoices';
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('accessToken') || '') }, body: JSON.stringify(invoice) });
+    const url = '/api/pos/invoices';
+    await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('accessToken') || '') }, body: JSON.stringify(invoice) });
     return true;
   } catch { return false; }
 };
 
 export const savePurchase = async (purchase: any): Promise<boolean> => {
   try {
-    const method = purchase.id ? 'PUT' : 'POST';
-    const url = purchase.id ? '/api/purchase/' + purchase.id : '/api/purchase';
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('accessToken') || '') }, body: JSON.stringify(purchase) });
+    const url = '/api/purchase';
+    await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('accessToken') || '') }, body: JSON.stringify(purchase) });
     return true;
   } catch { return false; }
 };

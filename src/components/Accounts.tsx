@@ -8,7 +8,7 @@ import React, { useState, useMemo } from 'react';
 import { 
  FileText, User, Plus, TrendingUp, RefreshCcw, BookOpen,
  Grid, Shield, Zap, LayoutDashboard, Package, Scale, Landmark, Calculator,
- ArrowUpRight, ArrowDownLeft, Wallet, PieChart
+ ArrowUpRight, ArrowDownLeft, Wallet, PieChart, X
 } from 'lucide-react';
 
 // Standardized Layout Components
@@ -61,6 +61,14 @@ const Accounts: React.FC = () => {
  const [activeTab, setActiveTab] = useState<string>('FINANCIAL_SUMMARY');
  const [selectedPartyId, setSelectedPartyId] = useState<string | null>(null);
  const [accountTypeFilter, setAccountTypeFilter] = useState('All');
+
+ const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+ const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+ const [accountForm, setAccountForm] = useState({
+ accountCode: '', accountName: '', accountType: 'Asset', openingBalance: 0,
+ accountFormat: 'debit', group: ''
+ });
+ const [isSubmitting, setIsSubmitting] = useState(false);
 
  const { data: parties, loading: loadingParties, refetch: refetchParties } = useDataFetch<Party[]>(
  `/api/accounting/chart-of-accounts${accountTypeFilter !== 'All' ? `?type=${accountTypeFilter}` : ''}`,
@@ -137,6 +145,74 @@ const Accounts: React.FC = () => {
  // ============================================================
  // 6. SIDEBAR & TOP ACTIONS
  // ============================================================
+
+ const handleSaveAccount = async () => {
+ if (!accountForm.accountName) {
+ notify.error('Account Name is required');
+ return;
+ }
+ try {
+ setIsSubmitting(true);
+ const token = localStorage.getItem('token');
+ const method = editingAccountId ? 'PUT' : 'POST';
+ const url = editingAccountId ? `/api/accounting/chart-of-accounts/${editingAccountId}` : '/api/accounting/chart-of-accounts';
+ 
+ const response = await fetch(url, {
+ method,
+ headers: {
+ 'Content-Type': 'application/json',
+ 'Authorization': `Bearer ${token}`
+ },
+ body: JSON.stringify({
+ id: editingAccountId ? undefined : crypto.randomUUID(),
+ ...accountForm
+ })
+ });
+ 
+ const data = await response.json();
+ if (!response.ok) throw new Error(data.error || 'Failed to save account');
+ 
+ notify.success(`Account ${editingAccountId ? 'updated' : 'created'} successfully`);
+ setIsAddModalOpen(false);
+ setEditingAccountId(null);
+ setAccountForm({ accountCode: '', accountName: '', accountType: 'Asset', openingBalance: 0, accountFormat: 'debit', group: '' });
+ refetchParties();
+ } catch (error: any) {
+ notify.error(error.message);
+ } finally {
+ setIsSubmitting(false);
+ }
+ };
+
+ const handleEditAccount = (account: any) => {
+ setEditingAccountId(account.id);
+ setAccountForm({
+ accountCode: account.account_code || '',
+ accountName: account.account_name || '',
+ accountType: account.account_type || 'Asset',
+ openingBalance: Math.abs(account.opening_balance || 0),
+ accountFormat: account.account_format || ((account.opening_balance || 0) >= 0 ? 'debit' : 'credit'),
+ group: account.account_group || ''
+ });
+ setIsAddModalOpen(true);
+ };
+
+ const handleDeleteAccount = async (id: string) => {
+ if (!window.confirm('Are you sure you want to delete this account?')) return;
+ try {
+ const token = localStorage.getItem('token');
+ const response = await fetch(`/api/accounting/chart-of-accounts/${id}`, {
+ method: 'DELETE',
+ headers: { 'Authorization': `Bearer ${token}` }
+ });
+ const data = await response.json();
+ if (!response.ok) throw new Error(data.error || 'Failed to delete account');
+ notify.success('Account deleted successfully');
+ refetchParties();
+ } catch (error: any) {
+ notify.error(error.message);
+ }
+ };
 
  const sidebarItems = [
  { id: 'FINANCIAL_SUMMARY', label: 'Dashboard', icon: <LayoutDashboard size={18}/>, onClick: () => openTab('FINANCIAL_SUMMARY', 'Dashboard'), isActive: activeTab === 'FINANCIAL_SUMMARY', group: 'Overview' },
@@ -226,7 +302,7 @@ const Accounts: React.FC = () => {
  <p className="text-sm text-slate-500 font-medium mt-1">Master list of all ledgers, debtors, and creditors</p>
  </div>
  {canEdit && (
- <button className="px-6 py-3 bg-accent text-white rounded-xl font-bold text-sm hover:bg-accent transition-all flex items-center gap-2 shadow-none shadow-none">
+ <button onClick={() => { setEditingAccountId(null); setAccountForm({ accountCode: '', accountName: '', accountType: 'Asset', openingBalance: 0, accountFormat: 'debit', group: '' }); setIsAddModalOpen(true); }} className="px-6 py-3 bg-accent text-white rounded-xl font-bold text-sm hover:bg-accent transition-all flex items-center gap-2 shadow-none shadow-none">
  <Plus size={18} /> Add New Account
  </button>
  )}
@@ -254,8 +330,16 @@ const Accounts: React.FC = () => {
  { key: 'account_type', label: 'Type', width: '15%', format: (v) => <Badge value={v} variant={v === 'Asset' || v === 'Income' ? 'success' : 'danger'} /> },
  { key: 'account_group', label: 'Group', width: '15%' },
  { key: 'current_balance', label: 'Live Balance', width: '20%', align: 'right', format: (v, row) => `₹${Math.abs(v || (row as any).opening_balance || 0).toLocaleString()} ${(v || 0) >= 0 ? 'Dr' : 'Cr'}` },
- { key: 'actions', label: 'View', width: '10%', align: 'center', format: (_, row) => (
+ { key: 'actions', label: 'Actions', width: '15%', align: 'center', format: (_, row) => (
+ <div className="flex justify-center gap-3">
  <button onClick={() => { setSelectedPartyId(row.id); openTab('LEDGER', 'General Ledger'); }} className="text-accent hover:underline font-bold text-xs uppercase tracking-widest">Detail</button>
+ {canEdit && (
+ <>
+ <button onClick={() => handleEditAccount(row)} className="text-slate-500 hover:text-blue-600 font-bold text-xs uppercase tracking-widest"><Edit3 size={14} /></button>
+ <button onClick={() => handleDeleteAccount(row.id)} className="text-slate-500 hover:text-red-600 font-bold text-xs uppercase tracking-widest"><Trash2 size={14} /></button>
+ </>
+ )}
+ </div>
  )}
  ]}
  data={partyPagination.paginatedData}
@@ -270,6 +354,65 @@ const Accounts: React.FC = () => {
  <button onClick={() => partyPagination.goToPage(partyPagination.currentPage + 1)} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold disabled:opacity-50">NEXT</button>
  </div>
  )}
+ 
+ {isAddModalOpen && (
+ <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+ <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 flex flex-col">
+ <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+ <h3 className="text-xl font-bold text-slate-800">{editingAccountId ? 'Edit Account' : 'Add New Account'}</h3>
+ <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-red-500 transition-colors">
+ <X size={24} />
+ </button>
+ </div>
+ <div className="p-6 space-y-4">
+ <div>
+ <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Account Name *</label>
+ <input type="text" value={accountForm.accountName} onChange={e => setAccountForm({...accountForm, accountName: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-accent outline-none" placeholder="e.g. Office Supplies" />
+ </div>
+ <div className="grid grid-cols-2 gap-4">
+ <div>
+ <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Account Code</label>
+ <input type="text" value={accountForm.accountCode} onChange={e => setAccountForm({...accountForm, accountCode: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-accent outline-none" placeholder="Auto if blank" />
+ </div>
+ <div>
+ <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Type *</label>
+ <select value={accountForm.accountType} onChange={e => setAccountForm({...accountForm, accountType: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-accent outline-none bg-white">
+ <option value="Asset">Asset</option>
+ <option value="Liability">Liability</option>
+ <option value="Equity">Equity</option>
+ <option value="Income">Income</option>
+ <option value="Expense">Expense</option>
+ </select>
+ </div>
+ </div>
+ <div className="grid grid-cols-2 gap-4">
+ <div>
+ <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Opening Balance</label>
+ <input type="number" value={accountForm.openingBalance} onChange={e => setAccountForm({...accountForm, openingBalance: Number(e.target.value)})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-accent outline-none" />
+ </div>
+ <div>
+ <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Balance Type</label>
+ <select value={accountForm.accountFormat} onChange={e => setAccountForm({...accountForm, accountFormat: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-accent outline-none bg-white">
+ <option value="debit">Debit</option>
+ <option value="credit">Credit</option>
+ </select>
+ </div>
+ </div>
+ <div>
+ <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Group (Optional)</label>
+ <input type="text" value={accountForm.group} onChange={e => setAccountForm({...accountForm, group: e.target.value})} className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-accent outline-none" placeholder="e.g. Current Assets" />
+ </div>
+ </div>
+ <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-3 justify-end">
+ <button onClick={() => setIsAddModalOpen(false)} className="px-6 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors">Cancel</button>
+ <button onClick={handleSaveAccount} disabled={isSubmitting} className="flex-1 px-6 py-3 bg-accent text-white rounded-xl font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2">
+ {isSubmitting ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> : (editingAccountId ? 'Update Account' : 'Create Account')}
+ </button>
+ </div>
+ </div>
+ </div>
+ )}
+ 
  </div>
  );
  

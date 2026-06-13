@@ -36,10 +36,27 @@ async function runSchemeLifecycleTest() {
 
         // 3. Setup: Partner, Product & Batch
         console.log('\nStep 3: Setting up test data (Partner, Product, Batch)...');
-        const partnerRes = await axios.get(`${API_URL}/pcd/partners?limit=1`, { headers });
-        const partner = partnerRes.data.data[0];
-        if (!partner) throw new Error('No partner found for test');
-        console.log(`Using Partner: ${partner.name}`);
+        const ts = Date.now();
+        const partnerPayload = {
+            name: 'Scheme Test Partner ' + ts,
+            territory: 'Territory ' + ts,
+            contact_number: '9999999999',
+            email: 'scheme_' + ts + '@test.com',
+            status: 'ACTIVE'
+        };
+        const newPartnerRes = await axios.post(`${API_URL}/pcd/partners`, partnerPayload, { headers });
+        let partner = newPartnerRes.data.data;
+        console.log(`Created Partner: ${partner.name}`);
+
+        // Sync to parties if not synced automatically
+        if (!partner.converted_party_id) {
+            console.log('Syncing partner to ERP parties...');
+            await axios.post(`${API_URL}/pcd/partners/${partner.id}/sync`, {}, { headers });
+            // re-fetch partner
+            const getPartnerRes = await axios.get(`${API_URL}/pcd/partners/${partner.id}`, { headers });
+            partner = getPartnerRes.data.data;
+        }
+        console.log(`Using Partner: ${partner.name}, Party ID: ${partner.converted_party_id}`);
 
         const prodRes = await axios.get(`${API_URL}/pos/products`, { headers });
         const product = prodRes.data.data.find(p => p.batches.length > 0);

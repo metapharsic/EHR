@@ -1,10 +1,10 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { GeneralLedgerService, ChartOfAccountsService } from '../services/accountingService';
 import { Search, Download, Printer, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react';
 
-export const GeneralLedger: React.FC = () => {
+export const GeneralLedger: React.FC<{ accountId?: string }> = ({ accountId }) => {
  const [accounts, setAccounts] = useState<any[]>([]);
- const [selectedAccount, setSelectedAccount] = useState<string>('');
+ const [selectedAccount, setSelectedAccount] = useState<string>(accountId || '');
  const [entries, setEntries] = useState<any[]>([]);
  const [openingBalance, setOpeningBalance] = useState<number>(0);
  const [loading, setLoading] = useState(false);
@@ -20,10 +20,18 @@ export const GeneralLedger: React.FC = () => {
 
  useEffect(() => {
  ChartOfAccountsService.getAllAccounts()
- .then(d => setAccounts(Array.isArray(d) ? d : []))
+ .then(d => {
+   const flatAccounts = Array.isArray(d) ? d : [];
+   setAccounts(flatAccounts);
+   if (accountId && !selectedAccount) {
+     // Fallback selection if accounts load later
+     const found = flatAccounts.find(a => (a.id === accountId) || (a.accountCode === accountId));
+     if (found) setSelectedAccount(found.id || found.accountCode);
+   }
+ })
  .catch(() => setAccounts([]))
  .finally(() => setLoadingAccounts(false));
- }, []);
+ }, [accountId]);
 
  const loadLedger = useCallback(async () => {
  if (!selectedAccount) return;

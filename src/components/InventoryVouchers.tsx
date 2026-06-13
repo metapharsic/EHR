@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Save, Search, Plus, Calculator, FileText, Printer, Download, AlertCircle } from 'lucide-react';
 import { DenseGrid, ColumnDef } from './common/DenseGrid';
 import { useCompany } from '../context/CompanyContext';
@@ -369,7 +369,7 @@ export const InventoryVouchers: React.FC = () => {
  const db = await import('../services/databaseService');
  const commonData = {
  ...form,
- id: `${voucherType}-${Date.now()}`,
+ id: crypto.randomUUID(),
  items: items.map(i => {
  const product = products.find(p => p.name === i.item);
  const bObj = product?.batches?.find((b: any) => b.no === i.batch || b.batch_number === i.batch || b.id === i.batch);

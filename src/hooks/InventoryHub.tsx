@@ -240,15 +240,12 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
     setSavingSku(true);
     try {
       const payload = {
-        id: crypto.randomUUID(),
         name: skuForm.itemName,
         genericName: skuForm.genericName,
         code: skuForm.itemCode,
         manufacturer: skuForm.manufacturer,
         category: skuForm.stockGroup,
         reorderLevel: Number(skuForm.reorderLevel) || 0,
-        minStockLevel: Number(skuForm.minStockLevel) || 0,
-        openingStock: Number(skuForm.openingStock) || 0,
         mrp: Number(skuForm.mrp) || 0,
         purchaseRate: Number(skuForm.purchaseRate) || 0,
         sellingRate: Number(skuForm.sellingRate) || 0,
@@ -1060,7 +1057,7 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
           {skuFormTab === 'INVENTORY' && (
               <div className="space-y-8 animate-fadeIn">
                   <div className="grid grid-cols-2 gap-8">
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 shadow-inner">
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Target Reorder Level</label>
                             <div className="flex items-center gap-4">
@@ -1072,13 +1069,6 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
                             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Min Safety Stock</label>
                             <div className="flex items-center gap-4">
                                 <input type="number" value={skuForm.minStockLevel} onChange={e => setSkuForm({...skuForm, minStockLevel: toFormNumber(e.target.value)})} className="bg-transparent w-full text-3xl font-black outline-none focus:text-accent" placeholder="0"/>
-                                <span className="text-xs font-black text-slate-400 uppercase">{skuForm.baseUom}</span>
-                            </div>
-                        </div>
-                        <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 shadow-inner">
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Opening Stock</label>
-                            <div className="flex items-center gap-4">
-                                <input type="number" value={skuForm.openingStock} onChange={e => setSkuForm({...skuForm, openingStock: toFormNumber(e.target.value)})} className="bg-transparent w-full text-3xl font-black outline-none focus:text-accent" placeholder="0"/>
                                 <span className="text-xs font-black text-slate-400 uppercase">{skuForm.baseUom}</span>
                             </div>
                         </div>

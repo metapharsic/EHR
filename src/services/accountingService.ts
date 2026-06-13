@@ -1244,7 +1244,7 @@ export const BOMService = {
 export const StockSummaryService = {
   getSummary: async (valuationMethod = 'FIFO') => {
     try {
-      const response = await fetch('/api/inventory/stock-summary', { 
+      const response = await fetch('/api/stock-summary', { 
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ valuationMethod })

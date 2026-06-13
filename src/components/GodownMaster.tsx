@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
-import { Save, Search, Plus, MapPin, Download, Printer, Edit3, AlertCircle, RefreshCw, Warehouse } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Save, Search, Plus, MapPin, Download, Printer, Edit3, Trash, AlertCircle, RefreshCw, Warehouse } from 'lucide-react';
 import { GodownService } from '../services/accountingService';
 import { utils, writeFile } from 'xlsx';
 import { printReport, addExcelBranding } from '../utils/accountingExport';
@@ -45,8 +45,11 @@ export const GodownMaster: React.FC = () => {
  await GodownService.update(editingId, form);
  setGodowns(prev => prev.map(g => g.id === editingId ? { ...g, ...form } : g));
  } else {
- const result = await GodownService.create(form);
- setGodowns(prev => [...prev, result]);
+ const newId = crypto.randomUUID();
+ const payload = { ...form, id: newId };
+ const result = await GodownService.create(payload);
+ // Backend might return nested data, ensure we spread result correctly.
+ setGodowns(prev => [...prev, result.data || result]);
  }
  setSuccessMsg('Godown saved successfully');
  } catch {
@@ -58,6 +61,22 @@ export const GodownMaster: React.FC = () => {
  setSaving(false); setView('LIST'); setEditingId(null); setForm(defaultForm);
  setTimeout(() => setSuccessMsg(''), 3000);
  }
+ };
+
+ const handleDelete = async (id: string, name: string) => {
+   if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
+   setLoading(true);
+   try {
+     await GodownService.delete(id);
+     setGodowns(prev => prev.filter(g => g.id !== id));
+     setSuccessMsg('Godown deleted successfully');
+   } catch (err) {
+     console.error(err);
+     setSuccessMsg('Failed to delete godown');
+   } finally {
+     setLoading(false);
+     setTimeout(() => setSuccessMsg(''), 3000);
+   }
  };
 
  const handleExport = () => {
@@ -184,8 +203,9 @@ export const GodownMaster: React.FC = () => {
  {g.isThirdParty ? <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded">External</span>
  : <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded">Own</span>}
  </td>
- <td className="p-3 text-center opacity-0 group-hover:opacity-100 transition-opacity">
- <button onClick={() => { setEditingId(g.id); setForm({ ...defaultForm, ...g }); setView('FORM'); }} className="p-1 text-amber-600 hover:bg-amber-50 rounded"><Edit3 size={13}/></button>
+ <td className="p-3 text-center opacity-0 group-hover:opacity-100 transition-opacity flex justify-center gap-1">
+ <button onClick={(e) => { e.stopPropagation(); setEditingId(g.id); setForm({ ...defaultForm, ...g }); setView('FORM'); }} className="p-1 text-amber-600 hover:bg-amber-50 rounded" title="Edit"><Edit3 size={13}/></button>
+ <button onClick={(e) => { e.stopPropagation(); handleDelete(g.id, g.name); }} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Delete"><Trash size={13}/></button>
  </td>
  </tr>
  ))}

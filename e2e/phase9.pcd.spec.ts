@@ -20,7 +20,7 @@ test.describe("Phase 9 — PCD: Partners API", () => {
   test("P9-02 | POST /api/pcd/partners → onboard partner", async () => {
     const ts = Date.now();
     const { status, body } = await api("post", "/api/pcd/partners", {
-      name: "E2E PCD Partner " + ts, type: "Distributor", territory: "Maharashtra",
+      name: "E2E PCD Partner " + ts, type: "Distributor", territory: "Maharashtra " + ts,
       phone: "9876543210", email: "pcd" + ts + "@test.com", status: "Active", credit_limit: 200000, commission_rate: 5.0
     });
     expect([200, 201, 400, 409]).toContain(status);  // 409 = duplicate email

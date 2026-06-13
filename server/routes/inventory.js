@@ -306,6 +306,7 @@ router.get('/:id/batches', async (req, res, next) => {
 router.post('/', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER']), async (req, res) => {
   try {
     const { 
+      id,
       name, genericName, code, manufacturer, category, 
       reorderLevel, reorderQty, mrp, ptr, pts, 
       purchaseRate, sellingRate, hsnCode, taxRate, 
@@ -342,19 +343,21 @@ router.post('/', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER
       return res.status(422).json({ success: false, error: 'Opening stock cannot be negative' });
     }
 
+    const finalId = id || require('crypto').randomUUID();
+
     const result = await db.query(
       `INSERT INTO products (
-        name, generic_name, code, manufacturer, category, 
+        id, name, generic_name, code, manufacturer, category, 
         reorder_level, reorder_qty, mrp, ptr, pts, 
         purchase_rate, selling_rate, hsn, gst, 
         opening_stock, current_stock, uom, min_stock_level,
         maintain_batches, track_expiry, branch_distribution,
         created_by, updated_at
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $16, $17, $18, $19, $20, $21, NOW()) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16, $17, $18, $19, $20, $21, $22, NOW()) 
        RETURNING *`,
       [
-        name, genericName, code, manufacturer, category, 
+        finalId, name, genericName, code, manufacturer, category, 
         reorderLevel || 100, reorderQty || 100, mrp || 0, ptr || 0, pts || 0,
         purchaseRate || 0, sellingRate || 0, hsnCode || '', taxRate || 12,
         openingStock || 0, uom || 'Strip', minStockLevel || 50,

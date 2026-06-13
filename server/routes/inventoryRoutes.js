@@ -85,7 +85,7 @@ router.get('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (re
 // POST: Create new godown
 router.post('/godowns', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
-        const { name, address, manager_id, is_default } = req.body;
+        const { id, name, address, manager_id, is_default } = req.body;
         const companyId = req.user.companyId || 1;
         
         // Validate required fields
@@ -93,12 +93,12 @@ router.post('/godowns', verifyTokenMiddleware, verify2FAMiddleware, async (req, 
             return res.status(400).json({ error: 'Godown name is required' });
         }
         
-        const id = uuidv4();
+        const godownId = id || uuidv4();
         const result = await db.query(
             `INSERT INTO godowns (id, company_id, name, address, manager_id, is_default, status)
              VALUES ($1, $2, $3, $4, $5, $6, 'Active')
              RETURNING id, company_id, name, address, manager_id, is_default, status, created_at, updated_at`,
-            [id, companyId, name, address || null, manager_id || null, is_default || false]
+            [godownId, companyId, name, address || null, manager_id || null, is_default || false]
         );
         
         console.log('✅ Godown created:', result.rows[0]);
@@ -144,6 +144,31 @@ router.put('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (re
     } catch (error) {
         console.error('❌ Error updating godown:', error);
         res.status(500).json({ error: 'Failed to update godown' });
+    }
+});
+
+// DELETE: Delete godown
+router.delete('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const companyId = req.user.companyId || 1;
+        
+        const result = await db.query(
+            `UPDATE godowns 
+             SET status = 'Deleted', updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1 AND company_id = $2
+             RETURNING id`,
+            [id, companyId]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Godown not found' });
+        }
+        
+        res.json({ success: true, message: 'Godown deleted successfully' });
+    } catch (error) {
+        console.error('❌ Error deleting godown:', error);
+        res.status(500).json({ error: 'Failed to delete godown' });
     }
 });
 
@@ -699,11 +724,11 @@ router.post('/stock-summary', verifyTokenMiddleware, verify2FAMiddleware, async 
             PeriodMovement AS (
                 SELECT product_id, SUM(in_qty) as inward_qty, SUM(out_qty) as outward_qty
                 FROM stock_ledger_entries
-                WHERE movement_date BETWEEN $1 AND $4 AND company_id = $2
+                WHERE movement_date BETWEEN $1 AND ${godownId ? '$4' : '$3'} AND company_id = $2
                 ${godownId ? 'AND godown_id = $3' : ''}
                 GROUP BY product_id
             )
-            SELECT p.id, p.name, p.sku, p.category, p.unit,
+            SELECT p.id, p.name, p.code as sku, p.category, p.uom as unit, p.purchase_rate as unit_price,
                    COALESCE(os.opening_qty, 0) as opening_qty,
                    COALESCE(pm.inward_qty, 0) as inward_qty,
                    COALESCE(pm.outward_qty, 0) as outward_qty,
@@ -711,10 +736,10 @@ router.post('/stock-summary', verifyTokenMiddleware, verify2FAMiddleware, async 
             FROM products p
             LEFT JOIN OpeningStock os ON p.id = os.product_id
             LEFT JOIN PeriodMovement pm ON p.id = pm.product_id
-            WHERE p.status = 'Active'
+            WHERE p.is_active = true
             ORDER BY p.name ASC`;
         
-        const finalParams = godownId ? [sDate, companyId, godownId, eDate] : [sDate, companyId, null, eDate];
+        const finalParams = godownId ? [sDate, companyId, godownId, eDate] : [sDate, companyId, eDate];
 
         const { rows } = await db.query(sql, finalParams);
         res.json({ success: true, data: rows });
@@ -797,7 +822,7 @@ router.post('/reconciliations', verifyTokenMiddleware, verify2FAMiddleware, asyn
         await client.query('BEGIN');
         const { postToStockLedger } = require('../utils/ledgerHelper');
 
-        const reconciliationId = uuidv4();
+        const reconciliationId = req.body.id || uuidv4();
         const reconciliationNumber = `SR-${Date.now()}`;
         const godownId = srcGodown || placeOfSupply || null;
 
@@ -908,7 +933,7 @@ router.post('/stock-journals', verifyTokenMiddleware, verify2FAMiddleware, async
 
         const { postToGeneralLedger, postToStockLedger, findAccount } = require('../utils/ledgerHelper');
         
-        const journalId = uuidv4();
+        const journalId = req.body.id || uuidv4();
         const journalNumber = `SJ-${Date.now()}`;
         const inventoryAccountId = await findAccount(client, companyId, 'Inventory');
         const adjAccountId = await findAccount(client, companyId, 'Cost of Goods Sold'); // Using COGS as adjustment account
@@ -984,7 +1009,7 @@ router.post('/stock-transfers', verifyTokenMiddleware, verify2FAMiddleware, asyn
         await client.query('BEGIN');
         const { postToStockLedger } = require('../utils/ledgerHelper');
 
-        const transferId = uuidv4();
+        const transferId = req.body.id || uuidv4();
         const transferNumber = transferNo || `ST-${Date.now()}`;
         
         // 1. Create Stock Transfer Record

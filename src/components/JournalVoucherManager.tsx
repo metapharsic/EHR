@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { JournalVoucherService, ChartOfAccountsService } from '../services/accountingService';
 import { Plus, BookOpen, Save, X, AlertCircle, Search, Filter, RotateCcw, Eye, ChevronDown, ChevronRight, Printer, Download } from 'lucide-react';
 import { DenseGrid } from './common/DenseGrid';
@@ -140,6 +140,7 @@ export const JournalVoucherManager: React.FC = () => {
  setSaving(true);
  try {
  const created = await JournalVoucherService.createJournalVoucher({
+ id: crypto.randomUUID(),
  voucherNo,
  date,
  status: 'Draft', // initial creation is always draft
