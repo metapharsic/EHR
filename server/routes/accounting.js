@@ -652,14 +652,15 @@ router.get('/general-ledger/:accountId', verifyTokenMiddleware, verify2FAMiddlew
         const openingBalance = masterOb + parseFloat(priorRes.rows[0].net);
 
         // 3. Fetch period transactions with optional voucherType filter
-        let query = `SELECT gl.id, gl.company_id, gl.account_id, gl.party_id, gl.voucher_id, 
-                            gl.transaction_date AS date, 
-                            gl.voucher_type AS "voucherType", 
-                            gl.voucher_no AS "voucherNo", 
+        let query = `SELECT gl.id, gl.company_id, gl.account_id, gl.party_id, gl.voucher_id,
+                            gl.transaction_date AS date,
+                            gl.voucher_type AS "voucherType",
+                            jv.voucher_no AS "voucherNo",
                             gl.debit, gl.credit, gl.narration, gl.running_balance,
                             coa.account_name AS particulars
                      FROM general_ledger gl
                      LEFT JOIN chart_of_accounts coa ON coa.id = gl.account_id
+                     LEFT JOIN journal_vouchers jv ON jv.id = gl.voucher_id
                      WHERE gl.account_id = $1
                        AND gl.transaction_date BETWEEN $2 AND $3`;
         const params = [accountId, dateFrom, dateTo];
