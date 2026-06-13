@@ -40,6 +40,18 @@ router.get('/stats', verifyTokenMiddleware, asyncRoute(async (req, res) => {
         stats.active_pcd_partners = parseInt(pcdCount.rows[0].count);
         stats.monthly_sales_volume = parseFloat(salesVol.rows[0].vol);
 
+        const velocityMoM = await db.query(`
+            SELECT
+                COUNT(*) FILTER (WHERE created_at >= date_trunc('month', CURRENT_DATE)) AS this_month,
+                COUNT(*) FILTER (WHERE created_at >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month')
+                                  AND created_at < date_trunc('month', CURRENT_DATE)) AS last_month
+            FROM leads WHERE company_id = $1`, [companyId]);
+        const tm = parseInt(velocityMoM.rows[0].this_month) || 0;
+        const lm = parseInt(velocityMoM.rows[0].last_month) || 0;
+        stats.lead_velocity = lm === 0
+            ? (tm > 0 ? 100 : 0)
+            : Math.round(((tm - lm) / lm) * 100);
+
         res.json(stats);
     } catch (error) {
         logger.error('Failed to fetch CRM stats', { error: error.message });
@@ -58,9 +70,11 @@ router.get('/leads', verifyTokenMiddleware, asyncRoute(async (req, res) => {
         const companyId = req.user.companyId || 1;
         
         let query = `
-            SELECT l.*, 
-                   (SELECT COUNT(*) FROM lead_activities WHERE lead_id = l.id) as activity_count
-            FROM leads l 
+            SELECT l.*,
+                   u.name AS assignee_name,
+                   (SELECT COUNT(*) FROM lead_activities WHERE lead_id = l.id) AS activity_count
+            FROM leads l
+            LEFT JOIN users u ON u.id = l.assigned_to
             WHERE l.company_id = $1
         `;
         let params = [companyId];
@@ -159,6 +173,21 @@ router.get('/leads/:id', verifyTokenMiddleware, asyncRoute(async (req, res) => {
     }
 }));
 
+// DELETE lead (discard opportunity at any stage)
+router.delete('/leads/:id', verifyTokenMiddleware, asyncRoute(async (req, res) => {
+    try {
+        const { rowCount } = await db.query(
+            'DELETE FROM leads WHERE id = $1 AND company_id = $2',
+            [req.params.id, req.user.companyId || 1]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'Lead not found' });
+        res.json({ ok: true });
+    } catch (error) {
+        logger.error('Failed to delete lead', { error: error.message });
+        res.status(500).json({ error: 'Failed to discard opportunity' });
+    }
+}));
+
 // POST new lead
 router.post('/leads', verifyTokenMiddleware, asyncRoute(async (req, res) => {
     const { 
@@ -174,7 +203,7 @@ router.post('/leads', verifyTokenMiddleware, asyncRoute(async (req, res) => {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
             [
                 name, companyName || company || 'N/A', email, contact || phone || 'N/A', location || 'N/A', status || 'New', priority || 'Medium',
-                source, nextFollowUp || null, estimatedValue || 0, assignedTo || null, notes, industryType, req.user.companyId || 1
+                source, nextFollowUp || new Date(Date.now() + 3*24*60*60*1000).toISOString().slice(0,10), estimatedValue || 0, assignedTo || null, notes, industryType, req.user.companyId || 1
             ]
         );
         res.status(201).json(rows[0]);
@@ -217,7 +246,7 @@ router.put('/leads/:id', verifyTokenMiddleware, asyncRoute(async (req, res) => {
 
 router.get('/leads/:id/interests', verifyTokenMiddleware, asyncRoute(async (req, res) => {
     const query = `
-        SELECT lpi.*, p.name as product_name, p.category as product_category
+        SELECT lpi.*, p.name as product_name, p.therapeutic_category as product_category
         FROM lead_product_interests lpi
         JOIN products p ON lpi.product_id = p.id
         WHERE lpi.lead_id = $1
@@ -237,6 +266,21 @@ router.post('/leads/:id/interests', verifyTokenMiddleware, asyncRoute(async (req
         [req.params.id, productId, interestLevel || 'Medium', notes]
     );
     res.status(201).json(rows[0]);
+}));
+
+// DELETE product interest
+router.delete('/leads/:id/interests/:interestId', verifyTokenMiddleware, asyncRoute(async (req, res) => {
+    try {
+        const { rowCount } = await db.query(
+            'DELETE FROM lead_product_interests WHERE id = $1 AND lead_id = $2',
+            [req.params.interestId, req.params.id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'Interest not found' });
+        res.json({ ok: true });
+    } catch (error) {
+        logger.error('Failed to delete interest', { error: error.message });
+        res.status(500).json({ error: 'Failed to remove interest' });
+    }
 }));
 
 // ============================================
@@ -389,6 +433,21 @@ router.post('/leads/:id/activities', verifyTokenMiddleware, asyncRoute(async (re
     } catch (error) {
         logger.error('Failed to create activity', { error: error.message });
         res.status(500).json({ error: 'Failed to create activity' });
+    }
+}));
+
+// DELETE activity
+router.delete('/leads/:id/activities/:actId', verifyTokenMiddleware, asyncRoute(async (req, res) => {
+    try {
+        const { rowCount } = await db.query(
+            'DELETE FROM lead_activities WHERE id = $1 AND lead_id = $2',
+            [req.params.actId, req.params.id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'Activity not found' });
+        res.json({ ok: true });
+    } catch (error) {
+        logger.error('Failed to delete activity', { error: error.message });
+        res.status(500).json({ error: 'Failed to remove activity' });
     }
 }));
 

@@ -683,14 +683,24 @@ router.post("/transactions", async (req, res) => {
         }
 
         const invNo = "PCD-" + Date.now().toString().slice(-6);
-        
+
+        // Compute GST from product rate (MRP-inclusive pricing: back-calculate taxable value)
+        let gstPercent = 0;
+        if (product_id) {
+          const gstRes = await client.query("SELECT gst FROM products WHERE id=$1", [product_id]);
+          gstPercent = parseFloat(gstRes.rows[0]?.gst || 0);
+        }
+        const gstFactor = 1 + (gstPercent / 100);
+        const taxableValue = parseFloat((finalNetAmount / gstFactor).toFixed(2));
+        const gstAmount = parseFloat((finalNetAmount - taxableValue).toFixed(2));
+
         const invResult = await client.query(
           `INSERT INTO sales_invoices (
-            invoice_number, date, customer_name, customer_mobile, 
-            payment_mode, sub_total, total_discount, net_amount, status, created_by, party_id, company_id
-          ) VALUES ($1, $2, $3, $4, 'Credit', $5, $6, $7, 'Completed', $8, $9, $10)
+            invoice_number, date, customer_name, customer_mobile,
+            payment_mode, sub_total, taxable_value, total_gst, total_discount, net_amount, status, created_by, party_id, company_id, source_type
+          ) VALUES ($1, $2, $3, $4, 'Credit', $5, $6, $7, $8, $9, 'Completed', $10, $11, $12, 'PCD')
           RETURNING id`,
-          [invNo, order_date || new Date(), p.name, p.contact_number, subTotal, discountAmt, finalNetAmount, userId, p.converted_party_id, companyId]
+          [invNo, order_date || new Date(), p.name, p.contact_number, subTotal, taxableValue, gstAmount, discountAmt, finalNetAmount, userId, p.converted_party_id, companyId]
         );
         const invoiceId = invResult.rows[0].id;
 
@@ -783,15 +793,21 @@ router.post("/transactions", async (req, res) => {
 router.get("/dashboard/summary", async (req, res) => {
   try {
     const companyId = req.user?.companyId || 1;
-    const [partners, revenue, schemes, approvals, targets, receivables] = await Promise.all([
+    const [partners, revenue, schemes, approvals, targets, receivables, aging] = await Promise.all([
       db.query("SELECT COUNT(*) FROM pcd_partners WHERE company_id = $1 AND status='ACTIVE'", [companyId]),
       db.query("SELECT COALESCE(SUM(order_amount),0) AS total FROM pcd_transactions WHERE company_id = $1", [companyId]),
       db.query("SELECT COUNT(*) FROM pcd_schemes WHERE company_id = $1 AND status='ACTIVE'", [companyId]),
       db.query("SELECT COUNT(*) FROM pcd_partner_documents WHERE status='PENDING'"),
       db.query("SELECT COALESCE(AVG(CASE WHEN target_amount>0 THEN achieved_amount/target_amount*100 ELSE 0 END),0) AS avg_achievement FROM pcd_targets WHERE company_id = $1 AND status IN ('IN_PROGRESS','ACHIEVED','EXCEEDED')", [companyId]),
       db.query("SELECT COALESCE(SUM(outstanding_amount),0) AS total FROM pcd_receivables WHERE company_id = $1 AND status != 'CLOSED'", [companyId]),
+      db.query(`SELECT
+        COALESCE(SUM(CASE WHEN CURRENT_DATE - due_date BETWEEN 1 AND 30 THEN outstanding_amount ELSE 0 END),0) AS bucket_0_30,
+        COALESCE(SUM(CASE WHEN CURRENT_DATE - due_date BETWEEN 31 AND 60 THEN outstanding_amount ELSE 0 END),0) AS bucket_31_60,
+        COALESCE(SUM(CASE WHEN CURRENT_DATE - due_date > 60 THEN outstanding_amount ELSE 0 END),0) AS bucket_61_plus
+        FROM pcd_receivables WHERE company_id=$1 AND status NOT IN ('CLOSED','CLEARED') AND due_date < CURRENT_DATE`, [companyId]),
     ]);
 
+    const ag = aging.rows[0];
     res.json({
       success: true,
       data: {
@@ -801,6 +817,11 @@ router.get("/dashboard/summary", async (req, res) => {
         pendingApprovals: parseInt(approvals.rows[0].count),
         avgTargetAchievement: parseFloat(parseFloat(targets.rows[0].avg_achievement).toFixed(1)),
         outstandingReceivables: parseFloat(receivables.rows[0].total),
+        agingBuckets: {
+          bucket_0_30: parseFloat(ag.bucket_0_30),
+          bucket_31_60: parseFloat(ag.bucket_31_60),
+          bucket_61_plus: parseFloat(ag.bucket_61_plus),
+        },
       }
     });
   } catch(e) {
@@ -1025,6 +1046,13 @@ router.put("/receivables/:id", async (req, res) => {
       "UPDATE pcd_receivables SET paid_amount=$1, outstanding_amount=$2, status=$3, updated_at=NOW() WHERE id=$4 RETURNING *",
       [newPaid, outstanding, newStatus, req.params.id]
     );
+    // Sync pcd_transactions.payment_status when fully cleared
+    if (outstanding <= 0 && rec.invoice_id) {
+      await db.query(
+        "UPDATE pcd_transactions SET payment_status='PAID' WHERE sales_invoice_id=$1",
+        [rec.invoice_id]
+      );
+    }
     await db.query(
       "INSERT INTO pcd_activity_log (actor_name, action_type, description, entity_type, entity_id, partner_id, company_id) VALUES ($1,$2,$3,$4,$5,$6,$7)",
       [req.user?.name || "System", "PAYMENT_RECEIVED", "Payment \u20b9" + paid_amount + " recorded for invoice " + rec.invoice_id, "receivable", rec.id, rec.partner_id, rec.company_id]

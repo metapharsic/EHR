@@ -12,7 +12,14 @@ interface UseWebSocketOptions {
   reconnectDelay?: number;
 }
 
-const WS_URL = `ws://${window.location.hostname}:5000/ws`;
+const getWsUrl = () => {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return `ws://${window.location.hostname}:5000/ws`;
+  }
+  return `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+};
+
+const WS_URL = getWsUrl();
 const TERMINAL_CLOSE_CODES = new Set([4001]); // auth failure — don't reconnect
 
 export const useWebSocket = ({ onMessage, onConnect, onDisconnect, reconnectDelay = 3000 }: UseWebSocketOptions) => {

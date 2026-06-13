@@ -545,16 +545,13 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
           </div>
         ) 
       },
-      { key: 'actions', label: 'Actions', width: '12%', align: 'center' as const, render: (_: any, row: any) => (
-        <div className="flex gap-[4px] justify-center">
-          <button onClick={(e) => { e.stopPropagation(); handleEditSku(row); }} className="w-[28px] h-[28px] flex items-center justify-center text-[#64748b] hover:text-[#0f172a] hover:bg-[#f1f5f9] bg-transparent rounded-[4px] transition-all">
-            <Edit3 size={14}/>
+      { key: 'actions', label: 'Actions', width: '14%', align: 'center' as const, render: (_: any, row: any) => (
+        <div className="flex flex-col gap-[4px] items-center">
+          <button onClick={(e) => { e.stopPropagation(); handleEditSku(row); }} className="flex items-center gap-[5px] px-[10px] py-[5px] bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-[5px] text-[11px] font-[700] transition-all w-full justify-center">
+            <Edit3 size={12}/> Edit
           </button>
-          <button onClick={(e) => { e.stopPropagation(); handleDeleteSku(row.id); }} className="w-[28px] h-[28px] flex items-center justify-center text-[#94a3b8] hover:text-[#ef4444] hover:bg-[#fef2f2] bg-transparent rounded-[4px] transition-all">
-            <Trash2 size={14}/>
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); window.location.hash = `#/analytics?sku=${row.id}`; }} className="w-[28px] h-[28px] flex items-center justify-center text-[#94a3b8] hover:text-[#22c55e] hover:bg-[#f0fdf4] bg-transparent rounded-[4px] transition-all">
-            <BarChart3 size={14}/>
+          <button onClick={(e) => { e.stopPropagation(); handleDeleteSku(row.id); }} className="flex items-center gap-[5px] px-[10px] py-[5px] bg-red-50 text-red-500 hover:bg-red-100 rounded-[5px] text-[11px] font-[700] transition-all w-full justify-center">
+            <Trash2 size={12}/> Delete
           </button>
         </div>
       ) }
@@ -571,8 +568,15 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
       { key: 'manufacturer', label: 'Manufacturer', width: '15%', render: (v: any) => <span className="text-[10px] text-slate-400 font-bold uppercase">{v || 'N/A'}</span> },
       { key: 'currentStock', label: 'Stock', width: '10%', align: 'right' as const, render: (v: any, row: any) => <span className="font-bold text-xs">{v} {row.uom}</span> },
       { key: 'category', label: 'Category', width: '15%', render: (v: any) => <Badge text={v} variant="neutral" /> },
-      { key: 'actions', label: 'Actions', width: '10%', align: 'center' as const, render: (_: any, row: any) => (
-        <button onClick={(e) => { e.stopPropagation(); handleEditSku(row); }} className="text-accent hover:underline text-[10px] font-bold uppercase">Edit</button>
+      { key: 'actions', label: 'Actions', width: '15%', align: 'center' as const, render: (_: any, row: any) => (
+        <div className="flex gap-[6px] justify-center">
+          <button onClick={(e) => { e.stopPropagation(); handleEditSku(row); }} className="flex items-center gap-[4px] px-[8px] py-[4px] bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-[10px] font-bold transition-all">
+            <Edit3 size={11}/> Edit
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); handleDeleteSku(row.id); }} className="flex items-center gap-[4px] px-[8px] py-[4px] bg-red-50 text-red-500 hover:bg-red-100 rounded text-[10px] font-bold transition-all">
+            <Trash2 size={11}/> Del
+          </button>
+        </div>
       )}
     ];
 

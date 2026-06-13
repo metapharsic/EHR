@@ -185,7 +185,7 @@ export const useDataFetch = <T = any>(
     fullResponse,
     loading,
     error,
-    refetch: () => fetchData(),
+    refetch: () => { dataCache.delete(endpoint); return fetchData(); },
     isOnline,
     cacheHit
   };

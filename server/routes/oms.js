@@ -14,7 +14,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const logger = require('../utils/logger');
-const { verifyTokenMiddleware } = require('../utils/jwt');
+const { verifyTokenMiddleware, verifyRoleMiddleware } = require('../utils/jwt');
 const ledgerHelper = require('../utils/ledgerHelper');
 const aiAgent = require('../services/aiOmsAgent');
 
@@ -710,8 +710,8 @@ router.post('/:id/convert-to-invoice', verifyTokenMiddleware, asyncRoute(async (
         const invRes = await client.query(
             `INSERT INTO sales_invoices (
                 company_id, party_id, invoice_number, date, customer_name, payment_mode,
-                sub_total, taxable_value, total_gst, total_discount, round_off, net_amount, status, created_by
-            ) VALUES ($1,$2,$3,$4,$5,'Credit',$6,$7,$8,$9,0,$10,'Completed',$11)
+                sub_total, taxable_value, total_gst, total_discount, round_off, net_amount, status, created_by, source_type
+            ) VALUES ($1,$2,$3,$4,$5,'Credit',$6,$7,$8,$9,0,$10,'Completed',$11,'OMS')
             RETURNING id`,
             [companyId, order.distributor_id, invoiceNumber, today, order.distributor_name,
              subTotal, subTotal, totalGst, totalDiscount, netAmount, userId]
@@ -788,7 +788,7 @@ router.post('/:id/convert-to-invoice', verifyTokenMiddleware, asyncRoute(async (
 // ============================================
 // CANCEL ORDER (release reservations)
 // ============================================
-router.delete('/:id', verifyTokenMiddleware, asyncRoute(async (req, res) => {
+router.delete('/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'MANAGER']), asyncRoute(async (req, res) => {
     const client = await db.getClient();
     try {
         const { id } = req.params;
@@ -1017,20 +1017,27 @@ router.put('/returns/:returnId/approve', verifyTokenMiddleware, asyncRoute(async
             return res.status(400).json({ success: false, error: `Return is already in '${ret.status}' state` });
         }
 
-        // Load return items
+        // Load return items — JOIN order_items to pull gst_percent
         const itemsRes = await client.query(
-            `SELECT * FROM order_return_items WHERE return_id = $1`,
+            `SELECT ori.*, COALESCE(oi.gst_percent, 0) AS gst_percent
+             FROM order_return_items ori
+             LEFT JOIN order_items oi ON oi.id = ori.order_item_id
+             WHERE ori.return_id = $1`,
             [returnId]
         );
         const items = itemsRes.rows;
 
-        let totalCreditAmount = 0;
+        let totalCreditTaxable = 0;
+        let totalCreditGst = 0;
 
         // Process stock-IN for restockable items
         for (const item of items) {
             const qty = Number(item.quantity || 0);
             const rate = Number(item.rate || 0);
-            totalCreditAmount += qty * rate;
+            const gstPct = Number(item.gst_percent || 0);
+            const taxable = qty * rate;
+            totalCreditTaxable += taxable;
+            totalCreditGst += parseFloat((taxable * gstPct / 100).toFixed(2));
 
             if (item.restock && item.product_id && qty > 0) {
                 const batchId = item.batch_id;
@@ -1063,6 +1070,8 @@ router.put('/returns/:returnId/approve', verifyTokenMiddleware, asyncRoute(async
             }
         }
 
+        const totalCreditAmount = totalCreditTaxable + totalCreditGst;
+
         // Create Credit Note in sales_invoices
         const cnNumber = `CN-${ret.return_number}`;
         const today = new Date().toISOString().slice(0, 10);
@@ -1070,8 +1079,8 @@ router.put('/returns/:returnId/approve', verifyTokenMiddleware, asyncRoute(async
             `INSERT INTO sales_invoices (
                 company_id, party_id, invoice_number, date, customer_name, payment_mode,
                 sub_total, taxable_value, total_gst, total_discount, round_off,
-                net_amount, status, created_by
-             ) VALUES ($1, $2, $3, $4, $5, 'Credit', $6, $6, 0, 0, 0, $6, 'Completed', $7)
+                net_amount, status, created_by, source_type
+             ) VALUES ($1, $2, $3, $4, $5, 'Credit', $6, $6, $7, 0, 0, $8, 'Completed', $9, 'OMS')
              RETURNING id`,
             [
                 ret.company_id || 1,
@@ -1079,23 +1088,26 @@ router.put('/returns/:returnId/approve', verifyTokenMiddleware, asyncRoute(async
                 cnNumber,
                 today,
                 ret.distributor_name,
+                totalCreditTaxable,
+                totalCreditGst,
                 totalCreditAmount,
                 userId
             ]
         );
         const creditNoteId = cnRes.rows[0].id;
 
-        // Insert credit note items
+        // Insert credit note items with correct gst_percent from original order items
         for (const item of items) {
             const qty = Number(item.quantity || 0);
             const rate = Number(item.rate || 0);
-            const amount = qty * rate;
+            const taxable = qty * rate;
+            const gstPct = Number(item.gst_percent || 0);
             await client.query(
                 `INSERT INTO sales_invoice_items (
                     invoice_id, product_id, batch_id, quantity, mrp, rate,
                     discount_percent, discount_amount, taxable_value, gst_percent, total_amount
-                 ) VALUES ($1, $2, $3, $4, $5, $5, 0, 0, $6, 0, $6)`,
-                [creditNoteId, item.product_id, item.batch_id || null, qty, rate, amount]
+                 ) VALUES ($1, $2, $3, $4, $5, $5, 0, 0, $6, $7, $6)`,
+                [creditNoteId, item.product_id, item.batch_id || null, qty, rate, taxable, gstPct]
             );
         }
 

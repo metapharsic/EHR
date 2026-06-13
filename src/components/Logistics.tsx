@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
  Truck, Box, FileText, MapPin, ExternalLink, Plus, Search, Filter, 
  Download, BarChart3, Calendar, Package, User, CreditCard, 
@@ -36,6 +36,7 @@ const Logistics: React.FC = () => {
  // ============================================================
  const { data: logisticsData, loading, error, refetch } = useDataFetch<any[]>('/api/logistics');
  const { data: statsData, loading: statsLoading, refetch: refetchStats } = useDataFetch<any>('/api/logistics/stats');
+ const { data: dropdownData, refetch: refetchDropdown } = useDataFetch<any>('/api/logistics/dropdown');
 
  // ============================================================
  // FILTER & VIEW STATES
@@ -99,6 +100,7 @@ const Logistics: React.FC = () => {
  const handleRefresh = () => {
  refetch();
  refetchStats();
+ refetchDropdown();
  };
 
  const handleAddDispatch = async (e: React.FormEvent) => {
@@ -493,13 +495,27 @@ const Logistics: React.FC = () => {
  <div className="grid grid-cols-2 gap-4">
  <div>
  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Invoice Number *</label>
- <input 
+ <select 
  required
- type="text" 
  className="w-full p-2 border rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none"
  value={dispatchForm.invoice_no}
- onChange={e => setDispatchForm({...dispatchForm, invoice_no: e.target.value})}
- />
+ onChange={e => {
+ const selectedInvoice = e.target.value;
+ const invoiceDetails = dropdownData?.pendingInvoices?.find((inv: any) => inv.invoice_number === selectedInvoice);
+ setDispatchForm({
+ ...dispatchForm, 
+ invoice_no: selectedInvoice,
+ customer_name: invoiceDetails ? invoiceDetails.customer_name : dispatchForm.customer_name
+ });
+ }}
+ >
+ <option value="">Select Pending Invoice</option>
+ {dropdownData?.pendingInvoices?.map((inv: any) => (
+ <option key={inv.invoice_number} value={inv.invoice_number}>
+ {inv.invoice_number} - {inv.customer_name}
+ </option>
+ ))}
+ </select>
  </div>
  <div>
  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Customer Name *</label>

@@ -29,9 +29,12 @@ router.get('/', async (req, res) => {
 
     let query = `
       SELECT si.*, si.customer_name as party_name,
+             si.invoice_number as invoice_no,
+             si.date as invoice_date,
+             si.net_amount as net_payable,
              (SELECT COUNT(*) FROM sales_invoice_items WHERE invoice_id = si.id) as item_count
       FROM sales_invoices si
-      WHERE 1=1
+      WHERE (si.invoice_number LIKE 'PCD-%' OR si.invoice_number LIKE 'WHO-%')
     `;
     const params = [];
 
@@ -63,7 +66,7 @@ router.get('/', async (req, res) => {
     const { rows } = await db.query(query, params);
 
     // Get total count
-    let countQuery = "SELECT COUNT(*) as count FROM sales_invoices WHERE 1=1";
+    let countQuery = "SELECT COUNT(*) as count FROM sales_invoices WHERE (invoice_number LIKE 'PCD-%' OR invoice_number LIKE 'WHO-%')";
     const countParams = [];
     if (search) {
       countQuery += ` AND (invoice_number ILIKE $${countParams.length + 1} OR customer_name ILIKE $${countParams.length + 1})`;
@@ -96,9 +99,9 @@ router.get('/', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
-    const totalQuery = "SELECT COUNT(*) FROM sales_invoices";
-    const revenueQuery = "SELECT SUM(net_amount) FROM sales_invoices";
-    const monthQuery = "SELECT SUM(net_amount) FROM sales_invoices WHERE date >= date_trunc('month', CURRENT_DATE)";
+    const totalQuery = "SELECT COUNT(*) FROM sales_invoices WHERE (invoice_number LIKE 'PCD-%' OR invoice_number LIKE 'WHO-%')";
+    const revenueQuery = "SELECT SUM(net_amount) FROM sales_invoices WHERE (invoice_number LIKE 'PCD-%' OR invoice_number LIKE 'WHO-%')";
+    const monthQuery = "SELECT SUM(net_amount) FROM sales_invoices WHERE date >= date_trunc('month', CURRENT_DATE) AND (invoice_number LIKE 'PCD-%' OR invoice_number LIKE 'WHO-%')";
 
     const [total, revenue, month] = await Promise.all([
       db.query(totalQuery),

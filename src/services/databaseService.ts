@@ -550,8 +550,8 @@ export const saveVoucherType = async (vt: any): Promise<boolean> => {
   try {
     const method = vt.id ? 'PUT' : 'POST';
     const url = vt.id ? '/api/vouchers/types/' + vt.id : '/api/vouchers/types';
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('accessToken') || '') }, body: JSON.stringify(vt) });
-    return true;
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('accessToken') || '') }, body: JSON.stringify(vt) });
+    return res.ok;
   } catch { return false; }
 };
 

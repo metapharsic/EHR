@@ -292,4 +292,87 @@ router.post('/purchase-return', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/vouchers/types
+ * Create a new Voucher Type
+ */
+router.post('/types', async (req, res) => {
+    try {
+        const {
+            name, alias, typeOfVoucher, abbreviation, methodOfVoucherNumbering,
+            useEffectiveDates, makeOptionalByDefault, allowNarration,
+            provideNarrationsForEachLedger, printAfterSaving, nameOfClass
+        } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ success: false, error: 'Name is required' });
+        }
+
+        const classStr = Array.isArray(nameOfClass) ? JSON.stringify(nameOfClass) : nameOfClass;
+
+        const { rows } = await db.query(
+            `INSERT INTO voucher_types 
+            (name, alias, type_of_voucher, abbreviation, method_of_voucher_numbering, 
+            use_effective_dates, make_optional_by_default, allow_narration, 
+            provide_narrations_for_each_ledger, print_after_saving, name_of_class) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+            [name, alias, typeOfVoucher, abbreviation, methodOfVoucherNumbering,
+            useEffectiveDates, makeOptionalByDefault, allowNarration,
+            provideNarrationsForEachLedger, printAfterSaving, classStr]
+        );
+
+        res.json({ success: true, data: rows[0] });
+    } catch (error) {
+        logger.error('Failed to create voucher type', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * PUT /api/vouchers/types/:id
+ * Update an existing Voucher Type
+ */
+router.put('/types/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            name, alias, typeOfVoucher, abbreviation, methodOfVoucherNumbering,
+            useEffectiveDates, makeOptionalByDefault, allowNarration,
+            provideNarrationsForEachLedger, printAfterSaving, nameOfClass, is_active
+        } = req.body;
+
+        const classStr = Array.isArray(nameOfClass) ? JSON.stringify(nameOfClass) : nameOfClass;
+
+        const { rows } = await db.query(
+            `UPDATE voucher_types SET 
+            name = COALESCE($1, name),
+            alias = COALESCE($2, alias),
+            type_of_voucher = COALESCE($3, type_of_voucher),
+            abbreviation = COALESCE($4, abbreviation),
+            method_of_voucher_numbering = COALESCE($5, method_of_voucher_numbering),
+            use_effective_dates = COALESCE($6, use_effective_dates),
+            make_optional_by_default = COALESCE($7, make_optional_by_default),
+            allow_narration = COALESCE($8, allow_narration),
+            provide_narrations_for_each_ledger = COALESCE($9, provide_narrations_for_each_ledger),
+            print_after_saving = COALESCE($10, print_after_saving),
+            name_of_class = COALESCE($11, name_of_class),
+            is_active = COALESCE($12, is_active),
+            updated_at = CURRENT_TIMESTAMP
+            WHERE id = $13 RETURNING *`,
+            [name, alias, typeOfVoucher, abbreviation, methodOfVoucherNumbering,
+            useEffectiveDates, makeOptionalByDefault, allowNarration,
+            provideNarrationsForEachLedger, printAfterSaving, classStr, is_active, id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Voucher type not found' });
+        }
+
+        res.json({ success: true, data: rows[0] });
+    } catch (error) {
+        logger.error('Failed to update voucher type', { error: error.message });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;

@@ -353,6 +353,7 @@ export interface GSTReportEntry {
   totalTax: number;
 }
 
+// Legacy strategic PCD module type (camelCase). New API module uses PCDPartner from pcdService.ts (snake_case).
 export interface PCDPartner {
   id: string;
   name: string;

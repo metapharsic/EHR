@@ -231,7 +231,7 @@ router.get('/invoices/stats', async (req, res) => {
         const { date_from, date_to } = req.query;
 
         const params = [];
-        let where = 'WHERE 1=1';
+        let where = "WHERE si.invoice_number NOT LIKE 'PCD-%'";
         if (date_from) { params.push(date_from); where += ` AND si.date::date >= $${params.length}`; }
         if (date_to)   { params.push(date_to);   where += ` AND si.date::date <= $${params.length}`; }
 
@@ -289,6 +289,7 @@ router.get('/invoices', async (req, res) => {
             date_to     = '',
             payment_mode= '',
             status      = '',
+            source_type = '',
             sort_by     = 'date',
             sort_order  = 'desc',
             page        = '0',
@@ -301,7 +302,10 @@ router.get('/invoices', async (req, res) => {
         const pageOffset    = (parseInt(page) || 0) * pageLimit;
 
         const params = [];
-        let where = 'WHERE 1=1';
+        // When no source_type filter: show all (POS + PCD + OMS). Legacy rows without source_type excluded by old PCD prefix guard.
+        let where = source_type
+          ? "WHERE 1=1"
+          : "WHERE (si.source_type IS NULL OR si.source_type != 'PCD' OR si.invoice_number NOT LIKE 'PCD-BF-%')";
 
         if (search) {
             params.push(`%${search}%`);
@@ -311,6 +315,7 @@ router.get('/invoices', async (req, res) => {
         if (date_to)   { params.push(date_to);   where += ` AND si.date::date <= $${params.length}`; }
         if (payment_mode) { params.push(payment_mode); where += ` AND si.payment_mode = $${params.length}`; }
         if (status)       { params.push(status);       where += ` AND si.status = $${params.length}`; }
+        if (source_type)  { params.push(source_type);  where += ` AND si.source_type = $${params.length}`; }
 
         const countParams = [...params];
         params.push(pageLimit, pageOffset);
@@ -492,10 +497,10 @@ router.post('/invoices', async (req, res) => {
         // 1. Create Invoice Header
         const invoiceResult = await client.query(
             `INSERT INTO sales_invoices (
-                invoice_number, date, customer_name, customer_mobile, doctor_name, 
-                payment_mode, sub_total, taxable_value, total_gst, total_discount, 
-                round_off, net_amount, status, created_by, party_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                invoice_number, date, customer_name, customer_mobile, doctor_name,
+                payment_mode, sub_total, taxable_value, total_gst, total_discount,
+                round_off, net_amount, status, created_by, party_id, source_type
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'POS')
             RETURNING id`,
             [
                 invoice_number, date, customer_name, customer_mobile, doctor_name,
@@ -845,19 +850,20 @@ router.delete('/invoices/:id', async (req, res) => {
  */
 router.get('/dashboard-summary', async (req, res) => {
     try {
-        const todayResult = await db.query("SELECT COALESCE(SUM(net_amount), 0) as revenue, COUNT(*) as count FROM sales_invoices WHERE date::date = CURRENT_DATE");
-        const yesterdayResult = await db.query("SELECT COALESCE(SUM(net_amount), 0) as revenue FROM sales_invoices WHERE date::date = CURRENT_DATE - INTERVAL '1 day'");
-        const monthlyResult = await db.query("SELECT COALESCE(SUM(net_amount), 0) as revenue FROM sales_invoices WHERE date >= date_trunc('month', CURRENT_DATE)");
+        const todayResult = await db.query("SELECT COALESCE(SUM(net_amount), 0) as revenue, COUNT(*) as count FROM sales_invoices WHERE date::date = CURRENT_DATE AND invoice_number NOT LIKE 'PCD-%'");
+        const yesterdayResult = await db.query("SELECT COALESCE(SUM(net_amount), 0) as revenue FROM sales_invoices WHERE date::date = CURRENT_DATE - INTERVAL '1 day' AND invoice_number NOT LIKE 'PCD-%'");
+        const monthlyResult = await db.query("SELECT COALESCE(SUM(net_amount), 0) as revenue FROM sales_invoices WHERE date >= date_trunc('month', CURRENT_DATE) AND invoice_number NOT LIKE 'PCD-%'");
         const itemsResult = await db.query(`
             SELECT COALESCE(SUM(quantity), 0) as items 
             FROM sales_invoice_items sii 
             JOIN sales_invoices si ON sii.invoice_id = si.id 
-            WHERE si.date::date = CURRENT_DATE
+            WHERE si.date::date = CURRENT_DATE AND si.invoice_number NOT LIKE 'PCD-%'
         `);
         const recentResult = await db.query(`
             SELECT si.*, u.name as created_by_name 
             FROM sales_invoices si 
             LEFT JOIN users u ON si.created_by = u.id 
+            WHERE si.invoice_number NOT LIKE 'PCD-%'
             ORDER BY si.created_at DESC LIMIT 10
         `);
 
@@ -894,13 +900,13 @@ router.get('/terminal/summary', async (req, res) => {
         const monthlyResult = await db.query(`
             SELECT COALESCE(SUM(net_amount), 0) as revenue 
             FROM sales_invoices 
-            WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+            WHERE date >= CURRENT_DATE - INTERVAL '30 days' AND invoice_number NOT LIKE 'PCD-%'
         `);
         
         const prevMonthlyResult = await db.query(`
             SELECT COALESCE(SUM(net_amount), 0) as revenue 
             FROM sales_invoices 
-            WHERE date BETWEEN CURRENT_DATE - INTERVAL '60 days' AND CURRENT_DATE - INTERVAL '30 days'
+            WHERE date BETWEEN CURRENT_DATE - INTERVAL '60 days' AND CURRENT_DATE - INTERVAL '30 days' AND invoice_number NOT LIKE 'PCD-%'
         `);
 
         const monthlyRevenue = parseFloat(monthlyResult.rows[0]?.revenue || 0);

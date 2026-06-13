@@ -70,7 +70,7 @@ router.get('/', async (req, res) => {
         p.name,
         p.generic_name as "genericName",
         p.manufacturer,
-        p.current_stock as "currentStock",
+        COALESCE((SELECT SUM(b.stock) FROM batches b WHERE b.product_id = p.id), 0) as "currentStock",
         p.reorder_level as "reorderLevel",
         p.reorder_qty as "reorderQty",
         p.min_stock_level as "minStockLevel",
@@ -92,9 +92,10 @@ router.get('/', async (req, res) => {
         p.branch_distribution as "branchDistribution",
         COALESCE(p.current_stock * p.mrp, 0) as "totalValue",
         (SELECT COUNT(*) FROM batches b WHERE b.product_id = p.id) as "batchCount",
-        CASE 
-          WHEN NOT EXISTS (SELECT 1 FROM batches b WHERE b.product_id = p.id AND b.expiry_date >= NOW()::date) THEN 'EXPIRED'
-          WHEN EXISTS (SELECT 1 FROM batches b WHERE b.product_id = p.id AND b.expiry_date BETWEEN NOW()::date AND (NOW() + interval '30 days')::date) THEN 'EXPIRING_SOON'
+        CASE
+          WHEN NOT EXISTS (SELECT 1 FROM batches b WHERE b.product_id = p.id AND b.stock > 0) THEN 'OK'
+          WHEN NOT EXISTS (SELECT 1 FROM batches b WHERE b.product_id = p.id AND b.stock > 0 AND b.expiry_date >= NOW()::date) THEN 'EXPIRED'
+          WHEN EXISTS (SELECT 1 FROM batches b WHERE b.product_id = p.id AND b.stock > 0 AND b.expiry_date BETWEEN NOW()::date AND (NOW() + interval '30 days')::date) THEN 'EXPIRING_SOON'
           ELSE 'OK'
         END as "expiryStatus"
       FROM products p

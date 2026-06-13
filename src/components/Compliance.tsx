@@ -287,7 +287,10 @@ const Compliance: React.FC = () => {
   const exportLicensesCSV = () => {
     const rows = [
       ['Name','License Number','Category','Status','Issue Date','Expiry Date','Issued By','Notes'],
-      ...filteredLicenses.map(l => [l.name, l.license_number, l.category, computeStatus(l.expiry_date), l.start_date||'', l.expiry_date||'Perpetual', l.issued_by||'', l.notes||'']),
+      ...filteredLicenses.map(l => [l.name, l.license_number, l.category, computeStatus(l.expiry_date), 
+      l.start_date ? new Date(l.start_date).toLocaleDateString('en-IN') : '', 
+      l.expiry_date ? new Date(l.expiry_date).toLocaleDateString('en-IN') : 'Perpetual', 
+      l.issued_by||'', l.notes||'']),
     ];
     exportCSV(rows, `licenses_${new Date().toISOString().slice(0,10)}.csv`);
   };
@@ -782,7 +785,7 @@ const Compliance: React.FC = () => {
                       <span className="text-slate-500 text-xs">Expires</span>
                       <div className="text-right">
                         <span className={`font-bold text-xs ${uiStatus==='Expiring Soon'?'text-orange-600':uiStatus==='Expired'?'text-red-600':'text-slate-700'}`}>
-                          {lic.expiry_date||'Perpetual'}
+                          {lic.expiry_date ? new Date(lic.expiry_date).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : 'Perpetual'}
                         </span>
                         {days!==null && days>=0 && days<=60 && (
                           <p className={`text-[10px] font-bold ${days<=7?'text-red-500':days<=30?'text-orange-500':'text-yellow-600'}`}>{days} days left</p>

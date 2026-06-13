@@ -53,8 +53,7 @@ const VoucherSetupPage: React.FC = () => {
   const handleSaveVoucherType = async () => {
     if (!vtForm.name || !vtForm.typeOfVoucher) return;
     
-    const newVT: VoucherTypeMaster = {
-      id: selectedVoucherType?.id || `VT-${Date.now()}`,
+    const newVT: any = {
       name: vtForm.name!,
       alias: vtForm.alias,
       typeOfVoucher: vtForm.typeOfVoucher as VoucherType,
@@ -68,6 +67,10 @@ const VoucherSetupPage: React.FC = () => {
       nameOfClass: vtForm.nameOfClass || []
     };
 
+    if (selectedVoucherType?.id) {
+      newVT.id = selectedVoucherType.id;
+    }
+
     const success = await saveVoucherType(newVT);
     if (success) {
       addNotification({
@@ -79,6 +82,13 @@ const VoucherSetupPage: React.FC = () => {
       setIsEditingVT(false);
       setSelectedVoucherType(null);
       loadData();
+    } else {
+      addNotification({
+        type: 'error',
+        title: 'Save Failed',
+        message: `Could not save Voucher Type. It may already exist.`,
+        priority: 'high'
+      });
     }
   };
 

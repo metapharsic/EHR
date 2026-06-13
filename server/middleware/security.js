@@ -18,7 +18,7 @@ const helmetMiddleware = helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: [
         "'self'",
         "http://localhost:5000",
@@ -29,10 +29,12 @@ const helmetMiddleware = helmet({
         "ws://localhost:5173",   // legacy fallback
         "http://localhost:5173",
         "https://api.metapharsic.com",
-        "https://generativelanguage.googleapis.com"  // Gemini AI
+        "https://generativelanguage.googleapis.com",  // Gemini AI
+        "wss://erp.metapharsic.cloud:5000",
+        "https://erp.metapharsic.cloud"
       ],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      objectSrc: ["'none'"],
+      objectSrc: ["'self'", "blob:"],
       upgradeInsecureRequests: []
     }
   },

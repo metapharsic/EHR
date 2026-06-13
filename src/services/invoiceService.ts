@@ -1,15 +1,12 @@
 import { SalesInvoice } from '../types';
-
-// Mock database for storing invoices
-let mockInvoiceDatabase: SalesInvoice[] = [];
+import apiClient from './apiClient';
 
 /**
- * Saves an invoice to the mock database
+ * Saves an invoice to the database via API
  */
 export const saveInvoiceToDB = async (invoice: SalesInvoice): Promise<boolean> => {
   try {
-    // Simulate database save operation
-    mockInvoiceDatabase.push(invoice);
+    const response = await apiClient.post('/api/pos', invoice);
     console.log(`Invoice ${invoice.invoiceNumber} saved to database`);
     return true;
   } catch (error) {
@@ -19,40 +16,39 @@ export const saveInvoiceToDB = async (invoice: SalesInvoice): Promise<boolean> =
 };
 
 /**
- * Gets all invoices from the mock database
+ * Gets all invoices from the database via API
  */
 export const getAllInvoicesFromDB = async (): Promise<SalesInvoice[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([...mockInvoiceDatabase]);
-    }, 100); // Simulate network delay
-  });
+  try {
+    const data = await apiClient.get('/api/pos/invoices');
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching invoices:', error);
+    return [];
+  }
 };
 
 /**
- * Gets an invoice by ID from the mock database
+ * Gets an invoice by ID from the database via API
  */
 export const getInvoiceByIdFromDB = async (id: string): Promise<SalesInvoice | undefined> => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const invoice = mockInvoiceDatabase.find(inv => inv.id === id);
-      resolve(invoice);
-    }, 100); // Simulate network delay
-  });
+  try {
+    const data = await apiClient.get(`/api/pos/invoices/${id}`);
+    return data.data;
+  } catch (error) {
+    console.error(`Error fetching invoice ${id}:`, error);
+    return undefined;
+  }
 };
 
 /**
- * Updates an invoice in the mock database
+ * Updates an invoice in the database via API
  */
 export const updateInvoiceInDB = async (invoice: SalesInvoice): Promise<boolean> => {
   try {
-    const index = mockInvoiceDatabase.findIndex(inv => inv.id === invoice.id);
-    if (index !== -1) {
-      mockInvoiceDatabase[index] = invoice;
-      console.log(`Invoice ${invoice.invoiceNumber} updated in database`);
-      return true;
-    }
-    return false;
+    await apiClient.put(`/api/pos/invoices/${invoice.id}`, invoice);
+    console.log(`Invoice ${invoice.invoiceNumber} updated in database`);
+    return true;
   } catch (error) {
     console.error('Error updating invoice in database:', error);
     return false;
@@ -60,8 +56,14 @@ export const updateInvoiceInDB = async (invoice: SalesInvoice): Promise<boolean>
 };
 
 /**
- * Clears all invoices from the mock database (for testing)
+ * Clears all invoices from the database (admin only)
  */
-export const clearInvoiceDatabase = () => {
-  mockInvoiceDatabase = [];
+export const clearInvoiceDatabase = async (): Promise<boolean> => {
+  try {
+    await apiClient.delete('/api/pos/invoices/all');
+    return true;
+  } catch (error) {
+    console.error('Error clearing database:', error);
+    return false;
+  }
 };

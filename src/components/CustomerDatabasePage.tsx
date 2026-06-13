@@ -810,7 +810,7 @@ const CustomerDatabasePage: React.FC = () => {
     const active    = customers.filter(c => (c.status ?? 'Active') === 'Active');
     const totalDr   = active.reduce((s, c) => s + Math.max(0, c.currentBalance ?? 0), 0);
     const totalCr   = active.reduce((s, c) => s + Math.abs(Math.min(0, c.currentBalance ?? 0)), 0);
-    const overLimit = active.filter(c => (c.creditLimit ?? 0) > 0 && (c.currentBalance ?? 0) > (c.creditLimit ?? 0));
+    const overLimit = active.filter(c => Number(c.creditLimit ?? 0) > 0 && Number(c.currentBalance ?? 0) > Number(c.creditLimit ?? 0));
     const incomplete = active.filter(c => completenessScore(c) < 70);
     return { total: customers.length, active: active.length, totalDr, totalCr, overLimit: overLimit.length, incomplete: incomplete.length };
   }, [customers]);
@@ -1215,7 +1215,7 @@ const CustomerDatabasePage: React.FC = () => {
             {paginated.map(c => {
               const score     = completenessScore(c);
               const balance   = c.currentBalance ?? 0;
-              const overLimit = (c.creditLimit ?? 0) > 0 && balance > (c.creditLimit ?? 0);
+              const overLimit = Number(c.creditLimit ?? 0) > 0 && Number(balance) > Number(c.creditLimit ?? 0);
               const isDeleting = deletingId === c.id;
 
               return (

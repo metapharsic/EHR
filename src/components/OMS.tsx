@@ -357,7 +357,11 @@ const OMS: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'AI' && !insights) loadInsights();
+    if (activeTab === 'AI') {
+      if (!insights) loadInsights();
+      if (!demandPredictions) loadPredictions();
+      if (!reorderSuggestions) loadReorderSuggestions();
+    }
     /* eslint-disable-next-line */
   }, [activeTab]);
 

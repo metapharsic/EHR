@@ -234,7 +234,7 @@ const Login: React.FC = () => {
           {/* Brand Logo */}
           <div className="mb-6 md:mb-8 flex items-center gap-3 flex-shrink-0">
             <div className="p-1">
-              <img src="/logo.png" alt="Metapharsic Logo" className="h-16 w-auto object-contain drop-shadow-sm" />
+              <img src="/logo.svg" alt="Metapharsic Logo" className="h-16 w-auto object-contain drop-shadow-sm" />
             </div>
             <div className="flex flex-col justify-center">
               <span className="font-black tracking-tighter text-xl text-[#0F172A] leading-none">Metapharsic</span>

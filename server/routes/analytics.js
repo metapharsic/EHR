@@ -89,6 +89,7 @@ router.get('/inventory/comprehensive', verifyTokenMiddleware, verify2FAMiddlewar
         totalStock: parseFloat(p.totalStock),
         stockValue: parseFloat(p.stockValue),
         velocity: sales.velocity,
+        unitsSold: sales.unitsSold || 0,
         status: parseFloat(p.totalStock) < parseFloat(p.minStockLevel) ? 'Critical' : 'Healthy',
         fsn, ved, expired: exp.expired, nearExpiry: exp.nearExpiry,
         abc: 'C'

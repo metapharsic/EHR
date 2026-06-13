@@ -123,7 +123,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className={`flex items-center min-w-0 ${isOpen ? 'gap-3' : 'justify-center'}`}>
           <div className="h-10 w-10 flex-shrink-0 rounded-xl border border-slate-200 bg-white shadow-sm flex items-center justify-center overflow-hidden">
             <div className="h-8 w-8 flex items-center justify-center">
-              <img src="/logo.png" alt="Logo" className="h-full w-full object-contain" />
+              <img src="/logo.svg" alt="Logo" className="h-full w-full object-contain" />
             </div>
           </div>
           {isOpen && (

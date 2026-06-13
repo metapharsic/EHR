@@ -198,7 +198,11 @@ router.get("/licenses/:id/certificate", async (req, res) => {
     const full = path.join(UPLOAD_DIR, path.basename(rows[0].file_path));
     if (!fs.existsSync(full))
       return res.status(404).json({ success: false, error: "File not found on disk" });
-    res.download(full, rows[0].file_name || "certificate");
+    res.sendFile(full, {
+      headers: {
+        'Content-Disposition': `inline; filename="${rows[0].file_name || 'certificate'}"`
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

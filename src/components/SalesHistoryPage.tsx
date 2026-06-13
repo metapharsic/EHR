@@ -34,6 +34,7 @@ interface InvoiceRow {
   total_gst: number;
   net_amount: number;
   status: string;
+  source_type?: string;
   created_by_name?: string;
 }
 
@@ -42,6 +43,7 @@ type SortOrder = 'asc' | 'desc';
 
 const PAYMENT_MODES = ['All', 'Cash', 'UPI', 'Credit Card', 'Bank', 'Cheque'];
 const STATUS_OPTIONS = ['All', 'Completed', 'Returned', 'CreditNote', 'Cancelled'];
+const SOURCE_TYPES = ['All', 'POS', 'PCD', 'OMS'];
 const PAGE_SIZES = [25, 50, 100];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -131,6 +133,7 @@ const SalesHistoryPage: React.FC = () => {
   const [dateTo, setDateTo]           = useState('');
   const [paymentMode, setPaymentMode] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [sourceFilter, setSourceFilter] = useState('All');
   const [sortBy, setSortBy]           = useState<SortField>('date');
   const [sortOrder, setSortOrder]     = useState<SortOrder>('desc');
   const [page, setPage]               = useState(0);
@@ -157,6 +160,7 @@ const SalesHistoryPage: React.FC = () => {
       ...(dateTo       && { date_to: dateTo }),
       ...(paymentMode !== 'All' && { payment_mode: paymentMode }),
       ...(statusFilter !== 'All' && { status: statusFilter }),
+      ...(sourceFilter !== 'All' && { source_type: sourceFilter }),
     });
 
     const statsParams = new URLSearchParams({
@@ -183,9 +187,9 @@ const SalesHistoryPage: React.FC = () => {
 
     setLoadingList(false);
     setLoadingStats(false);
-  }, [page, pageSize, sortBy, sortOrder, search, dateFrom, dateTo, paymentMode, statusFilter]);
+  }, [page, pageSize, sortBy, sortOrder, search, dateFrom, dateTo, paymentMode, statusFilter, sourceFilter]);
 
-  useEffect(() => { fetchAll(true); }, [search, dateFrom, dateTo, paymentMode, statusFilter, sortBy, sortOrder, pageSize]);
+  useEffect(() => { fetchAll(true); }, [search, dateFrom, dateTo, paymentMode, statusFilter, sourceFilter, sortBy, sortOrder, pageSize]);
   useEffect(() => { fetchAll(); }, [page]);
 
   // 60-second auto-refresh (§17D)
@@ -251,7 +255,7 @@ const SalesHistoryPage: React.FC = () => {
   // ── Bulk CSV Export ───────────────────────────────────────────────────────
   const handleBulkExport = () => {
     if (invoices.length === 0) return;
-    const headers = ['Invoice No', 'Customer', 'Date', 'Payment Mode', 'Subtotal', 'GST', 'Net Amount', 'Status'];
+    const headers = ['Invoice No', 'Customer', 'Date', 'Payment Mode', 'Gross Amount', 'GST', 'Net Amount', 'Status'];
     const rows = invoices.map(inv => [
       inv.invoice_number, inv.customer_name, formatDate(inv.date),
       inv.payment_mode,
@@ -283,16 +287,16 @@ const SalesHistoryPage: React.FC = () => {
       <h2 style="color:#1D3557">Complete Sales Register</h2>
       <p>Exported: ${new Date().toLocaleString()}</p>
       <table><thead><tr><th>Invoice No</th><th>Customer</th><th>Date</th><th>Payment</th>
-      <th>Subtotal</th><th>GST</th><th>Net Amount</th><th>Status</th></tr></thead>
+      <th>Gross Amount</th><th>GST</th><th>Net Amount</th><th>Status</th></tr></thead>
       <tbody>${rows}</tbody></table></body></html>`);
     w.document.close(); w.print();
   };
 
   const clearFilters = () => {
     setSearch(''); setDateFrom(''); setDateTo('');
-    setPaymentMode('All'); setStatusFilter('All');
+    setPaymentMode('All'); setStatusFilter('All'); setSourceFilter('All');
   };
-  const hasFilters = search || dateFrom || dateTo || paymentMode !== 'All' || statusFilter !== 'All';
+  const hasFilters = search || dateFrom || dateTo || paymentMode !== 'All' || statusFilter !== 'All' || sourceFilter !== 'All';
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -373,6 +377,12 @@ const SalesHistoryPage: React.FC = () => {
           data-testid="status-filter">
           {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
         </select>
+        {/* Source type */}
+        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}
+          className="px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-blue-400"
+          data-testid="source-filter">
+          {SOURCE_TYPES.map(s => <option key={s}>{s === 'All' ? 'All Sources' : s}</option>)}
+        </select>
         {/* Clear */}
         {hasFilters && (
           <button onClick={clearFilters}
@@ -400,7 +410,7 @@ const SalesHistoryPage: React.FC = () => {
               <SortTh label="Customer"   field="customer_name"  sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="p-4" />
               <SortTh label="Date"       field="date"           sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="p-4" />
               <th className="p-4 border-b">Payment</th>
-              <SortTh label="Subtotal"   field="net_amount"     sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="p-4 text-right" />
+              <SortTh label="Gross Amount" field="net_amount"   sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="p-4 text-right" />
               <th className="p-4 border-b text-right">GST</th>
               <SortTh label="Net Amount" field="net_amount"     sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} className="p-4 text-right" />
               <th className="p-4 border-b">Status</th>
@@ -617,8 +627,22 @@ const SalesHistoryPage: React.FC = () => {
                 <div className="flex justify-end">
                   <div className="w-72 space-y-2">
                     <div className="flex justify-between text-xs text-slate-500 font-bold">
-                      <span>Subtotal</span><span>{formatCurrency(selectedInvoice.taxableValue || (selectedInvoice as any).sub_total)}</span>
+                      <span>Gross Amount</span><span>{formatCurrency(selectedInvoice.taxableValue || (selectedInvoice as any).sub_total)}</span>
                     </div>
+                    {(() => {
+                      const gst = selectedInvoice.totalGst || (selectedInvoice as any).total_gst || 0;
+                      const half = gst / 2;
+                      return gst > 0 ? (
+                        <>
+                          <div className="flex justify-between text-xs text-slate-400 font-bold pl-2">
+                            <span>CGST</span><span className="text-blue-500">+ {formatCurrency(half)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-slate-400 font-bold pl-2">
+                            <span>SGST</span><span className="text-blue-500">+ {formatCurrency(half)}</span>
+                          </div>
+                        </>
+                      ) : null;
+                    })()}
                     <div className="flex justify-between text-xs text-slate-500 font-bold">
                       <span>Total GST</span><span className="text-blue-600">+ {formatCurrency(selectedInvoice.totalGst || (selectedInvoice as any).total_gst)}</span>
                     </div>

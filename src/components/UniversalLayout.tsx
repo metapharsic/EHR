@@ -539,7 +539,7 @@ export const EnterpriseLayout: React.FC<EnterpriseLayoutProps> = ({
  <div className="flex items-center gap-6">
  <div className="flex items-center gap-2 pr-6 border-r border-slate-100">
  <div className="w-8 h-8 flex-shrink-0">
- <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+ <img src="/logo.svg" alt="Logo" className="w-full h-full object-contain" />
  </div>
  <span className="font-bold tracking-widest text-xs uppercase">{title}</span>
  </div>

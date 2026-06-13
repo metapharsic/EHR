@@ -32,21 +32,13 @@ import {
  ResponsiveContainer, AreaChart, Area, Legend, PieChart, Pie, Cell 
 } from 'recharts';
 
-// Mock Data for CRM Analytics
-const MOCK_PIPELINE_DATA = [
-  { name: 'Week 1', leads: 400, value: 2400 },
-  { name: 'Week 2', leads: 300, value: 1398 },
-  { name: 'Week 3', leads: 200, value: 9800 },
-  { name: 'Week 4', leads: 278, value: 3908 },
-];
-
 // ============================================
 // KANBAN COMPONENT
 // ============================================
 
-const KanbanColumn: React.FC<{ 
-  title: string; 
-  leads: Lead[]; 
+const KanbanColumn: React.FC<{
+  title: string;
+  leads: Lead[];
   onView: (l: Lead) => void;
   status: string;
 }> = ({ title, leads, onView, status }) => {
@@ -96,12 +88,23 @@ const KanbanColumn: React.FC<{
               </div>
             </div>
 
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-50">
-               <div className="flex items-center gap-2 text-slate-400">
-                  <Clock size={12} />
-                  <span className="text-[10px] font-medium">{formatDate(lead.next_follow_up || lead.created_at)}</span>
-               </div>
-               <p className="text-xs font-bold text-slate-800">₹{Number(lead.estimated_value).toLocaleString()}</p>
+            {(lead as any).assignee_name && (
+              <div className="flex items-center gap-1 mt-2">
+                <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-black text-slate-500">
+                  {(lead as any).assignee_name.charAt(0)}
+                </div>
+                <span className="text-[9px] font-bold text-slate-400 truncate">{(lead as any).assignee_name}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-50">
+              <div className="flex items-center gap-2 text-slate-400">
+                <Clock size={12} />
+                <span className="text-[10px] font-medium">{formatDate(lead.next_follow_up || lead.created_at)}</span>
+                {Number((lead as any).activity_count) > 0 && (
+                  <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-1 rounded">{(lead as any).activity_count} acts</span>
+                )}
+              </div>
+              <p className="text-xs font-bold text-slate-800">₹{Number(lead.estimated_value).toLocaleString()}</p>
             </div>
           </div>
         ))}
@@ -140,6 +143,26 @@ const CRM: React.FC = () => {
   const [aiDraft, setAiDraft] = useState<string>('');
   const [aiStrategy, setAiStrategy] = useState<any | null>(null);
   const [showStrategyModal, setShowStrategyModal] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [boardSearch, setBoardSearch] = useState('');
+  const [boardPriority, setBoardPriority] = useState('All');
+
+  // Detail sub-data
+  const [leadInterests, setLeadInterests] = useState<any[]>([]);
+  const [leadActivities, setLeadActivities] = useState<any[]>([]);
+  const [repUsers, setRepUsers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // Interest modal state
+  const [showInterestModal, setShowInterestModal] = useState(false);
+  const [interestForm, setInterestForm] = useState({ productId: '', interestLevel: 'High', notes: '' });
+  const [savingInterest, setSavingInterest] = useState(false);
+
+  // Activity modal state
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [activityForm, setActivityForm] = useState({ type: 'CALL', description: '', outcome: '', followUpRequired: false, followUpDate: '' });
+  const [savingActivity, setSavingActivity] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -160,16 +183,20 @@ const CRM: React.FC = () => {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [leadsRes, statsRes, analyticsRes, queueRes] = await Promise.all([
+      const [leadsRes, statsRes, analyticsRes, queueRes, usersRes, productsRes] = await Promise.all([
         crmService.getLeads(),
         crmService.getStats(),
         crmService.getAnalytics(),
-        crmService.getLeads({ queue: 'today_and_overdue' })
+        crmService.getLeads({ queue: 'today_and_overdue' }),
+        fetch('/api/users').then(r => r.json()).catch(() => []),
+        fetch('/api/products?limit=200').then(r => r.json()).catch(() => []),
       ]);
       setLeads(leadsRes);
       setStats(statsRes);
       setAnalytics(analyticsRes);
       setQueueLeads(queueRes);
+      setRepUsers(Array.isArray(usersRes) ? usersRes : (usersRes?.data || []));
+      setProducts(Array.isArray(productsRes) ? productsRes : (productsRes?.data || []));
     } catch (err: any) {
       addNotification({ title: 'Sync Error', message: 'Failed to sync CRM data', type: 'error', priority: 'high' });
     } finally {
@@ -177,46 +204,156 @@ const CRM: React.FC = () => {
     }
   };
 
+  const loadLeadDetails = async (leadId: string) => {
+    setLoadingDetail(true);
+    try {
+      const [interests, activities] = await Promise.all([
+        crmService.getInterests(leadId),
+        crmService.getActivities(leadId),
+      ]);
+      setLeadInterests(interests);
+      setLeadActivities(activities);
+    } catch {
+      setLeadInterests([]);
+      setLeadActivities([]);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  useEffect(() => { fetchAllData(); }, []);
+
   useEffect(() => {
-    fetchAllData();
-  }, []);
+    if (selectedLead) loadLeadDetails(selectedLead.id);
+    else { setLeadInterests([]); setLeadActivities([]); }
+  }, [selectedLead?.id]);
+
+  const blankForm = () => ({
+    name: '', companyName: '', email: '', contact: '', location: '',
+    status: 'New', priority: 'Medium', source: 'Trade Show',
+    nextFollowUp: '', estimatedValue: 0, notes: '', industryType: 'Pharmacy'
+  });
 
   const handleOpenAdd = () => {
-    setFormData({
-      name: '',
-      companyName: '',
-      email: '',
-      contact: '',
-      location: '',
-      status: 'New',
-      priority: 'Medium',
-      source: 'Trade Show',
-      nextFollowUp: '',
-      estimatedValue: 0,
-      notes: '',
-      industryType: 'Pharmacy'
-    });
+    setFormData(blankForm());
+    setIsEditMode(false);
     setShowAddModal(true);
+  };
+
+  const handleEditLead = () => {
+    if (!selectedLead) return;
+    setFormData({
+      name: selectedLead.name || '',
+      companyName: selectedLead.company_name || '',
+      email: selectedLead.email || '',
+      contact: selectedLead.contact || '',
+      location: selectedLead.location || '',
+      status: selectedLead.status || 'New',
+      priority: selectedLead.priority || 'Medium',
+      source: selectedLead.source || 'Trade Show',
+      nextFollowUp: selectedLead.next_follow_up ? selectedLead.next_follow_up.split('T')[0] : '',
+      estimatedValue: Number(selectedLead.estimated_value) || 0,
+      notes: selectedLead.notes || '',
+      industryType: selectedLead.industry_type || 'Pharmacy',
+    });
+    setIsEditMode(true);
+    setShowAddModal(true);
+  };
+
+  const handleDiscardLead = async () => {
+    if (!selectedLead) return;
+    if (!window.confirm(`Discard opportunity for ${selectedLead.name}? This cannot be undone.`)) return;
+    setIsSaving(true);
+    try {
+      await crmService.deleteLead(selectedLead.id);
+      addNotification({ title: 'Discarded', message: `Opportunity for ${selectedLead.name} removed`, type: 'success', priority: 'medium' });
+      setShowDetailModal(false);
+      setSelectedLead(null);
+      fetchAllData();
+    } catch (err: any) {
+      addNotification({ title: 'Error', message: err.message || 'Failed to discard opportunity', type: 'error', priority: 'high' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveLead = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
-      if (selectedLead && !showAddModal) {
-        await crmService.updateLead(selectedLead.id, formData);
-        addNotification({ title: 'Success', message: 'Lead intelligence updated', type: 'success', priority: 'medium' });
+      if (isEditMode && selectedLead) {
+        const updated = await crmService.updateLead(selectedLead.id, formData);
+        setSelectedLead(updated);
+        addNotification({ title: 'Updated', message: 'Opportunity updated successfully', type: 'success', priority: 'medium' });
       } else {
         await crmService.createLead(formData);
-        addNotification({ title: 'Success', message: 'New opportunity registered', type: 'success', priority: 'medium' });
+        addNotification({ title: 'Registered', message: 'New opportunity registered', type: 'success', priority: 'medium' });
       }
       setShowAddModal(false);
-      setShowDetailModal(false);
+      setIsEditMode(false);
       fetchAllData();
     } catch (err: any) {
       addNotification({ title: 'Error', message: err.message || 'Operation failed', type: 'error', priority: 'high' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveInterest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLead || !interestForm.productId) return;
+    setSavingInterest(true);
+    try {
+      await crmService.addInterest(selectedLead.id, interestForm);
+      addNotification({ title: 'Linked', message: 'Product interest linked', type: 'success', priority: 'medium' });
+      setShowInterestModal(false);
+      setInterestForm({ productId: '', interestLevel: 'High', notes: '' });
+      loadLeadDetails(selectedLead.id);
+    } catch (err: any) {
+      addNotification({ title: 'Error', message: err.message || 'Failed to link product', type: 'error', priority: 'high' });
+    } finally {
+      setSavingInterest(false);
+    }
+  };
+
+  const handleDeleteInterest = async (interestId: string) => {
+    if (!selectedLead) return;
+    if (!window.confirm('Remove this product interest?')) return;
+    try {
+      await fetch(`/api/crm/leads/${selectedLead.id}/interests/${interestId}`, { method: 'DELETE' });
+      loadLeadDetails(selectedLead.id);
+    } catch {
+      addNotification({ title: 'Error', message: 'Failed to remove interest', type: 'error', priority: 'high' });
+    }
+  };
+
+  const handleSaveActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLead) return;
+    setSavingActivity(true);
+    try {
+      await crmService.addActivity(selectedLead.id, activityForm);
+      addNotification({ title: 'Logged', message: 'Activity recorded', type: 'success', priority: 'medium' });
+      setShowActivityModal(false);
+      setActivityForm({ type: 'CALL', description: '', outcome: '', followUpRequired: false, followUpDate: '' });
+      loadLeadDetails(selectedLead.id);
+      const updated = await crmService.getLead(selectedLead.id);
+      setSelectedLead(updated);
+    } catch (err: any) {
+      addNotification({ title: 'Error', message: err.message || 'Failed to log activity', type: 'error', priority: 'high' });
+    } finally {
+      setSavingActivity(false);
+    }
+  };
+
+  const handleDeleteActivity = async (actId: string) => {
+    if (!selectedLead) return;
+    if (!window.confirm('Remove this activity?')) return;
+    try {
+      await fetch(`/api/crm/leads/${selectedLead.id}/activities/${actId}`, { method: 'DELETE' });
+      loadLeadDetails(selectedLead.id);
+    } catch {
+      addNotification({ title: 'Error', message: 'Failed to remove activity', type: 'error', priority: 'high' });
     }
   };
 
@@ -285,6 +422,21 @@ const CRM: React.FC = () => {
     'New', 'Contacted', 'Qualified', 'Proposal', 'Negotiation'
   ], []);
 
+  const filteredLeads = useMemo(() => {
+    let list = leads;
+    if (boardPriority !== 'All') list = list.filter(l => l.priority === boardPriority);
+    if (boardSearch.trim()) {
+      const q = boardSearch.toLowerCase();
+      list = list.filter(l =>
+        l.name.toLowerCase().includes(q) ||
+        (l.company_name || '').toLowerCase().includes(q) ||
+        (l.location || '').toLowerCase().includes(q) ||
+        ((l as any).assignee_name || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [leads, boardSearch, boardPriority]);
+
   return (
     <ERPLayout
       title="Growth Command Center"
@@ -310,7 +462,7 @@ const CRM: React.FC = () => {
         {/* Unified Growth Metrics */}
         <StatCard label="PCD Network" value={stats?.active_pcd_partners || 0} icon={<MapPin className="text-rose-500" />} color="danger" trend="Active Partners" />
         <StatCard label="Recent Sales" value={`₹${(Number(stats?.monthly_sales_volume || 0) / 100000).toFixed(1)}L`} icon={<TrendingUp className="text-sky-500" />} color="info" trend="30d Volume" />
-        <StatCard label="Lead Velocity" value={`+${Math.floor(Math.random()*15 + 5)}%`} icon={<Zap className="text-amber-500" />} color="warning" trend="MoM Growth" />
+        <StatCard label="Lead Velocity" value={stats ? `${(stats.lead_velocity || 0) >= 0 ? '+' : ''}${stats.lead_velocity || 0}%` : '—'} icon={<Zap className="text-amber-500" />} color="warning" trend="MoM Growth" />
       </div>
 
       <Tabs 
@@ -324,22 +476,51 @@ const CRM: React.FC = () => {
       />
 
       {activeTab === 'BOARD' && (
-        <div className="flex gap-5 h-[calc(100vh-320px)] overflow-x-auto pb-4 custom-scrollbar">
-          {columns.map(col => (
-            <KanbanColumn 
-              key={col} 
-              title={col} 
-              status={col}
-              leads={leads.filter(l => l.status === col)} 
+        <div className="flex flex-col h-[calc(100vh-300px)]">
+          {/* Search + Filter bar */}
+          <div className="flex items-center gap-3 mb-4 flex-shrink-0">
+            <div className="relative flex-1 max-w-sm">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-blue-500 transition-colors"
+                placeholder="Search leads, companies, reps…"
+                value={boardSearch}
+                onChange={e => setBoardSearch(e.target.value)}
+              />
+              {boardSearch && (
+                <button onClick={() => setBoardSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <XCircle size={14} />
+                </button>
+              )}
+            </div>
+            <select
+              className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-black uppercase outline-none focus:border-blue-500 transition-colors"
+              value={boardPriority}
+              onChange={e => setBoardPriority(e.target.value)}
+            >
+              {['All', 'Urgent', 'High', 'Medium', 'Low'].map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            {(boardSearch || boardPriority !== 'All') && (
+              <span className="text-[10px] font-bold text-slate-400">{filteredLeads.length} of {leads.length} leads</span>
+            )}
+          </div>
+          <div className="flex gap-5 flex-1 overflow-x-auto pb-4 custom-scrollbar">
+            {columns.map(col => (
+              <KanbanColumn
+                key={col}
+                title={col}
+                status={col}
+                leads={filteredLeads.filter(l => l.status === col)}
+                onView={(l) => { setSelectedLead(l); setShowDetailModal(true); }}
+              />
+            ))}
+            <KanbanColumn
+              title="Post-Pipeline"
+              status="Converted"
+              leads={filteredLeads.filter(l => ['Converted', 'Lost', 'On Hold'].includes(l.status))}
               onView={(l) => { setSelectedLead(l); setShowDetailModal(true); }}
             />
-          ))}
-          <KanbanColumn 
-              title="Post-Pipeline" 
-              status="Converted"
-              leads={leads.filter(l => ['Converted', 'Lost', 'On Hold'].includes(l.status))} 
-              onView={(l) => { setSelectedLead(l); setShowDetailModal(true); }}
-          />
+          </div>
         </div>
       )}
 
@@ -503,14 +684,32 @@ const CRM: React.FC = () => {
                 <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center text-white rotate-3 shadow-xl">
                   <Briefcase size={36} />
                 </div>
-                <div>
+                <div className="flex-1">
                   <h2 className="text-3xl font-black text-slate-900 tracking-tighter leading-none">{selectedLead.name}</h2>
-                  <div className="flex items-center gap-3 mt-3">
+                  <div className="flex items-center gap-3 mt-3 flex-wrap">
                     <Badge text={selectedLead.status} variant={selectedLead.status === 'Converted' ? 'success' : 'info'} />
                     <span className="text-sm font-bold text-slate-400 flex items-center gap-1.5"><MapPin size={14} /> {selectedLead.location || 'HQ'}</span>
                     <span className="text-sm font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-widest text-[10px]">{selectedLead.industry_type}</span>
                   </div>
+                  {/* Status changer */}
+                  <div className="flex items-center gap-2 mt-3">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Move to:</span>
+                    {['New','Contacted','Qualified','Proposal','Negotiation'].filter(s => s !== selectedLead.status).map(s => (
+                      <button key={s} onClick={async () => {
+                        try {
+                          const updated = await crmService.updateLead(selectedLead.id, { ...selectedLead, status: s });
+                          setSelectedLead(updated);
+                          fetchAllData();
+                        } catch { addNotification({ title: 'Error', message: 'Status update failed', type: 'error', priority: 'high' }); }
+                      }} className="text-[9px] font-black uppercase px-2 py-1 rounded-lg bg-slate-100 hover:bg-blue-100 hover:text-blue-700 transition-all">
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+                <button onClick={handleEditLead} className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-blue-600 transition-all">
+                  <Edit3 size={14} /> Edit
+                </button>
               </div>
 
               <div className="grid grid-cols-2 gap-8 mb-10">
@@ -527,7 +726,7 @@ const CRM: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center"><span className="text-xs font-bold text-slate-500">Potential</span><span className="text-lg font-black text-emerald-600">{formatCurrency(selectedLead.estimated_value)}</span></div>
                     <div className="flex justify-between items-center"><span className="text-xs font-bold text-slate-500">Last Active</span><span className="text-xs font-bold text-slate-800">{formatDate(selectedLead.last_activity_at || selectedLead.created_at)}</span></div>
-                    <div className="flex justify-between items-center"><span className="text-xs font-bold text-slate-500">Assigned Rep</span><span className="text-xs font-bold text-blue-600">Field Agent #01</span></div>
+                    <div className="flex justify-between items-center"><span className="text-xs font-bold text-slate-500">Assigned Rep</span><span className="text-xs font-bold text-blue-600">{repUsers.find((u: any) => u.id === selectedLead.assigned_to)?.name || 'Unassigned'}</span></div>
                   </div>
                 </div>
               </div>
@@ -545,45 +744,84 @@ const CRM: React.FC = () => {
               <div className="space-y-4 mb-10">
                 <div className="flex items-center justify-between border-b pb-2">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Product Interests</h4>
-                  <button className="text-[10px] font-black text-blue-600 uppercase hover:underline">Link SKU</button>
+                  <button onClick={() => setShowInterestModal(true)} className="text-[10px] font-black text-blue-600 uppercase hover:underline">+ Link SKU</button>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                       <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600"><Package size={14}/></div>
-                       <div>
-                         <p className="text-xs font-bold text-slate-800">Augmentin 625</p>
-                         <p className="text-[9px] font-bold text-slate-400 uppercase">Antibiotic</p>
-                       </div>
-                    </div>
-                    <Badge text="High" variant="info" />
+                {loadingDetail ? (
+                  <p className="text-[10px] text-slate-400 italic">Loading...</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {leadInterests.map((i: any) => (
+                      <div key={i.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-between group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600"><Package size={14}/></div>
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">{i.product_name}</p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase">{i.product_category || i.therapeutic_category || '—'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Badge text={i.interest_level} variant="info" />
+                          <button onClick={() => handleDeleteInterest(i.id)} className="opacity-0 group-hover:opacity-100 p-1 text-rose-400 hover:text-rose-600 transition-all"><Trash2 size={12}/></button>
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={() => setShowInterestModal(true)} className="p-3 bg-white border border-dashed border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:border-blue-300 hover:text-blue-500 transition-all">
+                      <Plus size={14} className="mr-2" /> <span className="text-[10px] font-bold uppercase">Add Interest</span>
+                    </button>
                   </div>
-                  <div className="p-3 bg-white border border-slate-200 rounded-xl flex items-center justify-center border-dashed text-slate-400">
-                    <Plus size={14} className="mr-2" /> <span className="text-[10px] font-bold uppercase">Add Interest</span>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Activities Timeline */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b pb-2">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Activity Timeline</h4>
-                  <button className="text-[10px] font-black text-blue-600 uppercase hover:underline">Log Event</button>
+                  <button onClick={() => setShowActivityModal(true)} className="text-[10px] font-black text-blue-600 uppercase hover:underline">+ Log Event</button>
                 </div>
-                <div className="space-y-4 relative before:absolute before:left-[15px] before:top-2 before:bottom-0 before:w-0.5 before:bg-slate-100">
-                   <div className="flex gap-4 relative">
-                      <div className="w-8 h-8 rounded-full bg-blue-600 border-4 border-white flex items-center justify-center z-10 shadow-sm">
-                        <Phone size={12} className="text-white" />
-                      </div>
-                      <div className="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <div className="flex justify-between items-center mb-1">
-                          <p className="text-xs font-black text-slate-800 uppercase">Initial Discovery Call</p>
-                          <span className="text-[9px] font-bold text-slate-400">2 days ago</span>
+                {loadingDetail ? (
+                  <p className="text-[10px] text-slate-400 italic">Loading...</p>
+                ) : leadActivities.length === 0 ? (
+                  <div className="flex flex-col items-center py-6 text-slate-300">
+                    <Activity size={24} className="mb-2" />
+                    <p className="text-[10px] font-bold uppercase">No activities logged yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 relative before:absolute before:left-[15px] before:top-2 before:bottom-0 before:w-0.5 before:bg-slate-100">
+                    {leadActivities.map((a: any) => {
+                      const iconMap: Record<string, React.ReactNode> = {
+                        CALL: <Phone size={12} className="text-white" />,
+                        EMAIL: <Mail size={12} className="text-white" />,
+                        MEETING: <Users size={12} className="text-white" />,
+                        VISIT: <MapPin size={12} className="text-white" />,
+                      };
+                      const timeAgo = (d: string) => {
+                        const diff = Date.now() - new Date(d).getTime();
+                        const days = Math.floor(diff / 86400000);
+                        return days === 0 ? 'Today' : days === 1 ? '1 day ago' : `${days} days ago`;
+                      };
+                      return (
+                        <div key={a.id} className="flex gap-4 relative group">
+                          <div className="w-8 h-8 rounded-full bg-blue-600 border-4 border-white flex items-center justify-center z-10 shadow-sm flex-shrink-0">
+                            {iconMap[a.type] || <Activity size={12} className="text-white" />}
+                          </div>
+                          <div className="flex-1 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <div className="flex justify-between items-start mb-1">
+                              <p className="text-xs font-black text-slate-800 uppercase">{a.type} {a.outcome ? `— ${a.outcome}` : ''}</p>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[9px] font-bold text-slate-400">{timeAgo(a.performed_at || a.created_at)}</span>
+                                <button onClick={() => handleDeleteActivity(a.id)} className="opacity-0 group-hover:opacity-100 p-0.5 text-rose-400 hover:text-rose-600 transition-all"><Trash2 size={10}/></button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-slate-500">{a.description}</p>
+                            {a.follow_up_required && a.follow_up_date && (
+                              <p className="text-[9px] text-amber-600 font-bold mt-1">Follow-up: {formatDate(a.follow_up_date)}</p>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-500">Discussed wholesale pricing for upcoming hospital project.</p>
-                      </div>
-                   </div>
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3 mt-10">
@@ -595,8 +833,13 @@ const CRM: React.FC = () => {
                   {isAiProcessing ? <Activity className="animate-spin" /> : <ShieldCheck size={18} />}
                   Convert to Customer (Sync ERP)
                 </button>
-                <button className="px-6 py-4 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all">
-                  <MoreHorizontal size={20} className="text-slate-400" />
+                <button
+                  onClick={handleDiscardLead}
+                  disabled={isSaving}
+                  className="px-6 py-4 border border-rose-200 rounded-2xl hover:bg-rose-50 transition-all disabled:opacity-50"
+                  title="Discard this opportunity"
+                >
+                  <Trash2 size={20} className="text-rose-400" />
                 </button>
               </div>
             </div>
@@ -699,66 +942,160 @@ const CRM: React.FC = () => {
 
       {/* Add Modal */}
       {showAddModal && (
-        <Modal 
-          isOpen={true} 
-          onClose={() => setShowAddModal(false)}
-          title="Register New Enterprise Opportunity"
+        <Modal
+          isOpen={true}
+          onClose={() => { setShowAddModal(false); setIsEditMode(false); }}
+          title={isEditMode ? `Edit — ${formData.name}` : 'Register New Enterprise Opportunity'}
           size="lg"
         >
-           <form onSubmit={handleSaveLead} className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Identity</h4>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Lead Name *</label>
-                    <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Company / Entity</label>
-                    <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all" value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} />
-                  </div>
+          <form onSubmit={handleSaveLead} className="space-y-6">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Identity</h4>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Lead Name *</label>
+                  <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                 </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Classification</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Type</label>
-                      <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-black uppercase outline-none" value={formData.industryType} onChange={e => setFormData({...formData, industryType: e.target.value})}>
-                        {['Pharmacy', 'Hospital', 'Clinic', 'Distributor', 'PCD Partner'].map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Priority</label>
-                      <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-black uppercase outline-none" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
-                        {['Low', 'Medium', 'High', 'Urgent'].map(p => <option key={p} value={p}>{p}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Potential Value (₹)</label>
-                    <input type="number" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-emerald-600 outline-none" value={formData.estimatedValue} onChange={e => setFormData({...formData, estimatedValue: Number(e.target.value)})} />
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Company / Entity</label>
+                  <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all" value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Contact Number *</label>
+                  <input required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all" value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} placeholder="e.g. 9876543210" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Email</label>
+                  <input type="email" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="e.g. name@company.com" />
                 </div>
               </div>
 
-              <div className="space-y-2 pt-2">
-                 <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Strategy Notes</label>
-                 <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-4 focus:ring-blue-500/10 outline-none min-h-[100px]" placeholder="Brief context for the AI Agent..." value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b pb-2">Classification</h4>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Location</label>
+                  <input className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none transition-all" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="City / Territory" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Type</label>
+                    <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-black uppercase outline-none" value={formData.industryType} onChange={e => setFormData({...formData, industryType: e.target.value})}>
+                      {['Pharmacy', 'Hospital', 'Clinic', 'Distributor', 'PCD Partner'].map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Priority</label>
+                    <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-black uppercase outline-none" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}>
+                      {['Low', 'Medium', 'High', 'Urgent'].map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Source</label>
+                    <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-black uppercase outline-none" value={formData.source} onChange={e => setFormData({...formData, source: e.target.value})}>
+                      {['Referral', 'Trade Show', 'Cold Call', 'Website', 'LinkedIn', 'MR Visit', 'Other'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Status</label>
+                    <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-black uppercase outline-none" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                      {['New','Contacted','Qualified','Proposal','Negotiation'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Potential Value (₹)</label>
+                  <input type="number" min="0" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-emerald-600 outline-none" value={formData.estimatedValue} onChange={e => setFormData({...formData, estimatedValue: Number(e.target.value)})} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Next Follow-up</label>
+                  <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none" value={formData.nextFollowUp} onChange={e => setFormData({...formData, nextFollowUp: e.target.value})} />
+                </div>
               </div>
+            </div>
 
-              <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-6 py-3 text-xs font-black uppercase text-slate-400 hover:text-slate-600">Dismiss</button>
-                <button 
-                  type="submit" 
-                  disabled={isSaving}
-                  className="px-10 py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] flex items-center gap-3 hover:bg-blue-600 transition-all disabled:opacity-50"
-                >
-                  {isSaving ? <Activity className="animate-spin" size={16} /> : <Save size={16} />}
-                  Execute Registration
-                </button>
+            <div className="space-y-2 pt-2">
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Strategy Notes</label>
+              <textarea className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-4 focus:ring-blue-500/10 outline-none min-h-[80px]" placeholder="Brief context for the AI Agent..." value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+              <button type="button" onClick={() => { setShowAddModal(false); setIsEditMode(false); }} className="px-6 py-3 text-xs font-black uppercase text-slate-400 hover:text-slate-600">Cancel</button>
+              <button type="submit" disabled={isSaving} className="px-10 py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] flex items-center gap-3 hover:bg-blue-600 transition-all disabled:opacity-50">
+                {isSaving ? <Activity className="animate-spin" size={16} /> : <Save size={16} />}
+                {isEditMode ? 'Save Changes' : 'Execute Registration'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Link SKU Modal */}
+      {showInterestModal && (
+        <Modal isOpen={true} onClose={() => setShowInterestModal(false)} title="Link Product Interest" size="sm">
+          <form onSubmit={handleSaveInterest} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Product *</label>
+              <select required className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" value={interestForm.productId} onChange={e => setInterestForm({...interestForm, productId: e.target.value})}>
+                <option value="">— Select Product —</option>
+                {products.map((p: any) => <option key={p.id} value={p.id}>{p.name} ({p.generic_name})</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Interest Level</label>
+              <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" value={interestForm.interestLevel} onChange={e => setInterestForm({...interestForm, interestLevel: e.target.value})}>
+                {['Low', 'Medium', 'High'].map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Notes</label>
+              <textarea className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none min-h-[60px]" value={interestForm.notes} onChange={e => setInterestForm({...interestForm, notes: e.target.value})} placeholder="e.g. bulk order, sample request..." />
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <button type="button" onClick={() => setShowInterestModal(false)} className="px-5 py-2.5 text-xs font-black uppercase text-slate-400 hover:text-slate-600">Cancel</button>
+              <button type="submit" disabled={savingInterest} className="px-8 py-2.5 bg-slate-900 text-white rounded-xl font-black text-xs uppercase hover:bg-blue-600 transition-all disabled:opacity-50">
+                {savingInterest ? <Activity className="animate-spin" size={14} /> : 'Link SKU'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Log Event Modal */}
+      {showActivityModal && (
+        <Modal isOpen={true} onClose={() => setShowActivityModal(false)} title="Log Activity" size="sm">
+          <form onSubmit={handleSaveActivity} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Type</label>
+                <select className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" value={activityForm.type} onChange={e => setActivityForm({...activityForm, type: e.target.value})}>
+                  {['CALL', 'EMAIL', 'MEETING', 'VISIT', 'NOTE'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
-           </form>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Outcome</label>
+                <input className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none" value={activityForm.outcome} onChange={e => setActivityForm({...activityForm, outcome: e.target.value})} placeholder="e.g. Interested, No Answer" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Description *</label>
+              <textarea required className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none min-h-[80px]" value={activityForm.description} onChange={e => setActivityForm({...activityForm, description: e.target.value})} placeholder="What happened in this interaction?" />
+            </div>
+            <div className="flex items-center gap-3">
+              <input type="checkbox" id="followup" checked={activityForm.followUpRequired} onChange={e => setActivityForm({...activityForm, followUpRequired: e.target.checked})} className="w-4 h-4 rounded" />
+              <label htmlFor="followup" className="text-xs font-bold text-slate-600">Follow-up required</label>
+              {activityForm.followUpRequired && (
+                <input type="date" className="ml-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none" value={activityForm.followUpDate} onChange={e => setActivityForm({...activityForm, followUpDate: e.target.value})} />
+              )}
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <button type="button" onClick={() => setShowActivityModal(false)} className="px-5 py-2.5 text-xs font-black uppercase text-slate-400 hover:text-slate-600">Cancel</button>
+              <button type="submit" disabled={savingActivity} className="px-8 py-2.5 bg-slate-900 text-white rounded-xl font-black text-xs uppercase hover:bg-blue-600 transition-all disabled:opacity-50">
+                {savingActivity ? <Activity className="animate-spin" size={14} /> : 'Log Event'}
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
 

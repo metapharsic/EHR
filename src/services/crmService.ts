@@ -26,6 +26,8 @@ export interface Lead {
   created_at: string;
   updated_at: string;
   activity_count?: number;
+  assignee_name?: string;
+  last_activity_at?: string;
 }
 
 export interface LeadProductInterest {
