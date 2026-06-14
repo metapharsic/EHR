@@ -32,6 +32,7 @@ import MultiBranchDashboard from './components/MultiBranchDashboard';
 import { IntelligenceDashboard } from './components/IntelligenceDashboard';
 import TallyVoucherEntry from './components/TallyVoucherEntry';
 import POSTerminalModal from './components/POSTerminalModal';
+import { DeerflowGlobalDashboard } from './components/DeerflowGlobalDashboard';
 
 import { Tab } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -94,6 +95,7 @@ const AppContent: React.FC = () => {
       case Tab.VOUCHER_SETUP: return <VoucherSetupPage />;
       case Tab.INVENTORY_VOUCHERS: return <InventoryVouchers />;
       case Tab.TALLY_VOUCHER_ENTRY: return <TallyVoucherEntry />;
+      case Tab.DEERFLOW_DASHBOARD: return <DeerflowGlobalDashboard />;
       default: return <Dashboard />;
     }
   };

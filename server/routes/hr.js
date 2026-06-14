@@ -13,6 +13,7 @@ const ledgerHelper = require('../utils/ledgerHelper');
 const payrollEngine = require('../utils/hrPayrollEngine');
 const aiAgent = require('../services/aiHrAgent');
 const { v4: uuidv4 } = require('uuid');
+const { triggerWorkflow } = require('../services/deerflowClient');
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -262,6 +263,15 @@ router.post(
       } catch (_) { /* function may not exist yet */ }
 
       await client.query('COMMIT');
+
+      // Trigger Deerflow Workflow
+      setImmediate(() => {
+        triggerWorkflow({
+          workflowId: 'EMPLOYEE_ONBOARDING_INITIATED',
+          moduleId: 'HRMS',
+          payload: { employeeId: empId, name, email, departmentId: department_id, joinDate: join_date }
+        }).catch(err => logger.error('Deerflow onboarding trigger failed', { error: err.message }));
+      });
 
       // Trigger onboarding async (non-blocking)
       setImmediate(async () => {
@@ -1256,7 +1266,7 @@ router.put(
     let clearance_status = req.body.clearance_status;
     if (clearance_status === undefined) {
       clearance_status = req.body;
-    } object e.g. { IT: true, Finance: false }
+    } // object e.g. { IT: true, Finance: false }
     const result = await db.query(
       `UPDATE hr_offboarding_checklists SET clearance_status=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
       [JSON.stringify(clearance_status), req.params.id]

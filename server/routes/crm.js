@@ -4,6 +4,7 @@ const db = require('../db');
 const logger = require('../utils/logger');
 const { verifyTokenMiddleware } = require('../utils/jwt');
 const aiAgent = require('../services/aiCrmAgent');
+const { triggerWorkflow } = require('../services/deerflowClient');
 
 // Helper to wrap async routes
 const asyncRoute = (fn) => (req, res, next) => {
@@ -389,6 +390,16 @@ router.post('/convert/:id', verifyTokenMiddleware, asyncRoute(async (req, res) =
         );
 
         await client.query('COMMIT');
+        
+        // Trigger Deerflow Workflow
+        setImmediate(() => {
+            triggerWorkflow({
+                workflowId: 'LEAD_CONVERTED',
+                moduleId: 'CRM',
+                payload: { leadId: lead.id, partyId, name: lead.name, industryType: lead.industry_type }
+            }).catch(err => logger.error('Deerflow lead conversion trigger failed', { error: err.message }));
+        });
+
         res.json({ success: true, partyId, message: `Lead successfully converted to ${lead.industry_type === 'PCD Partner' ? 'PCD Partner' : 'Customer'}` });
     } catch (error) {
         if (client) await client.query('ROLLBACK');

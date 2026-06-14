@@ -17,6 +17,7 @@ import { useDataFetch, useDatabaseStatus, useSearch, usePagination } from '../ho
 import { useAuth } from '../context/AuthContext';
 import { useNotificationSystem } from '../hooks/useNotifications';
 import { formatCurrency, formatDate } from '../utils/formatters';
+import { DeerflowWidget } from './DeerflowWidget';
 
 // Sub-components
 import { DayBook } from './DayBook';
@@ -259,6 +260,9 @@ const Accounts: React.FC = () => {
  case 'FINANCIAL_SUMMARY':
  return (
  <div className="space-y-8 animate-fadeIn">
+ <div className="mb-6">
+   <DeerflowWidget workflowId="JOURNAL_VOUCHER_CREATED" />
+ </div>
  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
  <StatCard label="Total Receivables" value={formatCurrency(totals.receivables)} icon={<ArrowUpRight size={24}/>} color="blue" />
  <StatCard label="Total Payables" value={formatCurrency(totals.payables)} icon={<ArrowDownLeft size={24}/>} color="rose" />

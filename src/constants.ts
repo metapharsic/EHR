@@ -46,6 +46,7 @@ export const ROLE_ACCESS: Record<Tab, UserRole[]> = {
 
   [Tab.INTELLIGENCE_DASHBOARD]: ['ADMIN', 'PHARMACIST', 'SALES_MANAGER', 'INVENTORY_MANAGER'],
   [Tab.LEDGER_CREATION]: ['ADMIN', 'FINANCE_MANAGER'],
+  [Tab.DEERFLOW_DASHBOARD]: ['ADMIN', 'HR_MANAGER', 'FINANCE_MANAGER', 'SALES_MANAGER'],
 };
 
 // Helper to create legacy fields for POS compatibility
