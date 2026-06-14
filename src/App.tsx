@@ -38,6 +38,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { CompanyProvider } from './context/CompanyContext';
 import { KeyboardShortcutProvider } from './context/KeyboardShortcutContext';
 import { NotificationProvider, NotificationBell } from './context/NotificationContext';
+import { DeerflowProvider } from './context/DeerflowContext';
 import { useAppStore } from './store/useAppStore';
 import { Menu } from 'lucide-react';
 
@@ -128,7 +129,9 @@ const App: React.FC = () => {
         <CompanyProvider>
           <KeyboardShortcutProvider>
             <NotificationProvider>
-              <AppContent />
+              <DeerflowProvider>
+                <AppContent />
+              </DeerflowProvider>
             </NotificationProvider>
           </KeyboardShortcutProvider>
         </CompanyProvider>
