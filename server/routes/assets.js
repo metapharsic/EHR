@@ -88,17 +88,29 @@ router.post('/', verifyRoleMiddleware(['ADMIN', 'ACCOUNTANT']), async (req, res)
             }
         }
 
-        // Find Fixed Assets account
-        let accountId = '17a3f9a1-6927-4186-8642-46b7aae8b1f9'; // fallback default
+        // Find Fixed Assets account — create one if missing
+        let accountId;
         try {
             const accResult = await db.query(
-                "SELECT id FROM chart_of_accounts WHERE account_name = 'Fixed Assets' OR account_code = 'AST-003' LIMIT 1"
+                "SELECT id FROM chart_of_accounts WHERE account_name ILIKE '%fixed asset%' OR account_code IN ('AST-003','FA-001') LIMIT 1"
             );
             if (accResult.rows.length > 0) {
                 accountId = accResult.rows[0].id;
+            } else {
+                // Insert a Fixed Assets account and use its id
+                const inserted = await db.query(
+                    `INSERT INTO chart_of_accounts (account_name, account_code, account_type)
+                     VALUES ('Fixed Assets', 'FA-001', 'Asset')
+                     ON CONFLICT (account_code) DO UPDATE SET account_name = EXCLUDED.account_name
+                     RETURNING id`
+                );
+                accountId = inserted.rows[0].id;
             }
         } catch (accErr) {
-            console.error('Error finding chart_of_accounts entry for assets:', accErr);
+            console.error('Error finding/creating chart_of_accounts entry for assets:', accErr);
+            // Last resort: pick any Asset-type account
+            const fallback = await db.query("SELECT id FROM chart_of_accounts WHERE account_type = 'Asset' LIMIT 1");
+            if (fallback.rows.length > 0) accountId = fallback.rows[0].id;
         }
 
         const specs = {

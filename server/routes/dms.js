@@ -117,7 +117,6 @@ router.get('/versions', verifyTokenMiddleware, async (req, res) => {
                 v.uploaded_name as "uploadedBy",
                 v.created_at as "uploadDate",
                 v.file_size_bytes as "fileSize",
-                v.status,
                 v.change_log as "changeLog",
                 v.approved_by as "approvedBy",
                 v.approval_date as "approvalDate"
