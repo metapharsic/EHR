@@ -234,6 +234,7 @@ const omsPortalRoutes = require('./routes/omsPortal');
 app.use('/api/portal', omsPortalRoutes);
 app.use('/api/compliance', complianceRoutes);
 app.use('/api', inventoryRoutesFull); // Support /api/godowns, /api/stock-ledger etc.
+app.use('/api', manufacturingRoutes); // Support /api/boms, /api/raw-materials etc.
 app.use('/api', posRoutes);       // Support /api/parties
 app.use('/uploads', require('express').static(require('path').join(__dirname, '..', 'uploads')));
 require('./services/complianceCron').startComplianceCron();

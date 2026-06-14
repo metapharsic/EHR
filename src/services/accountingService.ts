@@ -1274,6 +1274,11 @@ export const BOMService = {
     const r = await fetch(`${API}/boms/${id}`, { method: 'PUT', headers: hdr(), body: JSON.stringify(data) });
     if (!r.ok) throw new Error('Failed to update BOM');
     return r.json();
+  },
+  delete: async (id: string) => {
+    const r = await fetch(`${API}/boms/${id}`, { method: 'DELETE', headers: hdr() });
+    if (!r.ok) throw new Error('Failed to delete BOM');
+    return r.json();
   }
 };
 

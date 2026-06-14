@@ -42,7 +42,7 @@ router.get('/godowns', verifyTokenMiddleware, verify2FAMiddleware, async (req, r
         const companyId = req.user.companyId || 1;
         const result = await db.query(
             `SELECT id, company_id, name, address, manager_id, is_default, status, 
-                    created_at, updated_at
+                    parent, is_third_party, manager, created_at, updated_at
              FROM godowns 
              WHERE company_id = $1 AND status != 'Deleted'
              ORDER BY is_default DESC, name ASC`,
@@ -67,7 +67,9 @@ router.get('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (re
         const companyId = req.user.companyId || 1;
         
         const result = await db.query(
-            `SELECT * FROM godowns WHERE id = $1 AND company_id = $2`,
+            `SELECT id, company_id, name, address, manager_id, is_default, status, 
+                    parent, is_third_party, manager, created_at, updated_at
+             FROM godowns WHERE id = $1 AND company_id = $2`,
             [id, companyId]
         );
         
@@ -85,7 +87,7 @@ router.get('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (re
 // POST: Create new godown
 router.post('/godowns', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
-        const { id, name, address, manager_id, is_default } = req.body;
+        const { id, name, address, manager_id, is_default, parent, isThirdParty, is_third_party, manager, isActive, status } = req.body;
         const companyId = req.user.companyId || 1;
         
         // Validate required fields
@@ -94,11 +96,15 @@ router.post('/godowns', verifyTokenMiddleware, verify2FAMiddleware, async (req, 
         }
         
         const godownId = id || uuidv4();
+        const finalStatus = status || (isActive === false ? 'Inactive' : 'Active');
+        const finalIsThirdParty = is_third_party !== undefined ? is_third_party : (isThirdParty !== undefined ? isThirdParty : false);
+        const finalParent = parent || 'Primary';
+        
         const result = await db.query(
-            `INSERT INTO godowns (id, company_id, name, address, manager_id, is_default, status)
-             VALUES ($1, $2, $3, $4, $5, $6, 'Active')
-             RETURNING id, company_id, name, address, manager_id, is_default, status, created_at, updated_at`,
-            [godownId, companyId, name, address || null, manager_id || null, is_default || false]
+            `INSERT INTO godowns (id, company_id, name, address, manager_id, is_default, status, parent, is_third_party, manager)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             RETURNING id, company_id, name, address, manager_id, is_default, status, parent, is_third_party, manager, created_at, updated_at`,
+            [godownId, companyId, name, address || null, manager_id || null, is_default || false, finalStatus, finalParent, finalIsThirdParty, manager || null]
         );
         
         console.log('✅ Godown created:', result.rows[0]);
@@ -117,8 +123,11 @@ router.post('/godowns', verifyTokenMiddleware, verify2FAMiddleware, async (req, 
 router.put('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, address, manager_id, status } = req.body;
+        const { name, address, manager_id, status, parent, isThirdParty, is_third_party, manager, isActive } = req.body;
         const companyId = req.user.companyId || 1;
+        
+        const finalStatus = status !== undefined ? status : (isActive !== undefined ? (isActive ? 'Active' : 'Inactive') : null);
+        const finalIsThirdParty = is_third_party !== undefined ? is_third_party : (isThirdParty !== undefined ? isThirdParty : null);
         
         const result = await db.query(
             `UPDATE godowns 
@@ -126,10 +135,23 @@ router.put('/godowns/:id', verifyTokenMiddleware, verify2FAMiddleware, async (re
                  address = COALESCE($2, address),
                  manager_id = COALESCE($3, manager_id),
                  status = COALESCE($4, status),
+                 parent = COALESCE($5, parent),
+                 is_third_party = COALESCE($6, is_third_party),
+                 manager = COALESCE($7, manager),
                  updated_at = CURRENT_TIMESTAMP
-             WHERE id = $5 AND company_id = $6
-             RETURNING id, company_id, name, address, manager_id, is_default, status, created_at, updated_at`,
-            [name, address, manager_id, status, id, companyId]
+             WHERE id = $8 AND company_id = $9
+             RETURNING id, company_id, name, address, manager_id, is_default, status, parent, is_third_party, manager, created_at, updated_at`,
+            [
+                name !== undefined ? name : null,
+                address !== undefined ? address : null,
+                manager_id !== undefined ? manager_id : null,
+                finalStatus !== undefined ? finalStatus : null,
+                parent !== undefined ? parent : null,
+                finalIsThirdParty !== undefined ? finalIsThirdParty : null,
+                manager !== undefined ? manager : null,
+                id,
+                companyId
+            ]
         );
         
         if (result.rows.length === 0) {
@@ -952,7 +974,7 @@ router.post('/stock-journals', verifyTokenMiddleware, verify2FAMiddleware, async
             await client.query(
                 `INSERT INTO stock_journal_items (id, journal_id, product_id, godown_id, batch_id, qty, rate, amount) 
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [itemId, journalId, item.productId, item.godownId || null, item.batchId || null, item.qty, item.rate || 0, item.amount || 0]
+                [itemId, journalId, item.productId, item.godownId || item.godown || null, item.batchId || null, item.qty, item.rate || 0, item.amount || 0]
             );
 
             const absoluteQty = Math.abs(item.qty);
@@ -962,7 +984,7 @@ router.post('/stock-journals', verifyTokenMiddleware, verify2FAMiddleware, async
             // Stock Ledger Posting
             await postToStockLedger(client, {
                 companyId: companyId,
-                godownId: item.godownId || null,
+                godownId: item.godownId || item.godown || null,
                 productId: item.productId,
                 batchId: item.batchId || null,
                 movementType: movementType,
@@ -1026,13 +1048,13 @@ router.post('/stock-transfers', verifyTokenMiddleware, verify2FAMiddleware, asyn
             await client.query(
                 `INSERT INTO stock_transfer_items (id, transfer_id, product_id, godown_id, batch_id, qty, rate, amount) 
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [itemId, transferId, item.productId, item.godownId || null, item.batchId || null, item.qty, item.rate || 0, item.amount || 0]
+                [itemId, transferId, item.productId, item.godownId || item.godown || null, item.batchId || null, item.qty, item.rate || 0, item.amount || 0]
             );
 
             // Outward ledger entry
             await postToStockLedger(client, {
                 companyId: companyId,
-                godownId: item.godownId || null,
+                godownId: item.godownId || item.godown || null,
                 productId: item.productId,
                 batchId: item.batchId || null,
                 movementType: 'OUT',

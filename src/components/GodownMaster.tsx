@@ -25,15 +25,15 @@ export const GodownMaster: React.FC = () => {
  const defaultForm = { name: '', parent: 'Primary', manager: '', address: '', isThirdParty: false, isActive: true };
  const [form, setForm] = useState(defaultForm);
 
- const loadGodowns = useCallback(async () => {
- setLoading(true);
- try {
- const data = await GodownService.getAll();
- setGodowns(Array.isArray(data) ? data : []);
- } catch {
- setGodowns(DEMO_GODOWNS);
- } finally { setLoading(false); }
- }, []);
+  const loadGodowns = useCallback(async () => {
+  setLoading(true);
+  try {
+  const data = await GodownService.getAll();
+  setGodowns(Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []));
+  } catch {
+  setGodowns(DEMO_GODOWNS);
+  } finally { setLoading(false); }
+  }, []);
 
  useEffect(() => { if (view === 'LIST') loadGodowns(); }, [view, loadGodowns]);
 

@@ -35,6 +35,7 @@ const helmetMiddleware = helmet({
       ],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'self'", "blob:"],
+      frameSrc: ["'self'", "blob:"],
       upgradeInsecureRequests: []
     }
   },

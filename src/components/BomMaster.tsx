@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Save, Search, Plus, Wrench, PackagePlus, Download, Printer, Pencil } from 'lucide-react';
+import { Save, Search, Plus, Wrench, PackagePlus, Download, Printer, Pencil, Trash } from 'lucide-react';
 import { DenseGrid, ColumnDef } from './common/DenseGrid';
 import { BOMService } from '../services/accountingService';
 import { utils, writeFile } from 'xlsx';
@@ -41,7 +41,7 @@ export const BomMaster: React.FC = () => {
  setLoading(true);
  try {
  const data = await BOMService.getAll();
- setBoms(Array.isArray(data) ? data : []);
+ setBoms(Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []));
  } catch {
  setBoms(DEMO_BOMS);
  } finally { setLoading(false); }
@@ -74,6 +74,22 @@ export const BomMaster: React.FC = () => {
  setTimeout(() => setSuccessMsg(''), 3000);
  }
  };
+
+ const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
+    setLoading(true);
+    try {
+      await BOMService.delete(id);
+      setBoms(prev => prev.filter(b => b.id !== id));
+      setSuccessMsg('BOM deleted successfully');
+    } catch (err) {
+      console.error(err);
+      setSuccessMsg('Failed to delete BOM');
+    } finally {
+      setLoading(false);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    }
+  };
 
  const handleExport = () => {
  const wb = utils.book_new();
@@ -211,8 +227,9 @@ export const BomMaster: React.FC = () => {
  <td className="p-3 border-r border-slate-100 text-center text-xs font-bold text-green-700">{b.batchYield}</td>
  <td className="p-3 border-r border-slate-100 text-center text-xs font-bold text-slate-500">{(b.materials || []).length}</td>
  <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-800">?{(b.stdCost || 0).toFixed(2)}</td>
- <td className="p-3 text-center opacity-0 group-hover:opacity-100 transition-opacity">
- <button onClick={() => { setEditingId(b.id); setForm({ bomName: b.bomName, targetItem: b.targetItem, batchYield: b.batchYield, isActive: b.isActive }); setMaterials(b.materials || defaultMaterials); setView('FORM'); }} className="p-1 text-amber-600 hover:bg-amber-50 rounded"><Pencil size={13}/></button>
+ <td className="p-3 text-center opacity-0 group-hover:opacity-100 transition-opacity flex justify-center gap-1">
+ <button onClick={() => { setEditingId(b.id); setForm({ bomName: b.bomName, targetItem: b.targetItem, batchYield: b.batchYield, isActive: b.isActive }); setMaterials(b.materials || defaultMaterials); setView('FORM'); }} className="p-1 text-amber-600 hover:bg-amber-50 rounded" title="Edit"><Pencil size={13}/></button>
+ <button onClick={() => handleDelete(b.id, b.bomName)} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Delete"><Trash size={13}/></button>
  </td>
  </tr>
  ))}

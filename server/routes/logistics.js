@@ -45,7 +45,49 @@ router.get('/', async (req, res) => {
     const total = parseInt(countResult.rows[0].count);
 
     const query = `
-      SELECT *
+      SELECT 
+        id,
+        invoice_no as "invoiceNo",
+        customer_name as "customerName",
+        customer_address as "customerAddress",
+        customer_city as "customerCity",
+        customer_state as "customerState",
+        customer_pincode as "customerPincode",
+        dispatch_date as "dispatchDate",
+        expected_delivery_date as "expectedDeliveryDate",
+        actual_delivery_date as "actualDeliveryDate",
+        transporter,
+        transporter_id as "transporterId",
+        lr_number as "lrNumber",
+        eway_bill_no as "ewayBillNo",
+        eway_bill_date as "ewayBillDate",
+        boxes,
+        weight,
+        volume,
+        package_type as "packageType",
+        fragile,
+        temperature_controlled as "temperatureControlled",
+        insurance_value as "insuranceValue",
+        insurance_company as "insuranceCompany",
+        cod_amount as "codAmount",
+        shipping_cost as "shippingCost",
+        handling_charges as "handlingCharges",
+        total_charges as "totalCharges",
+        payment_mode as "paymentMode",
+        status,
+        delivery_attempts as "deliveryAttempts",
+        delivery_person as "deliveryPerson",
+        delivery_signature as "deliverySignature",
+        delivery_remarks as "deliveryRemarks",
+        vehicle_number as "vehicleNumber",
+        driver_name as "driverName",
+        driver_contact as "driverContact",
+        route_details as "routeDetails",
+        distance_covered as "distanceCovered",
+        fuel_consumed as "fuelConsumed",
+        tracking_updates as "trackingUpdates",
+        created_at as "createdAt",
+        updated_at as "updatedAt"
       FROM dispatches
       ${whereClause}
       ORDER BY ${sort} ${sortOrder}

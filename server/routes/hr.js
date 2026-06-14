@@ -470,6 +470,55 @@ router.delete(
   })
 );
 
+router.post(
+  '/employees/:id/terminate',
+  verifyTokenMiddleware,
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  asyncRoute(async (req, res) => {
+    const { id } = req.params;
+    const { exit_date, exit_reason } = req.body || {};
+    const client = await db.getClient();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `UPDATE employees SET status='Terminated', exit_date=$1, exit_reason=$2, updated_at=NOW() WHERE id=$3 RETURNING *`,
+        [exit_date || new Date(), exit_reason || null, id]
+      );
+      if (!result.rows.length) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ success: false, error: 'Employee not found' });
+      }
+      await client.query(
+        `INSERT INTO hr_employee_timeline (id, employee_id, event_type, description, event_date, performed_by, created_at)
+         VALUES ($1,$2,'Terminated','Employee terminated',$3,$4,NOW())`,
+        [uuidv4(), id, exit_date || new Date(), req.user.userId]
+      );
+      if (exit_date) {
+        // trigger offboarding async
+        setImmediate(async () => {
+          try {
+            await db.query(
+              `INSERT INTO hr_offboarding_checklists (id, employee_id, exit_date, status, initiated_by, created_at)
+               VALUES ($1,$2,$3,'Initiated',$4,NOW()) ON CONFLICT (employee_id) DO NOTHING`,
+              [uuidv4(), id, exit_date, req.user.userId]
+            );
+          } catch (e) {
+            logger.error('Offboarding trigger failed', { error: e.message });
+          }
+        });
+      }
+      await client.query('COMMIT');
+      res.json({ success: true, data: result.rows[0] });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('Failed to terminate employee', { error: error.message });
+      res.status(500).json({ success: false, error: error.message });
+    } finally {
+      client.release();
+    }
+  })
+);
+
 // ═══════════════════════════════════════════════════════════════════════════
 // DOCUMENTS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1204,7 +1253,10 @@ router.put(
   '/offboarding/:id/clearance',
   verifyTokenMiddleware,
   asyncRoute(async (req, res) => {
-    const { clearance_status } = req.body; // JSONB object e.g. { IT: true, Finance: false }
+    let clearance_status = req.body.clearance_status;
+    if (clearance_status === undefined) {
+      clearance_status = req.body;
+    } object e.g. { IT: true, Finance: false }
     const result = await db.query(
       `UPDATE hr_offboarding_checklists SET clearance_status=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
       [JSON.stringify(clearance_status), req.params.id]
@@ -2265,14 +2317,15 @@ router.post('/rewards', verifyTokenMiddleware, asyncRoute(async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 router.get('/analytics/headcount', verifyTokenMiddleware, asyncRoute(async (req, res) => {
-  const [byDept, byGrade, byType, byLocation, totalRes] = await Promise.all([
-    db.query(`SELECT d.name AS department, COUNT(e.id)::INT AS count FROM employees e LEFT JOIN hr_departments d ON d.id=e.department_id WHERE e.status='Active' GROUP BY d.name ORDER BY count DESC`),
-    db.query(`SELECT dg.grade, COUNT(e.id)::INT AS count FROM employees e LEFT JOIN hr_designations dg ON dg.id=e.designation_id WHERE e.status='Active' GROUP BY dg.grade ORDER BY count DESC`),
-    db.query(`SELECT employment_type, COUNT(*)::INT AS count FROM employees WHERE status='Active' GROUP BY employment_type`),
-    db.query(`SELECT work_location AS location, COUNT(*)::INT AS count FROM employees WHERE status='Active' GROUP BY work_location ORDER BY count DESC`),
-    db.query(`SELECT COUNT(*)::INT FROM employees WHERE status='Active'`),
+  const [byDept, byGrade, byType, byLocation, totalRes, activeRes] = await Promise.all([
+    db.query(`SELECT d.name AS department, COUNT(e.id)::INT AS count FROM employees e LEFT JOIN hr_departments d ON d.id=e.department_id WHERE LOWER(e.status)='active' GROUP BY d.name ORDER BY count DESC`),
+    db.query(`SELECT dg.grade, COUNT(e.id)::INT AS count FROM employees e LEFT JOIN hr_designations dg ON dg.id=e.designation_id WHERE LOWER(e.status)='active' GROUP BY dg.grade ORDER BY count DESC`),
+    db.query(`SELECT employment_type, COUNT(*)::INT AS count FROM employees WHERE LOWER(status)='active' GROUP BY employment_type`),
+    db.query(`SELECT work_location AS location, COUNT(*)::INT AS count FROM employees WHERE LOWER(status)='active' GROUP BY work_location ORDER BY count DESC`),
+    db.query(`SELECT COUNT(*)::INT FROM employees WHERE LOWER(status) != 'terminated'`),
+    db.query(`SELECT COUNT(*)::INT FROM employees WHERE LOWER(status)='active'`),
   ]);
-  res.json({ success: true, data: { total: totalRes.rows[0].count, byDept: byDept.rows, byGrade: byGrade.rows, byType: byType.rows, byLocation: byLocation.rows } });
+  res.json({ success: true, data: { total: totalRes.rows[0].count, active: activeRes.rows[0].count, byDept: byDept.rows, byGrade: byGrade.rows, byType: byType.rows, byLocation: byLocation.rows } });
 }));
 
 router.get('/analytics/attrition', verifyTokenMiddleware, asyncRoute(async (req, res) => {
@@ -2287,7 +2340,7 @@ router.get('/analytics/attrition', verifyTokenMiddleware, asyncRoute(async (req,
     ORDER BY month DESC
   `);
   
-  const totalEmployeesRes = await db.query(`SELECT COUNT(*)::INT FROM employees WHERE status='Active'`);
+  const totalEmployeesRes = await db.query(`SELECT COUNT(*)::INT FROM employees WHERE LOWER(status)='active'`);
   const activeCount = parseInt(totalEmployeesRes.rows[0].count || 0, 10);
   const exitsCount = result.rows.reduce((sum, row) => sum + row.exits, 0);
   const totalEmployees = activeCount + exitsCount;
@@ -2298,7 +2351,7 @@ router.get('/analytics/attrition', verifyTokenMiddleware, asyncRoute(async (req,
 
 router.get('/analytics/diversity', verifyTokenMiddleware, asyncRoute(async (req, res) => {
   const [gender, ageBands] = await Promise.all([
-    db.query(`SELECT gender, COUNT(*)::INT AS count FROM employees WHERE status='Active' AND gender IS NOT NULL GROUP BY gender`),
+    db.query(`SELECT gender, COUNT(*)::INT AS count FROM employees WHERE LOWER(status)='active' AND gender IS NOT NULL GROUP BY gender`),
     db.query(`
       SELECT
         CASE
@@ -2308,7 +2361,7 @@ router.get('/analytics/diversity', verifyTokenMiddleware, asyncRoute(async (req,
           ELSE '50+'
         END AS age_band,
         COUNT(*)::INT AS count
-      FROM employees WHERE status='Active' AND dob IS NOT NULL
+      FROM employees WHERE LOWER(status)='active' AND dob IS NOT NULL
       GROUP BY age_band
     `),
   ]);
@@ -2366,7 +2419,7 @@ router.get('/analytics/compliance-score', verifyTokenMiddleware, asyncRoute(asyn
   const [ackRes, incRes, empCount] = await Promise.all([
     db.query(`SELECT COUNT(DISTINCT employee_id)::INT AS acked FROM hr_policy_acknowledgments`),
     db.query(`SELECT COUNT(*)::INT AS total, COUNT(*) FILTER (WHERE status='Resolved')::INT AS resolved FROM hr_incidents`),
-    db.query(`SELECT COUNT(*)::INT AS total FROM employees WHERE status='Active'`),
+    db.query(`SELECT COUNT(*)::INT AS total FROM employees WHERE LOWER(status)='active'`),
   ]);
   const totalEmp = parseInt(empCount.rows[0]?.total) || 1;
   const ackRate = Math.round((parseInt(ackRes.rows[0]?.acked) / totalEmp) * 100);
@@ -2383,7 +2436,7 @@ router.post('/ai/attrition', verifyTokenMiddleware, asyncRoute(async (req, res) 
   const emps = await db.query(`
     SELECT e.*, d.name AS department_name FROM employees e
     LEFT JOIN hr_departments d ON d.id = e.department_id
-    WHERE e.status = 'Active'
+    WHERE LOWER(e.status) = 'active'
   `);
   const result = await aiAgent.predictAttrition(emps.rows);
   res.json({ success: true, data: result });
@@ -2410,17 +2463,24 @@ router.post('/ai/promotion-readiness/:empId', verifyTokenMiddleware, asyncRoute(
 }));
 
 router.post('/ai/weekly-briefing', verifyTokenMiddleware, asyncRoute(async (req, res) => {
-  const [headcount, leaves, incidents] = await Promise.all([
-    db.query(`SELECT COUNT(*) FILTER (WHERE status='Active')::INT AS active, COUNT(*) FILTER (WHERE status='Terminated')::INT AS terminated FROM employees`),
-    db.query(`SELECT COUNT(*) FILTER (WHERE status='Pending')::INT AS pending_leaves FROM hr_leaves WHERE created_at >= NOW() - INTERVAL '7 days'`),
-    db.query(`SELECT COUNT(*) FILTER (WHERE status='Open')::INT AS open_incidents FROM hr_incidents`),
+  const [activeRes, totalRes, pendingLeavesRes, openIncidentsRes, pendingPayrollRes, newJoinersRes] = await Promise.all([
+    db.query(`SELECT COUNT(*)::INT FROM employees WHERE LOWER(status)='active'`),
+    db.query(`SELECT COUNT(*)::INT FROM employees WHERE LOWER(status) != 'terminated'`),
+    db.query(`SELECT COUNT(*)::INT FROM hr_leaves WHERE status='Pending'`),
+    db.query(`SELECT * FROM hr_incidents WHERE status='Open'`),
+    db.query(`SELECT COUNT(*)::INT FROM salary_slips WHERE payment_status='Pending'`),
+    db.query(`SELECT COUNT(*)::INT FROM employees WHERE join_date >= NOW() - INTERVAL '7 days' AND LOWER(status) != 'terminated'`),
   ]);
-  const context = {
-    headcount: headcount.rows[0],
-    leaves: leaves.rows[0],
-    incidents: incidents.rows[0],
+
+  const stats = {
+    total_employees: totalRes.rows[0].count,
+    active_employees: activeRes.rows[0].count,
+    pending_leaves: pendingLeavesRes.rows[0].count,
+    pending_payroll: pendingPayrollRes.rows[0].count,
+    new_joiners: newJoinersRes.rows[0].count,
   };
-  const result = await aiAgent.generateWeeklyHRBriefing(context);
+
+  const result = await aiAgent.generateWeeklyHRBriefing(stats, openIncidentsRes.rows);
   res.json({ success: true, data: result });
 }));
 

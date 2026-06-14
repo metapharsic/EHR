@@ -289,7 +289,6 @@ router.get('/invoices', async (req, res) => {
             date_to     = '',
             payment_mode= '',
             status      = '',
-            source_type = '',
             sort_by     = 'date',
             sort_order  = 'desc',
             page        = '0',
@@ -302,10 +301,7 @@ router.get('/invoices', async (req, res) => {
         const pageOffset    = (parseInt(page) || 0) * pageLimit;
 
         const params = [];
-        // When no source_type filter: show all (POS + PCD + OMS). Legacy rows without source_type excluded by old PCD prefix guard.
-        let where = source_type
-          ? "WHERE 1=1"
-          : "WHERE (si.source_type IS NULL OR si.source_type != 'PCD' OR si.invoice_number NOT LIKE 'PCD-BF-%')";
+        let where = "WHERE si.invoice_number NOT LIKE 'PCD-%'";
 
         if (search) {
             params.push(`%${search}%`);
@@ -315,7 +311,6 @@ router.get('/invoices', async (req, res) => {
         if (date_to)   { params.push(date_to);   where += ` AND si.date::date <= $${params.length}`; }
         if (payment_mode) { params.push(payment_mode); where += ` AND si.payment_mode = $${params.length}`; }
         if (status)       { params.push(status);       where += ` AND si.status = $${params.length}`; }
-        if (source_type)  { params.push(source_type);  where += ` AND si.source_type = $${params.length}`; }
 
         const countParams = [...params];
         params.push(pageLimit, pageOffset);
@@ -495,16 +490,15 @@ router.post('/invoices', async (req, res) => {
         const userId = req.user?.userId || req.user?.id;
 
         // 1. Create Invoice Header
-        const invoiceIdToUse = req.body.id || uuidv4();
         const invoiceResult = await client.query(
             `INSERT INTO sales_invoices (
-                id, invoice_number, date, customer_name, customer_mobile, doctor_name,
-                payment_mode, sub_total, taxable_value, total_gst, total_discount,
-                round_off, net_amount, status, created_by, party_id, source_type
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'POS')
+                invoice_number, date, customer_name, customer_mobile, doctor_name, 
+                payment_mode, sub_total, taxable_value, total_gst, total_discount, 
+                round_off, net_amount, status, created_by, party_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             RETURNING id`,
             [
-                invoiceIdToUse, invoice_number, date, customer_name, customer_mobile, doctor_name,
+                invoice_number, date, customer_name, customer_mobile, doctor_name,
                 payment_mode, sub_total, taxable_value, total_gst, total_discount,
                 round_off, net_amount, 'Completed', userId, party_id
             ]
