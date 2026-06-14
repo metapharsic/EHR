@@ -64,7 +64,10 @@ const AuditLog: React.FC = () => {
  return {
  total: logs.length,
  today: logs.filter(l => l.timestamp.startsWith(today)).length,
- critical: logs.filter(l => l.action.toLowerCase().includes('failed') || l.action.toLowerCase().includes('delete')).length
+ critical: logs.filter(l => {
+ const a = (l.action || '').toLowerCase();
+ return a.includes('fail') || a.includes('delete') || a.includes('breach') || a.includes('error');
+ }).length
  };
  }, [logs]);
 
@@ -97,7 +100,7 @@ const AuditLog: React.FC = () => {
  <div className="flex gap-3">
  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
  <div>
- <h3 className="font-semibold text-red-900">??� Database Connection Failed</h3>
+ <h3 className="font-semibold text-red-900">??� Database Connection Failed</h3>
  <p className="text-red-700 text-sm mt-1">{dbStatus.error}</p>
  <button onClick={handleRefresh} className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">?? Retry</button>
  </div>
@@ -176,30 +179,46 @@ const AuditLog: React.FC = () => {
  width: '18%',
  render: (value) => <span className="text-xs font-mono text-slate-500">{value}</span>
  },
- { 
- key: 'user', 
- label: 'User', 
+ {
+ key: 'user',
+ label: 'User',
  width: '15%',
- render: (value) => (
+ render: (value) => {
+ const display = value && value !== 'System' ? value : 'System';
+ const initial = display.charAt(0).toUpperCase();
+ const isSystem = display === 'System';
+ return (
  <div className="flex items-center gap-2">
- <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
- {value?.charAt(0) || 'U'}
+ <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${isSystem ? 'bg-slate-100 text-slate-400' : 'bg-blue-100 text-blue-700'}`}>
+ {initial}
  </div>
- <span className="text-xs font-medium">{value}</span>
+ <span className={`text-xs font-medium ${isSystem ? 'text-slate-400 italic' : 'text-slate-700'}`}>{display}</span>
  </div>
- )
+ );
+ }
  },
- { 
- key: 'module', 
- label: 'Module', 
+ {
+ key: 'module',
+ label: 'Module',
  width: '12%',
- render: (value) => <Badge text={value} variant="info" />
+ render: (value) => value
+ ? <Badge text={value} variant="info" />
+ : <span className="text-[10px] text-slate-300">—</span>
  },
- { 
- key: 'action', 
- label: 'Action', 
+ {
+ key: 'action',
+ label: 'Action',
  width: '20%',
- render: (value) => <span className="font-medium text-slate-800">{value}</span>
+ render: (value) => {
+ if (!value) return <span className="text-slate-300">—</span>;
+ const isAlert = value.includes('BREACH') || value.includes('FAIL') || value.includes('ERROR') || value.includes('DELETE');
+ const isSuccess = value.includes('LOGIN') || value.includes('CREATE') || value.includes('UPDATE');
+ return (
+ <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+ isAlert ? 'bg-red-50 text-red-700' : isSuccess ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-700'
+ }`}>{value}</span>
+ );
+ }
  },
  { 
  key: 'ipAddress', 

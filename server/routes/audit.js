@@ -26,32 +26,36 @@ router.get('/', async (req, res) => {
     let params = [];
 
     if (search) {
-      whereClause += ' AND (action ILIKE $' + (params.length + 1) + 
-                     ' OR COALESCE(error_message, changes::text) ILIKE $' + (params.length + 1) + ')';
+      whereClause += ` AND (al.action ILIKE $${params.length + 1}
+                       OR COALESCE(u.name, u.email, '') ILIKE $${params.length + 1}
+                       OR COALESCE(al.error_message, al.details::text, al.changes::text) ILIKE $${params.length + 1})`;
       params.push(`%${search}%`);
     }
 
     if (module !== 'ALL') {
-      whereClause += ' AND module = $' + (params.length + 1);
+      // match either the stored module or the derived module (action prefix before first underscore)
+      whereClause += ` AND (al.module = $${params.length + 1} OR (al.module IS NULL AND SPLIT_PART(al.action, '_', 1) = $${params.length + 1}))`;
       params.push(module);
     }
 
-    const countQuery = `SELECT COUNT(*) FROM audit_logs ${whereClause}`;
+    const countQuery = `SELECT COUNT(*) FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id ${whereClause}`;
     const countResult = await db.query(countQuery, params);
     const total = parseInt(countResult.rows[0].count);
 
     const query = `
-      SELECT 
-        id,
-        user_id as "user",
-        action,
-        module,
-        COALESCE(error_message, changes::text) as details,
-        ip_address as "ipAddress",
-        created_at as timestamp
-      FROM audit_logs
+      SELECT
+        al.id,
+        COALESCE(u.name, u.email, 'System') AS "user",
+        al.action,
+        COALESCE(al.module, SPLIT_PART(al.action, '_', 1)) AS module,
+        COALESCE(al.error_message, al.details::text, al.changes::text) AS details,
+        al.ip_address AS "ipAddress",
+        al.created_at AS timestamp,
+        al.status
+      FROM audit_logs al
+      LEFT JOIN users u ON u.id = al.user_id
       ${whereClause}
-      ORDER BY created_at ${sortOrder}
+      ORDER BY al.created_at ${sortOrder}
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `;
 
