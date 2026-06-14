@@ -19,16 +19,12 @@ export const DeerflowGlobalDashboard: React.FC = () => {
   const fetchWorkflows = async () => {
     setLoading(true);
     try {
-      // In a real scenario, this would fetch from a central endpoint.
-      // For Phase 2, we simulate fetching the latest active workflows triggered across modules.
-      const simulatedData: WorkflowInstance[] = [
-        { id: '1', workflowId: 'EMPLOYEE_ONBOARDING_INITIATED', moduleId: 'HRMS', status: 'IN_PROGRESS', createdAt: new Date().toISOString() },
-        { id: '2', workflowId: 'JOURNAL_VOUCHER_CREATED', moduleId: 'ACCOUNTING', status: 'COMPLETED', createdAt: new Date(Date.now() - 3600000).toISOString() },
-        { id: '3', workflowId: 'LEAD_CONVERTED', moduleId: 'CRM', status: 'FAILED', createdAt: new Date(Date.now() - 7200000).toISOString() }
-      ];
-      setWorkflows(simulatedData);
+      const response = await apiClient.get('/deerflow/workflows?limit=20');
+      const data = response.data?.data ?? response.data ?? [];
+      setWorkflows(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch global workflows', err);
+      setWorkflows([]);
     } finally {
       setLoading(false);
     }
@@ -66,6 +62,14 @@ export const DeerflowGlobalDashboard: React.FC = () => {
         </button>
       </div>
 
+      {!loading && workflows.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-24 text-gray-500">
+          <Activity className="w-12 h-12 mb-4 opacity-30" />
+          <p className="text-lg font-medium">No workflow executions recorded yet.</p>
+          <p className="text-sm mt-1">Workflows triggered from HRMS, CRM, and Accounting will appear here.</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {workflows.map(wf => (
           <div key={wf.id} className="relative group p-6 rounded-xl bg-gray-800/50 border border-gray-700 hover:border-blue-500/50 transition-all duration-300 hover:-translate-y-1 shadow-lg overflow-hidden">
@@ -87,7 +91,7 @@ export const DeerflowGlobalDashboard: React.FC = () => {
                 {new Date(wf.createdAt).toLocaleTimeString()}
               </span>
               <button 
-                onClick={() => refresh(wf.id)}
+                onClick={() => refresh(wf.workflowId)}
                 className="text-sm text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
               >
                 Sync Status

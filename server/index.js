@@ -226,6 +226,8 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/logistics', logisticsRoutes);
 app.use('/api/audit', auditRoutes);
+const deerflowRoutes = require('./routes/deerflow');
+app.use('/api/deerflow', deerflowRoutes);
 app.use('/api/qc', qcRoutes);
 app.use('/api/rnd', rndRoutes);
 app.use('/api/sales', salesRoutes);

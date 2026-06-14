@@ -15,12 +15,15 @@ export const DeerflowProvider: React.FC<{children: React.ReactNode}> = ({ childr
 
   const refresh = async (id: string) => {
     try {
-      // In a real scenario, this would go through your ERP's API Gateway
-      const response = await fetch(`/api/deerflow/workflows/${id}/status`);
+      const token = localStorage.getItem('erp_token') || localStorage.getItem('token') || '';
+      const response = await fetch(`/api/deerflow/workflows/${id}/status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       setState({ workflowId: id, status: data.status });
     } catch (error) {
-      console.error("Failed to refresh Deerflow status:", error);
+      console.warn("Deerflow status refresh failed:", error);
     }
   };
 
