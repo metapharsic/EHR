@@ -634,19 +634,82 @@ const BackupTab: React.FC<{ addNotification: Function; onFactoryReset: () => voi
   const [restoreError, setRestoreError] = useState('');
   const [restoreSuccess, setRestoreSuccess] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [coverage, setCoverage] = useState<{ label: string; present: boolean }[]>([]);
+  const [coverageLoaded, setCoverageLoaded] = useState(false);
+
+  // Load coverage status on mount — tells user which sections have data
+  useEffect(() => {
+    (async () => {
+      const [company, params, notifs, security, appearance] = await Promise.allSettled([
+        settingsService.getCompany(),
+        settingsService.getParameters(),
+        settingsService.getNotifications(),
+        settingsService.getSecurity(),
+        settingsService.getAppearance(),
+      ]);
+      setCoverage([
+        { label: 'Company Profile',           present: !!(company.status === 'fulfilled' && company.value) },
+        { label: 'Application Parameters',    present: !!(params.status === 'fulfilled' && params.value) },
+        { label: 'Notification Preferences',  present: !!(notifs.status === 'fulfilled' && notifs.value) },
+        { label: 'Security Policy',           present: !!(security.status === 'fulfilled' && security.value) },
+        { label: 'Appearance Settings',       present: !!(appearance.status === 'fulfilled' && appearance.value) },
+      ]);
+      setCoverageLoaded(true);
+    })();
+  }, []);
 
   const handleBackup = async () => {
     setIsBackingUp(true);
     try {
-      const exportData = await settingsService.exportAll();
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      // Gather from all service methods (API-first, localStorage fallback) — NOT the raw /export endpoint
+      const [company, appParameters, notificationPreferences, securityPolicy, appearance] = await Promise.all([
+        settingsService.getCompany(),
+        settingsService.getParameters(),
+        settingsService.getNotifications(),
+        settingsService.getSecurity(),
+        settingsService.getAppearance(),
+      ]);
+
+      const sectionsPresent = [company, appParameters, notificationPreferences, securityPolicy, appearance]
+        .filter(Boolean).length;
+
+      if (sectionsPresent === 0) {
+        addNotification({
+          type: 'warning', title: 'Nothing to Export',
+          message: 'No settings have been saved yet. Configure and save your Company Profile and Application Parameters first.',
+          priority: 'medium', module: 'SYSTEM',
+        });
+        return;
+      }
+
+      const exportPayload = {
+        metadata: {
+          version: '4.2.0',
+          exportedAt: new Date().toISOString(),
+          appName: 'Metapharsic Lifesciences ERP',
+          type: 'full_settings_backup',
+          sectionsExported: sectionsPresent,
+        },
+        company,
+        appParameters,
+        notificationPreferences,
+        securityPolicy,
+        appearance,
+      };
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `metapharsic_backup_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
-      addNotification({ type: 'success', title: 'Backup Downloaded', message: 'Full settings backup (from server database) downloaded.', priority: 'low', module: 'SYSTEM' });
+
+      addNotification({
+        type: 'success', title: 'Backup Downloaded',
+        message: `${sectionsPresent}/5 settings sections exported successfully.`,
+        priority: 'low', module: 'SYSTEM',
+      });
     } catch (err: any) {
       addNotification({ type: 'error', title: 'Backup Failed', message: err?.message || 'Failed to export settings.', priority: 'high', module: 'SYSTEM' });
     } finally { setIsBackingUp(false); }
@@ -664,18 +727,40 @@ const BackupTab: React.FC<{ addNotification: Function; onFactoryReset: () => voi
       try {
         const parsed = JSON.parse(reader.result as string);
         const payload = parsed.data || parsed;
-        if (!payload.company && !payload.appParameters && !payload.notificationPreferences) {
-          throw new Error('Invalid backup format — missing required settings keys');
+
+        // Accept any valid backup that has at least one recognisable section
+        const hasAnySection = payload.company || payload.appParameters ||
+          payload.notificationPreferences || payload.securityPolicy || payload.appearance;
+        if (!hasAnySection) {
+          throw new Error('Invalid backup file — no recognisable settings sections found. Only use files exported from this ERP.');
         }
+
         await settingsService.importAll(payload);
         setRestoreSuccess(true);
+
+        // Refresh coverage after restore
+        setCoverageLoaded(false);
+        const [company, params, notifs, security, appearance] = await Promise.allSettled([
+          settingsService.getCompany(), settingsService.getParameters(),
+          settingsService.getNotifications(), settingsService.getSecurity(), settingsService.getAppearance(),
+        ]);
+        setCoverage([
+          { label: 'Company Profile',          present: !!(company.status === 'fulfilled' && company.value) },
+          { label: 'Application Parameters',   present: !!(params.status === 'fulfilled' && params.value) },
+          { label: 'Notification Preferences', present: !!(notifs.status === 'fulfilled' && notifs.value) },
+          { label: 'Security Policy',          present: !!(security.status === 'fulfilled' && security.value) },
+          { label: 'Appearance Settings',      present: !!(appearance.status === 'fulfilled' && appearance.value) },
+        ]);
+        setCoverageLoaded(true);
+
+        const exportedAt = payload.metadata?.exportedAt;
         addNotification({
           type: 'success', title: 'Settings Restored',
-          message: `Backup from ${payload.metadata?.exportedAt ? new Date(payload.metadata.exportedAt).toLocaleDateString('en-IN') : 'unknown date'} restored. Please refresh.`,
+          message: `Backup from ${exportedAt ? new Date(exportedAt).toLocaleDateString('en-IN') : 'unknown date'} restored. Please refresh.`,
           priority: 'medium', module: 'SYSTEM',
         });
       } catch (err: any) {
-        setRestoreError(err.message || 'Failed to restore. Ensure it is a valid Metapharsic ERP backup.');
+        setRestoreError(err.message || 'Failed to restore. Ensure it is a valid Metapharsic ERP backup file.');
       } finally {
         setIsRestoring(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -683,6 +768,8 @@ const BackupTab: React.FC<{ addNotification: Function; onFactoryReset: () => voi
     };
     reader.readAsText(file);
   };
+
+  const presentCount = coverage.filter(c => c.present).length;
 
   return (
     <div className="space-y-6">
@@ -694,14 +781,43 @@ const BackupTab: React.FC<{ addNotification: Function; onFactoryReset: () => voi
             <div>
               <h4 className="font-semibold text-blue-800 text-sm">Settings & Configuration Export</h4>
               <p className="text-xs text-blue-700 mt-1">
-                Downloads a complete snapshot of your ERP configuration — company profile, application parameters, 
-                WhatsApp settings, and notification preferences. Use this to migrate to a new device or restore after a reset.
+                Downloads a complete snapshot of your ERP configuration — company profile, application parameters,
+                notification preferences, security policy, and appearance settings.
               </p>
             </div>
           </div>
+
+          {/* Coverage status */}
+          {coverageLoaded && (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wide">Export Coverage</span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${presentCount === 5 ? 'bg-green-100 text-green-700' : presentCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                  {presentCount}/5 sections ready
+                </span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {coverage.map(({ label, present }) => (
+                  <div key={label} className="flex items-center justify-between px-4 py-2">
+                    <span className="text-xs text-slate-600">{label}</span>
+                    {present
+                      ? <CheckCircle size={14} className="text-green-500" />
+                      : <span className="text-[10px] text-amber-600 font-medium">Not saved yet</span>
+                    }
+                  </div>
+                ))}
+              </div>
+              {presentCount < 5 && (
+                <div className="px-4 py-2 bg-amber-50 border-t border-amber-100">
+                  <p className="text-[10px] text-amber-700">Save missing sections first for a complete backup.</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <button
             onClick={handleBackup}
-            disabled={isBackingUp}
+            disabled={isBackingUp || (coverageLoaded && presentCount === 0)}
             className="flex items-center gap-3 px-5 py-3 border-2 border-slate-200 rounded-xl hover:border-green-400 hover:bg-green-50 transition-all group disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isBackingUp
@@ -712,7 +828,7 @@ const BackupTab: React.FC<{ addNotification: Function; onFactoryReset: () => voi
               <p className="font-semibold text-slate-700 group-hover:text-green-700 transition-colors">
                 {isBackingUp ? 'Preparing Backup…' : 'Download Settings Backup'}
               </p>
-              <p className="text-xs text-slate-400">.json format · includes all configuration</p>
+              <p className="text-xs text-slate-400">.json format · {coverageLoaded ? `${presentCount}/5 sections` : 'includes all configuration'}</p>
             </div>
           </button>
         </div>
@@ -739,7 +855,7 @@ const BackupTab: React.FC<{ addNotification: Function; onFactoryReset: () => voi
           )}
           {restoreSuccess && (
             <div className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg flex items-center gap-2 text-sm">
-              <CheckCircle size={15} /> Settings restored successfully. Please refresh the page to apply changes.
+              <CheckCircle size={15} /> Settings restored successfully. Please refresh the page to apply all changes.
             </div>
           )}
 
@@ -764,7 +880,7 @@ const BackupTab: React.FC<{ addNotification: Function; onFactoryReset: () => voi
               <p className="font-semibold text-slate-700 group-hover:text-amber-700 transition-colors">
                 {isRestoring ? 'Restoring…' : 'Select Backup File'}
               </p>
-              <p className="text-xs text-slate-400">Select a .json backup file from your device</p>
+              <p className="text-xs text-slate-400">Select a .json backup file exported from this ERP</p>
             </div>
           </button>
         </div>
