@@ -1,4 +1,4 @@
-import axios from 'axios';
+const axios = require('axios');
 
 const api = axios.create({
   baseURL: process.env.DEERFLOW_BASE_URL || 'http://localhost:8080/api',
@@ -10,7 +10,7 @@ const api = axios.create({
  * @param {Object} payload 
  * @returns {Promise<any>}
  */
-export async function triggerWorkflow(payload) {
+async function triggerWorkflow(payload) {
   const resp = await api.post('/workflows/trigger', payload);
   return resp.data;
 }
@@ -20,7 +20,12 @@ export async function triggerWorkflow(payload) {
  * @param {string} workflowId 
  * @returns {Promise<any>}
  */
-export async function getWorkflowStatus(workflowId) {
+async function getWorkflowStatus(workflowId) {
   const resp = await api.get(`/workflows/${workflowId}/status`);
   return resp.data;
 }
+
+module.exports = {
+  triggerWorkflow,
+  getWorkflowStatus
+};
