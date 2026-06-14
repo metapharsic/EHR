@@ -165,7 +165,7 @@ export const CostCenterManager: React.FC = () => {
  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${CATEGORY_COLORS[cc.category] || 'bg-slate-100 text-slate-500'} border-transparent`}>{cc.category}</span>
  </td>
  <td className="p-3 border-r border-slate-100 text-slate-600">{cc.manager || '-'}</td>
- <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-800">{cc.budget ? `?${cc.budget.toLocaleString()}` : '-'}</td>
+ <td className="p-3 border-r border-slate-100 text-right font-bold text-slate-800">{cc.budget ? `₹${cc.budget.toLocaleString()}` : '-'}</td>
  <td className="p-3 border-r border-slate-100 text-center">
  <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border ${cc.isActive ? 'bg-green-100 text-green-700 border-green-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
  {cc.isActive ? 'Active' : 'Inactive'}
@@ -186,7 +186,7 @@ export const CostCenterManager: React.FC = () => {
 
  <div className="bg-[#1D3557] text-white flex text-sm font-bold px-4 py-2 shrink-0">
  <div className="flex-1 text-xs uppercase tracking-wider text-slate-300">{costCenters.length} Cost Centers</div>
- <div className="text-right text-xs">Total Budget: ?{costCenters.reduce((s, cc) => s + (cc.budget || 0), 0).toLocaleString()}</div>
+ <div className="text-right text-xs">Total Budget: ₹{costCenters.reduce((s, cc) => s + (cc.budget || 0), 0).toLocaleString()}</div>
  </div>
  </div>
  );

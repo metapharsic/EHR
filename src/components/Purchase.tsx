@@ -76,7 +76,7 @@ const Purchase: React.FC = () => {
   return (
     <ERPLayout
       title="Purchase Management"
-      description="Purchase Orders • Supplier Management • Stock Replenishment"
+      description="Purchase Orders ï¿½ Supplier Management ï¿½ Stock Replenishment"
       actionButtons={[
         { label: 'Refresh', onClick: refetch, icon: <RefreshCcw className="w-4 h-4" /> },
         canCreate && { label: 'New PO', onClick: () => {}, icon: <Plus className="w-4 h-4" />, variant: 'primary' }
@@ -86,7 +86,7 @@ const Purchase: React.FC = () => {
         <StatCard icon={<FileText className="w-5 h-5" />} label="Total Orders" value={stats.totalOrders} color="blue" />
         <StatCard icon={<Clock className="w-5 h-5" />} label="Pending" value={stats.pending} color="amber" />
         <StatCard icon={<CheckCircle className="w-5 h-5" />} label="Received" value={stats.received} color="emerald" />
-        <StatCard icon={<Truck className="w-5 h-5" />} label="Total Value" value={`?${(stats.totalValue/100000).toFixed(1)}L`} color="purple" />
+        <StatCard icon={<Truck className="w-5 h-5" />} label="Total Value" value={`â‚¹${(stats.totalValue/100000).toFixed(1)}L`} color="purple" />
       </div>
 
       <FilterBar

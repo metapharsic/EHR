@@ -45,7 +45,7 @@ const qs = (params: Record<string, any> = {}) => {
     if (v !== undefined && v !== null && v !== '') sp.append(k, String(v));
   });
   const s = sp.toString();
-  return s ? `?${s}` : '';
+  return s ? `₹${s}` : '';
 };
 
 export const omsService = {

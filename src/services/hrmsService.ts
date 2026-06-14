@@ -22,7 +22,7 @@ const ok = <T>(r: any): T => (r?.data !== undefined ? r.data : r);
 const qs = (p: Record<string, any> = {}) => {
   const s = new URLSearchParams();
   Object.entries(p).forEach(([k, v]) => { if (v != null && v !== '') s.append(k, String(v)); });
-  const q = s.toString(); return q ? `?${q}` : '';
+  const q = s.toString(); return q ? `₹${q}` : '';
 };
 
 export const hrmsService = {

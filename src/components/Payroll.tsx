@@ -291,7 +291,7 @@ const Payroll: React.FC = () => {
  <div className="text-xs text-slate-500">ID: {emp.id.slice(0, 8)}...</div>
  </td>
  <td className="p-4 text-slate-600">Medical Rep (Field)</td>
- <td className="p-4 text-right font-medium text-slate-500">?{(emp.baseSalary || 20000).toLocaleString()}</td>
+ <td className="p-4 text-right font-medium text-slate-500">₹{(emp.baseSalary || 20000).toLocaleString()}</td>
  <td className="p-4 text-center">
  {existingSlip ? (
  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
@@ -304,7 +304,7 @@ const Payroll: React.FC = () => {
  )}
  </td>
  <td className="p-4 text-right font-bold text-slate-800">
- {existingSlip ? `?${existingSlip.netPay.toLocaleString()}` : '-'}
+ {existingSlip ? `₹${existingSlip.netPay.toLocaleString()}` : '-'}
  </td>
  <td className="p-4 text-center">
  {existingSlip ? (
@@ -359,7 +359,7 @@ const Payroll: React.FC = () => {
  <FileText size={18}/> 
  {modalMode === 'VIEW' ? 'Salary Slip View' : modalMode === 'EDIT' ? 'Edit Payroll' : 'Process Payroll'}
  </h3>
- <p className="text-xs text-slate-400 mt-0.5">{selectedEmployee.name} � {currentSlip.month} {currentSlip.year}</p>
+ <p className="text-xs text-slate-400 mt-0.5">{selectedEmployee.name} � {currentSlip.month} {currentSlip.year}</p>
  </div>
  <div className="flex gap-2">
  {modalMode === 'VIEW' && (
@@ -413,7 +413,7 @@ const Payroll: React.FC = () => {
  <div className="mt-8 pt-4 border-t border-slate-200">
  <div className="flex justify-between items-center mb-4">
  <span className="text-sm font-bold text-slate-700">Net Payable</span>
- <span className="text-lg font-bold text-primary">?{currentSlip.netPay.toLocaleString()}</span>
+ <span className="text-lg font-bold text-primary">₹{currentSlip.netPay.toLocaleString()}</span>
  </div>
  <button 
  onClick={handleSaveSlip}
@@ -490,8 +490,8 @@ const Payroll: React.FC = () => {
 
  {/* Totals */}
  <div className="flex justify-between items-center bg-slate-100 p-3 border border-slate-300 mb-6 font-bold text-slate-800 text-xs">
- <div className="w-1/2 text-center">Gross Earnings: ?{currentSlip.grossSalary.toLocaleString()}</div>
- <div className="w-1/2 text-center border-l border-slate-300">Total Deductions: ?{currentSlip.totalDeductions.toLocaleString()}</div>
+ <div className="w-1/2 text-center">Gross Earnings: ₹{currentSlip.grossSalary.toLocaleString()}</div>
+ <div className="w-1/2 text-center border-l border-slate-300">Total Deductions: ₹{currentSlip.totalDeductions.toLocaleString()}</div>
  </div>
 
  {/* Net Pay */}

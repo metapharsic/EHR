@@ -95,7 +95,7 @@ export const PdcManagement: React.FC = () => {
  <div className="flex gap-2">
  <button 
  onClick={() => {
- const rows = pdcs.map(p => `<tr><td>${p.type}</td><td>${p.pdcDate}</td><td>${p.party}</td><td>${p.chqNo}</td><td>${p.bank}</td><td>${p.status}</td><td class="text-right">?${p.amount.toLocaleString()}</td></tr>`).join('');
+ const rows = pdcs.map(p => `<tr><td>${p.type}</td><td>${p.pdcDate}</td><td>${p.party}</td><td>${p.chqNo}</td><td>${p.bank}</td><td>${p.status}</td><td class="text-right">₹${p.amount.toLocaleString()}</td></tr>`).join('');
  printReport('Post-Dated Cheques Register', `<table><thead><tr><th>Type</th><th>PDC Date</th><th>Party</th><th>Chq No</th><th>Bank</th><th>Status</th><th class="text-right">Amount</th></tr></thead><tbody>${rows}</tbody></table>`, company);
  }}
  className="flex items-center gap-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-sm font-bold shadow-sm transition-colors"

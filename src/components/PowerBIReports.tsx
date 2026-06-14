@@ -431,16 +431,16 @@ const PowerBIReports: React.FC<PowerBIReportsProps> = ({ data = [], reportType =
  {forecastData.map((row, idx) => (
  <tr key={idx}>
  <td className="p-2 font-medium">{row.period}</td>
- <td className="p-2 text-right font-bold text-accent">?{row.forecast.toLocaleString()}</td>
- <td className="p-2 text-right text-slate-500">?{row.lowerBound.toLocaleString()}</td>
- <td className="p-2 text-right text-slate-500">?{row.upperBound.toLocaleString()}</td>
+ <td className="p-2 text-right font-bold text-accent">‚Çπ{row.forecast.toLocaleString()}</td>
+ <td className="p-2 text-right text-slate-500">‚Çπ{row.lowerBound.toLocaleString()}</td>
+ <td className="p-2 text-right text-slate-500">‚Çπ{row.upperBound.toLocaleString()}</td>
  <td className="p-2 text-center">
  <span className={`px-2 py-0.5 rounded-full text-xs ${
  row.trend === 'up' ? 'bg-green-100 text-green-700' :
  row.trend === 'down' ? 'bg-red-100 text-red-700' :
  'bg-slate-100 text-slate-700'
  }`}>
- {row.trend === 'up' ? '??è Up' : row.trend === 'down' ? '??è Down' : '??è Stable'}
+ {row.trend === 'up' ? '??ÔøΩ Up' : row.trend === 'down' ? '??ÔøΩ Down' : '??ÔøΩ Stable'}
  </span>
  </td>
  </tr>

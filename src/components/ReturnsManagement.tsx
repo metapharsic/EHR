@@ -226,7 +226,7 @@ const ReturnsManagement: React.FC = () => {
  {returnNote.total_value && (
  <div className="mt-2 flex items-center gap-2 text-sm font-medium text-slate-700">
  <DollarSign size={16} />
- ?{returnNote.total_value.toLocaleString()}
+ ₹{returnNote.total_value.toLocaleString()}
  </div>
  )}
  </div>

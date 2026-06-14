@@ -155,7 +155,7 @@ const Sales: React.FC = () => {
  <div className="flex gap-3">
  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
  <div>
- <h3 className="font-semibold text-red-900">??� Database Connection Failed</h3>
+ <h3 className="font-semibold text-red-900">??� Database Connection Failed</h3>
  <p className="text-red-700 text-sm mt-1">{dbStatus.error}</p>
  <button onClick={handleRefresh} className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg text-sm">?? Retry</button>
  </div>
@@ -179,13 +179,13 @@ const Sales: React.FC = () => {
  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
  <StatCard 
  title="Total Revenue (All Time)" 
- value={`?${stats.totalRevenue.toLocaleString()}`} 
+ value={`₹${stats.totalRevenue.toLocaleString()}`} 
  color="blue" 
  icon={<TrendingUp size={20} />} 
  />
  <StatCard 
  title="Monthly Sales" 
- value={`?${stats.monthlyRevenue.toLocaleString()}`} 
+ value={`₹${stats.monthlyRevenue.toLocaleString()}`} 
  color="success" 
  icon={<ShoppingBag size={20} />} 
  />
@@ -275,7 +275,7 @@ const Sales: React.FC = () => {
  label: 'Amount', 
  width: '15%',
  align: 'right',
- render: (val) => <span className="font-bold">?{Number(val).toLocaleString()}</span>
+ render: (val) => <span className="font-bold">₹{Number(val).toLocaleString()}</span>
  },
  { 
  key: 'status', 
@@ -364,7 +364,7 @@ const Sales: React.FC = () => {
  label: 'Outstanding', 
  width: '15%',
  align: 'right',
- render: (val) => <span className={`font-bold ${Number(val) > 0 ? 'text-red-600' : 'text-green-600'}`}>?{Math.abs(Number(val)).toLocaleString()}</span>
+ render: (val) => <span className={`font-bold ${Number(val) > 0 ? 'text-red-600' : 'text-green-600'}`}>₹{Math.abs(Number(val)).toLocaleString()}</span>
  },
  { 
  key: 'status', 
@@ -401,7 +401,7 @@ const Sales: React.FC = () => {
  style={{ height: `${h}%` }}
  >
  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
- ?{(h * 10000).toLocaleString()}
+ ₹{(h * 10000).toLocaleString()}
  </div>
  </div>
  <span className="text-[10px] font-bold text-slate-400">M{i+1}</span>
@@ -509,8 +509,8 @@ const Sales: React.FC = () => {
  <tr key={idx}>
  <td className="px-4 py-2 font-medium">{item.name}</td>
  <td className="px-4 py-2 text-center">{item.quantity}</td>
- <td className="px-4 py-2 text-right">?{item.rate.toLocaleString()}</td>
- <td className="px-4 py-2 text-right">?{(item.quantity * item.rate).toLocaleString()}</td>
+ <td className="px-4 py-2 text-right">₹{item.rate.toLocaleString()}</td>
+ <td className="px-4 py-2 text-right">₹{(item.quantity * item.rate).toLocaleString()}</td>
  <td className="px-4 py-2 text-center">
  <button 
  type="button" 
@@ -531,7 +531,7 @@ const Sales: React.FC = () => {
  <tfoot className="bg-slate-50 font-bold">
  <tr>
  <td colSpan={3} className="px-4 py-2 text-right uppercase text-[10px]">Total Taxable</td>
- <td className="px-4 py-2 text-right">?{invoiceForm.items.reduce((s, i) => s + (i.quantity * i.rate), 0).toLocaleString()}</td>
+ <td className="px-4 py-2 text-right">₹{invoiceForm.items.reduce((s, i) => s + (i.quantity * i.rate), 0).toLocaleString()}</td>
  <td></td>
  </tr>
  </tfoot>
@@ -614,15 +614,15 @@ const Sales: React.FC = () => {
  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
  <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
  <p className="text-[10px] text-slate-400 font-bold uppercase">Sub Total</p>
- <p className="text-lg font-bold">?{Number(selectedInvoice.total_taxable || 0).toLocaleString()}</p>
+ <p className="text-lg font-bold">₹{Number(selectedInvoice.total_taxable || 0).toLocaleString()}</p>
  </div>
  <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
  <p className="text-[10px] text-slate-400 font-bold uppercase">Total Tax</p>
- <p className="text-lg font-bold text-orange-600">?{Number(selectedInvoice.total_gst || (Number(selectedInvoice.total_cgst || 0) + Number(selectedInvoice.total_sgst || 0) + Number(selectedInvoice.total_igst || 0))).toLocaleString()}</p>
+ <p className="text-lg font-bold text-orange-600">₹{Number(selectedInvoice.total_gst || (Number(selectedInvoice.total_cgst || 0) + Number(selectedInvoice.total_sgst || 0) + Number(selectedInvoice.total_igst || 0))).toLocaleString()}</p>
  </div>
  <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
  <p className="text-[10px] text-primary/60 font-bold uppercase">Net Payable</p>
- <p className="text-lg font-bold text-primary">?{Number(selectedInvoice.net_payable).toLocaleString()}</p>
+ <p className="text-lg font-bold text-primary">₹{Number(selectedInvoice.net_payable).toLocaleString()}</p>
  </div>
  </div>
  </section>

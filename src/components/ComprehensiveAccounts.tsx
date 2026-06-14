@@ -214,7 +214,7 @@ const ComprehensiveAccounts: React.FC = () => {
  }
  setAccountsLoading(false);
  } catch (error) {
- console.error('??� Using demo Chart of Accounts:', error);
+ console.error('??� Using demo Chart of Accounts:', error);
  // Fallback to Tally ERP-like demo data
  const demoAccounts = [
  // ASSET ACCOUNTS
@@ -289,7 +289,7 @@ const ComprehensiveAccounts: React.FC = () => {
  console.log('? Journal Vouchers loaded:', Array.isArray(vouchers) ? vouchers.length + ' vouchers' : 'Not an array!', vouchers);
  
  if (!Array.isArray(vouchers)) {
- console.warn('??� Vouchers is not array, converting:', vouchers);
+ console.warn('??� Vouchers is not array, converting:', vouchers);
  const vouchersArray = Array.isArray(vouchers.value) ? vouchers.value : [];
  setJournalVouchers(vouchersArray);
  } else {
@@ -726,7 +726,7 @@ const ComprehensiveAccounts: React.FC = () => {
  <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={false}/>
  <XAxis type="number" hide />
  <YAxis dataKey="name" type="category" hide />
- <RechartsTooltip formatter={(val: any) => `?${val?.toLocaleString() || 0}`} cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/>
+ <RechartsTooltip formatter={(val: any) => `₹${val?.toLocaleString() || 0}`} cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/>
  <Legend iconType="circle" />
  <Bar dataKey="Assets" stackId="a" fill="#10b981" radius={[0,4,4,0]} barSize={24} />
  <Bar dataKey="Liabilities" stackId="b" fill="#f43f5e" radius={[4,0,0,4]} barSize={24} />
@@ -738,10 +738,10 @@ const ComprehensiveAccounts: React.FC = () => {
  <div>
  <h4 className="font-bold text-slate-800 mb-3">Assets</h4>
  <div className="space-y-2 p-3 bg-slate-50 rounded-lg">
- <p className="text-sm">Current: ?{balanceSheet.assets?.currentItems?.[0]}</p>
- <p className="text-sm">Fixed: ?{balanceSheet.assets?.fixedItems?.[0]}</p>
+ <p className="text-sm">Current: ₹{balanceSheet.assets?.currentItems?.[0]}</p>
+ <p className="text-sm">Fixed: ₹{balanceSheet.assets?.fixedItems?.[0]}</p>
  <p className="font-bold border-t pt-2">
- Total: ?{balanceSheet.totalAssets?.toLocaleString()}
+ Total: ₹{balanceSheet.totalAssets?.toLocaleString()}
  </p>
  </div>
  </div>
@@ -749,10 +749,10 @@ const ComprehensiveAccounts: React.FC = () => {
  <div>
  <h4 className="font-bold text-slate-800 mb-3">Liabilities & Equity</h4>
  <div className="space-y-2 p-3 bg-slate-50 rounded-lg">
- <p className="text-sm">Liabilities: ?{balanceSheet.totalLiabilities?.toLocaleString()}</p>
- <p className="text-sm">Equity: ?{balanceSheet.totalEquity?.toLocaleString()}</p>
+ <p className="text-sm">Liabilities: ₹{balanceSheet.totalLiabilities?.toLocaleString()}</p>
+ <p className="text-sm">Equity: ₹{balanceSheet.totalEquity?.toLocaleString()}</p>
  <p className="font-bold border-t pt-2">
- Total: ?{(balanceSheet.totalLiabilities + balanceSheet.totalEquity)?.toLocaleString()}
+ Total: ₹{(balanceSheet.totalLiabilities + balanceSheet.totalEquity)?.toLocaleString()}
  </p>
  </div>
  </div>
@@ -787,16 +787,16 @@ const ComprehensiveAccounts: React.FC = () => {
  <div className="space-y-4">
  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
  <p className="text-sm text-slate-600">Revenue</p>
- <p className="text-2xl font-bold text-green-700">?{profitLoss.revenue?.subtotal?.toLocaleString()}</p>
+ <p className="text-2xl font-bold text-green-700">₹{profitLoss.revenue?.subtotal?.toLocaleString()}</p>
  </div>
  <div className="p-4 bg-red-50 rounded-lg border border-red-200">
  <p className="text-sm text-slate-600">Total Expenses</p>
- <p className="text-2xl font-bold text-red-700">?{profitLoss.expenses?.subtotal?.toLocaleString()}</p>
+ <p className="text-2xl font-bold text-red-700">₹{profitLoss.expenses?.subtotal?.toLocaleString()}</p>
  </div>
  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
  <p className="text-sm text-slate-600">Net Profit</p>
  <p className={`text-2xl font-bold ${profitLoss.netProfitAfterTax >= 0 ? 'text-green-700' : 'text-red-700'}`}>
- ?{profitLoss.netProfitAfterTax?.toLocaleString()}
+ ₹{profitLoss.netProfitAfterTax?.toLocaleString()}
  </p>
  </div>
  </div>
@@ -810,8 +810,8 @@ const ComprehensiveAccounts: React.FC = () => {
  ]}>
  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
- <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(val) => `?${val/1000}k`} />
- <RechartsTooltip cursor={{fill: '#f8fafc'}} formatter={(value: any) => `?${value.toLocaleString()}`} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+ <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(val) => `₹${val/1000}k`} />
+ <RechartsTooltip cursor={{fill: '#f8fafc'}} formatter={(value: any) => `₹${value.toLocaleString()}`} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
  <Legend iconType="circle" wrapperStyle={{fontSize: '12px'}} />
  <Bar dataKey="Revenue" fill="#16a34a" radius={[4,4,0,0]} maxBarSize={60} />
  <Bar dataKey="Expenses" fill="#dc2626" radius={[4,4,0,0]} maxBarSize={60} />
@@ -904,7 +904,7 @@ const ComprehensiveAccounts: React.FC = () => {
  >
  <div>
  <div className="font-semibold text-slate-800 text-sm">{account.accountName}</div>
- <div className="text-xs text-slate-500">{account.accountCode} � {account.accountType}</div>
+ <div className="text-xs text-slate-500">{account.accountCode} � {account.accountType}</div>
  </div>
  {glAccountId === account.id && <ChevronDown size={14} className="text-accent transform -rotate-90" />}
  </div>
@@ -1026,8 +1026,8 @@ const ComprehensiveAccounts: React.FC = () => {
  <td className="p-4 text-slate-600 font-mono text-xs">{entry.date}</td>
  <td className="p-4 font-medium text-accent cursor-pointer hover:underline">{entry.voucherNo}</td>
  <td className="p-4 text-slate-600 max-w-[200px] truncate" title={entry.narration}>{entry.narration}</td>
- <td className="p-4 text-right font-medium">{entry.debit > 0 ? `?${entry.debit.toLocaleString()}` : '-'}</td>
- <td className="p-4 text-right font-medium">{entry.credit > 0 ? `?${entry.credit.toLocaleString()}` : '-'}</td>
+ <td className="p-4 text-right font-medium">{entry.debit > 0 ? `₹${entry.debit.toLocaleString()}` : '-'}</td>
+ <td className="p-4 text-right font-medium">{entry.credit > 0 ? `₹${entry.credit.toLocaleString()}` : '-'}</td>
  <td className="p-4 text-right font-bold text-slate-800">{entry.runningBalance?.toLocaleString()} {entry.runningBalance >= 0 ? 'Dr' : 'Cr'}</td>
  </tr>
  ))}
@@ -1093,11 +1093,11 @@ const ComprehensiveAccounts: React.FC = () => {
  agingData.map((data, idx) => (
  <tr key={idx} className="hover:bg-slate-50">
  <td className="p-3 font-medium text-slate-800">{data.partyName}</td>
- <td className="p-3 text-right font-bold text-slate-700">?{data.totalDue.toLocaleString()}</td>
- <td className="p-3 text-right text-green-700">{data.days0_30 > 0 ? `?${data.days0_30.toLocaleString()}` : '-'}</td>
- <td className="p-3 text-right text-yellow-600">{data.days31_60 > 0 ? `?${data.days31_60.toLocaleString()}` : '-'}</td>
- <td className="p-3 text-right text-orange-600">{data.days61_90 > 0 ? `?${data.days61_90.toLocaleString()}` : '-'}</td>
- <td className="p-3 text-right text-red-700 font-bold">{data.days90Plus > 0 ? `?${data.days90Plus.toLocaleString()}` : '-'}</td>
+ <td className="p-3 text-right font-bold text-slate-700">₹{data.totalDue.toLocaleString()}</td>
+ <td className="p-3 text-right text-green-700">{data.days0_30 > 0 ? `₹${data.days0_30.toLocaleString()}` : '-'}</td>
+ <td className="p-3 text-right text-yellow-600">{data.days31_60 > 0 ? `₹${data.days31_60.toLocaleString()}` : '-'}</td>
+ <td className="p-3 text-right text-orange-600">{data.days61_90 > 0 ? `₹${data.days61_90.toLocaleString()}` : '-'}</td>
+ <td className="p-3 text-right text-red-700 font-bold">{data.days90Plus > 0 ? `₹${data.days90Plus.toLocaleString()}` : '-'}</td>
  <td className="p-3 text-center">
  {(data.days31_60 > 0 || data.days61_90 > 0 || data.days90Plus > 0) && (
  <button 
@@ -1184,15 +1184,15 @@ const ComprehensiveAccounts: React.FC = () => {
  <div className="flex justify-between text-sm">
  <div>
  <p className="text-slate-500 text-xs uppercase font-bold">Allocated Budget</p>
- <p className="font-semibold text-slate-800">?{cc.budget.toLocaleString()}</p>
+ <p className="font-semibold text-slate-800">₹{cc.budget.toLocaleString()}</p>
  </div>
  <div className="text-right">
  <p className="text-slate-500 text-xs uppercase font-bold">Consumed (Actuals)</p>
- <p className={`font-semibold ${isOverBudget ? 'text-red-600' : 'text-slate-800'}`}>?{cc.consumed.toLocaleString()}</p>
+ <p className={`font-semibold ${isOverBudget ? 'text-red-600' : 'text-slate-800'}`}>₹{cc.consumed.toLocaleString()}</p>
  </div>
  </div>
  <div className="mt-4 pt-3 border-t border-slate-100 text-right">
- <p className="text-xs text-slate-500">Variance: <span className={`font-bold ${isOverBudget ? 'text-red-500' : 'text-green-500'}`}>?{Math.abs(cc.budget - cc.consumed).toLocaleString()}</span> {isOverBudget ? 'Over Budget' : 'Remaining'}</p>
+ <p className="text-xs text-slate-500">Variance: <span className={`font-bold ${isOverBudget ? 'text-red-500' : 'text-green-500'}`}>₹{Math.abs(cc.budget - cc.consumed).toLocaleString()}</span> {isOverBudget ? 'Over Budget' : 'Remaining'}</p>
  </div>
  </div>
  );
@@ -1275,7 +1275,7 @@ const ComprehensiveAccounts: React.FC = () => {
  ]}>
  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0"/>
  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}}/>
- <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `?${val/1000}k`} tick={{fill: '#64748b', fontSize: 12}} />
+ <YAxis axisLine={false} tickLine={false} tickFormatter={(val) => `₹${val/1000}k`} tick={{fill: '#64748b', fontSize: 12}} />
  <RechartsTooltip formatter={(val: any) => formatCurrency(val)} contentStyle={{borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}/>
  <Legend iconType="circle" wrapperStyle={{paddingTop: '10px'}}/>
  <Line type="monotone" dataKey="Cash" stroke="#3b82f6" strokeWidth={3} dot={{r: 4, strokeWidth: 2}} activeDot={{r: 6}} name="Conservative Case" />

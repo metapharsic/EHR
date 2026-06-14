@@ -91,7 +91,7 @@ const RnD: React.FC = () => {
  return (
  <ERPLayout
  title="R&D / Formulation Lab"
- description="New Product Development • Recipe Management • Lab Experiments"
+ description="New Product Development ï¿½ Recipe Management ï¿½ Lab Experiments"
  actionButtons={[
  { label: 'Refresh', onClick: handleRefresh, icon: <RefreshCw size={16}/> },
  { label: 'New Formulation', onClick: () => setShowAddModal(true), variant: 'primary', icon: <Plus size={16}/> }
@@ -147,7 +147,7 @@ const RnD: React.FC = () => {
  </div>
  
  <h3 className="text-lg font-bold text-slate-800 mb-1">{f.product_name}</h3>
- <p className="text-sm text-slate-500 mb-4">{f.dosage_form} • v{f.version}</p>
+ <p className="text-sm text-slate-500 mb-4">{f.dosage_form} ï¿½ v{f.version}</p>
 
  <div className="space-y-2 text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
  <div className="flex justify-between">
@@ -156,7 +156,7 @@ const RnD: React.FC = () => {
  </div>
  <div className="flex justify-between">
  <span>Target Cost</span>
- <span className="font-bold text-green-600">?{Number(f.target_cost).toFixed(4)}</span>
+ <span className="font-bold text-green-600">â‚¹{Number(f.target_cost).toFixed(4)}</span>
  </div>
  </div>
  </div>

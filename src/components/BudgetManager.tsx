@@ -178,7 +178,7 @@ export const BudgetManager: React.FC = () => {
  <div className="p-4 flex justify-between items-start border-b border-slate-100">
  <div>
  <div className="font-bold text-[#1D3557] text-base">{b.budgetName}</div>
- <div className="text-xs text-slate-500 font-medium mt-0.5">{b.budgetType} • {b.financialYear} • {b.startDate} to {b.endDate}</div>
+ <div className="text-xs text-slate-500 font-medium mt-0.5">{b.budgetType} ï¿½ {b.financialYear} ï¿½ {b.startDate} to {b.endDate}</div>
  </div>
  <div className="flex items-center gap-3">
  <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${diff >= 0 ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
@@ -190,17 +190,17 @@ export const BudgetManager: React.FC = () => {
  <div className="p-4 grid grid-cols-4 gap-4">
  <div>
  <div className="text-[10px] text-slate-500 uppercase font-bold">Total Budget</div>
- <div className="font-bold text-slate-800 text-lg">?{(b.totalBudget || 0).toLocaleString()}</div>
+ <div className="font-bold text-slate-800 text-lg">â‚¹{(b.totalBudget || 0).toLocaleString()}</div>
  </div>
  <div>
  <div className="text-[10px] text-slate-500 uppercase font-bold">Actual Spent</div>
- <div className="font-bold text-slate-800 text-lg">?{(b.totalActual || 0).toLocaleString()}</div>
+ <div className="font-bold text-slate-800 text-lg">â‚¹{(b.totalActual || 0).toLocaleString()}</div>
  </div>
  <div>
  <div className="text-[10px] text-slate-500 uppercase font-bold">Variance</div>
  <div className={`font-bold text-lg flex items-center gap-1 ${diff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
  {diff >= 0 ? <TrendingDown size={16}/> : <TrendingUp size={16}/>}
- ?{Math.abs(diff).toLocaleString()} ({Math.abs(pct).toFixed(1)}%)
+ â‚¹{Math.abs(diff).toLocaleString()} ({Math.abs(pct).toFixed(1)}%)
  </div>
  </div>
  <div>

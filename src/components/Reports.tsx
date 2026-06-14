@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, Legend } from 'recharts';
 import { FileBarChart, ArrowDown, ArrowUp, Download, AlertCircle, FileText, Calendar, ShoppingBag, Stethoscope, User, TrendingUp, Users, Map, Briefcase, Percent, BarChart3 } from 'lucide-react';
@@ -214,10 +214,10 @@ const Reports: React.FC = () => {
  <>
  {/* KPI Cards */}
  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
- <ReportCard title="Total Stock Value" value={`?${totalStockValue.toLocaleString()}`} icon={<FileBarChart size={20}/>} trend={5.2} />
- <ReportCard title="Total Sales (Oct)" value={`?${totalSalesValue.toLocaleString()}`} icon={<ArrowUp size={20}/>} trend={12.5} />
- <ReportCard title="Total Purchases" value={`?${totalPurchaseValue.toLocaleString()}`} icon={<ArrowDown size={20}/>} trend={-2.4} />
- <ReportCard title="Net Profit (Est)" value={`?${(totalSalesValue * 0.2).toLocaleString()}`} icon={<FileBarChart size={20}/>} trend={8.1} />
+ <ReportCard title="Total Stock Value" value={`₹${totalStockValue.toLocaleString()}`} icon={<FileBarChart size={20}/>} trend={5.2} />
+ <ReportCard title="Total Sales (Oct)" value={`₹${totalSalesValue.toLocaleString()}`} icon={<ArrowUp size={20}/>} trend={12.5} />
+ <ReportCard title="Total Purchases" value={`₹${totalPurchaseValue.toLocaleString()}`} icon={<ArrowDown size={20}/>} trend={-2.4} />
+ <ReportCard title="Net Profit (Est)" value={`₹${(totalSalesValue * 0.2).toLocaleString()}`} icon={<FileBarChart size={20}/>} trend={8.1} />
  </div>
 
  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -321,7 +321,7 @@ const Reports: React.FC = () => {
  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}}/>
  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10}}/>
- <Tooltip formatter={(value) => [`?${value.toLocaleString()}`, 'Sales']}/>
+ <Tooltip formatter={(value) => [`₹${value.toLocaleString()}`, 'Sales']}/>
  <Area type="monotone" dataKey="total" stroke="#0ea5e9" fillOpacity={1} fill="url(#colorTotal)" />
  </AreaChart>
  </ResponsiveContainer>
@@ -331,7 +331,7 @@ const Reports: React.FC = () => {
  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
  <p className="text-xs font-bold text-slate-500 uppercase mb-1">Avg Daily Sales</p>
  <h3 className="text-2xl font-bold text-slate-800">
- ?{(MOCK_DAILY_SALES.reduce((a,b) => a + b.total, 0) / MOCK_DAILY_SALES.length).toLocaleString(undefined, {maximumFractionDigits: 0})}
+ ₹{(MOCK_DAILY_SALES.reduce((a,b) => a + b.total, 0) / MOCK_DAILY_SALES.length).toLocaleString(undefined, {maximumFractionDigits: 0})}
  </h3>
  </div>
  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
@@ -360,9 +360,9 @@ const Reports: React.FC = () => {
  <tr key={i} className="hover:bg-slate-50">
  <td className="p-4 text-sm font-medium text-slate-800">{day.date}</td>
  <td className="p-4 text-sm text-center text-slate-600">{day.invoices}</td>
- <td className="p-4 text-sm text-right text-green-600 font-medium">?{day.cashSales.toLocaleString()}</td>
- <td className="p-4 text-sm text-right text-accent font-medium">?{day.upiSales.toLocaleString()}</td>
- <td className="p-4 text-sm text-right font-bold text-slate-800">?{day.total.toLocaleString()}</td>
+ <td className="p-4 text-sm text-right text-green-600 font-medium">₹{day.cashSales.toLocaleString()}</td>
+ <td className="p-4 text-sm text-right text-accent font-medium">₹{day.upiSales.toLocaleString()}</td>
+ <td className="p-4 text-sm text-right font-bold text-slate-800">₹{day.total.toLocaleString()}</td>
  </tr>
  ))}
  </tbody>
@@ -391,11 +391,11 @@ const Reports: React.FC = () => {
  <div className="mt-6 border-t border-slate-100 pt-4 grid grid-cols-3 gap-6 text-center">
  <div>
  <p className="text-xs text-slate-500 uppercase">Total Revenue</p>
- <p className="text-xl font-bold text-slate-800">?{MOCK_SALES_DATA.reduce((a,b) => a + b.sales, 0).toLocaleString()}</p>
+ <p className="text-xl font-bold text-slate-800">₹{MOCK_SALES_DATA.reduce((a,b) => a + b.sales, 0).toLocaleString()}</p>
  </div>
  <div>
  <p className="text-xs text-slate-500 uppercase">Total Profit</p>
- <p className="text-xl font-bold text-green-600">?{MOCK_SALES_DATA.reduce((a,b) => a + b.profit, 0).toLocaleString()}</p>
+ <p className="text-xl font-bold text-green-600">₹{MOCK_SALES_DATA.reduce((a,b) => a + b.profit, 0).toLocaleString()}</p>
  </div>
  <div>
  <p className="text-xs text-slate-500 uppercase">Growth</p>
@@ -430,7 +430,7 @@ const Reports: React.FC = () => {
  <td className="p-4 text-sm font-bold text-slate-800">{prod.name}</td>
  <td className="p-4 text-sm text-slate-600">{prod.category}</td>
  <td className="p-4 text-sm text-center text-slate-700">{prod.quantity}</td>
- <td className="p-4 text-sm text-right font-bold text-slate-800">?{prod.value.toLocaleString()}</td>
+ <td className="p-4 text-sm text-right font-bold text-slate-800">₹{prod.value.toLocaleString()}</td>
  <td className="p-4 text-center">
  <span className={`text-xs font-bold px-2 py-1 rounded-full ${prod.growth > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
  {prod.growth > 0 ? '+' : ''}{prod.growth}%
@@ -465,7 +465,7 @@ const Reports: React.FC = () => {
  <td className="p-4 text-sm font-bold text-slate-800">{doc.name}</td>
  <td className="p-4 text-sm text-slate-600">{doc.specialty}</td>
  <td className="p-4 text-sm text-center text-slate-700">{doc.prescriptions}</td>
- <td className="p-4 text-sm text-right font-bold text-primary">?{doc.value.toLocaleString()}</td>
+ <td className="p-4 text-sm text-right font-bold text-primary">₹{doc.value.toLocaleString()}</td>
  </tr>
  ))}
  </tbody>
@@ -490,7 +490,7 @@ const Reports: React.FC = () => {
  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
  ))}
  </Pie>
- <Tooltip formatter={(val) => `?${Number(val).toLocaleString()}`}/>
+ <Tooltip formatter={(val) => `₹${Number(val).toLocaleString()}`}/>
  </PieChart>
  </ResponsiveContainer>
  </div>
@@ -501,7 +501,7 @@ const Reports: React.FC = () => {
  <span className="w-2 h-2 rounded-full" style={{backgroundColor: COLORS[i % COLORS.length]}}></span>
  {doc.name}
  </span>
- <span className="font-bold">?{doc.value.toLocaleString()}</span>
+ <span className="font-bold">₹{doc.value.toLocaleString()}</span>
  </div>
  ))}
  </div>
@@ -532,7 +532,7 @@ const Reports: React.FC = () => {
  </div>
  <div>
  <p className="text-xs text-slate-400 uppercase">Revenue</p>
- <p className="font-bold text-green-600">?{(user.value/1000).toFixed(1)}k</p>
+ <p className="font-bold text-green-600">₹{(user.value/1000).toFixed(1)}k</p>
  </div>
  </div>
  </div>
@@ -550,7 +550,7 @@ const Reports: React.FC = () => {
  <div>
  <p className="text-slate-500 text-xs font-bold uppercase mb-1">Total Field Sales</p>
  <h3 className="text-2xl font-bold text-slate-800">
- ?{employeeSalesData.reduce((acc, curr) => acc + curr.Total, 0).toLocaleString()}
+ ₹{employeeSalesData.reduce((acc, curr) => acc + curr.Total, 0).toLocaleString()}
  </h3>
  </div>
  <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><Users size={24}/></div>
@@ -561,7 +561,7 @@ const Reports: React.FC = () => {
  <div>
  <p className="text-slate-500 text-xs font-bold uppercase mb-1">PCD Contribution</p>
  <h3 className="text-2xl font-bold text-purple-600">
- ?{employeeSalesData.reduce((acc, curr) => acc + curr.PCD, 0).toLocaleString()}
+ ₹{employeeSalesData.reduce((acc, curr) => acc + curr.PCD, 0).toLocaleString()}
  </h3>
  </div>
  <div className="p-3 bg-purple-50 text-purple-600 rounded-lg"><Map size={24}/></div>
@@ -572,7 +572,7 @@ const Reports: React.FC = () => {
  <div>
  <p className="text-slate-500 text-xs font-bold uppercase mb-1">Direct Sales</p>
  <h3 className="text-2xl font-bold text-sky-600">
- ?{employeeSalesData.reduce((acc, curr) => acc + curr.Metapharsic, 0).toLocaleString()}
+ ₹{employeeSalesData.reduce((acc, curr) => acc + curr.Metapharsic, 0).toLocaleString()}
  </h3>
  </div>
  <div className="p-3 bg-sky-50 text-sky-600 rounded-lg"><Briefcase size={24}/></div>
@@ -598,8 +598,8 @@ const Reports: React.FC = () => {
  <BarChart data={employeeSalesData} margin={{top: 20, right: 30, left: 20, bottom: 5}}>
  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
  <XAxis dataKey="name" tick={{fontSize: 12, fill: '#64748b'}} />
- <YAxis tick={{fontSize: 12, fill: '#64748b'}} tickFormatter={(val) => `?${val/1000}k`}/>
- <Tooltip cursor={{fill: '#f8fafc'}} formatter={(value) => `?${Number(value).toLocaleString()}`}/>
+ <YAxis tick={{fontSize: 12, fill: '#64748b'}} tickFormatter={(val) => `₹${val/1000}k`}/>
+ <Tooltip cursor={{fill: '#f8fafc'}} formatter={(value) => `₹${Number(value).toLocaleString()}`}/>
  <Legend />
  {(employeeCategoryFilter === 'All' || employeeCategoryFilter === 'Metapharsic') && (
  <Bar dataKey="Metapharsic" name="Metapharsic (Direct)" stackId="a" fill="#0ea5e9" barSize={40} />
@@ -627,9 +627,9 @@ const Reports: React.FC = () => {
  {employeeSalesData.map((emp, i) => (
  <tr key={i} className="hover:bg-slate-50">
  <td className="p-4 font-bold text-slate-800">{emp.name}</td>
- <td className="p-4 text-right font-medium text-sky-600">?{emp.Metapharsic.toLocaleString()}</td>
- <td className="p-4 text-right font-medium text-purple-600">?{emp.PCD.toLocaleString()}</td>
- <td className="p-4 text-right font-bold text-slate-800">?{emp.Total.toLocaleString()}</td>
+ <td className="p-4 text-right font-medium text-sky-600">₹{emp.Metapharsic.toLocaleString()}</td>
+ <td className="p-4 text-right font-medium text-purple-600">₹{emp.PCD.toLocaleString()}</td>
+ <td className="p-4 text-right font-bold text-slate-800">₹{emp.Total.toLocaleString()}</td>
  <td className="p-4">
  <div className="flex h-2 rounded-full overflow-hidden bg-slate-100 w-full">
  {emp.Total > 0 && (
@@ -660,21 +660,21 @@ const Reports: React.FC = () => {
  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
  <p className="text-slate-500 text-xs font-bold uppercase mb-1">GSTR-1 (Sales)</p>
  <h3 className="text-2xl font-bold text-slate-800">
- ?{MOCK_GST_REPORT.reduce((a,b) => a + b.totalTax, 0).toLocaleString()}
+ ₹{MOCK_GST_REPORT.reduce((a,b) => a + b.totalTax, 0).toLocaleString()}
  </h3>
  <p className="text-xs text-slate-400 mt-1">Tax Liability</p>
  </div>
  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
  <p className="text-slate-500 text-xs font-bold uppercase mb-1">GSTR-2 (Input Credit)</p>
  <h3 className="text-2xl font-bold text-green-600">
- ?{(MOCK_GST_REPORT.reduce((a,b) => a + b.totalTax, 0) * 0.7).toLocaleString()}
+ ₹{(MOCK_GST_REPORT.reduce((a,b) => a + b.totalTax, 0) * 0.7).toLocaleString()}
  </h3>
  <p className="text-xs text-slate-400 mt-1">Available ITC</p>
  </div>
  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
  <p className="text-slate-500 text-xs font-bold uppercase mb-1">GSTR-3B (Payable)</p>
  <h3 className="text-2xl font-bold text-red-600">
- ?{(MOCK_GST_REPORT.reduce((a,b) => a + b.totalTax, 0) * 0.3).toLocaleString()}
+ ₹{(MOCK_GST_REPORT.reduce((a,b) => a + b.totalTax, 0) * 0.3).toLocaleString()}
  </h3>
  <p className="text-xs text-slate-400 mt-1">Net Payable</p>
  </div>
@@ -704,11 +704,11 @@ const Reports: React.FC = () => {
  <tr key={i} className="hover:bg-slate-50">
  <td className="p-4 font-mono text-slate-600">{row.hsn}</td>
  <td className="p-4 text-slate-800 font-medium">{row.description}</td>
- <td className="p-4 text-right text-slate-700">?{row.taxableValue.toLocaleString()}</td>
+ <td className="p-4 text-right text-slate-700">₹{row.taxableValue.toLocaleString()}</td>
  <td className="p-4 text-center text-slate-600">{row.taxRate}%</td>
- <td className="p-4 text-right text-slate-600">?{row.cgst.toLocaleString()}</td>
- <td className="p-4 text-right text-slate-600">?{row.sgst.toLocaleString()}</td>
- <td className="p-4 text-right font-bold text-slate-800">?{row.totalTax.toLocaleString()}</td>
+ <td className="p-4 text-right text-slate-600">₹{row.cgst.toLocaleString()}</td>
+ <td className="p-4 text-right text-slate-600">₹{row.sgst.toLocaleString()}</td>
+ <td className="p-4 text-right font-bold text-slate-800">₹{row.totalTax.toLocaleString()}</td>
  </tr>
  ))}
  </tbody>
@@ -724,7 +724,7 @@ const Reports: React.FC = () => {
  <h3 className="text-red-800 font-bold text-lg">Total Outstanding Liability</h3>
  <p className="text-red-600 text-sm">Amount payable to suppliers</p>
  </div>
- <div className="text-3xl font-bold text-red-700">?{totalOutstanding.toLocaleString()}</div>
+ <div className="text-3xl font-bold text-red-700">₹{totalOutstanding.toLocaleString()}</div>
  </div>
 
  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -750,7 +750,7 @@ const Reports: React.FC = () => {
  </div>
  <div className="text-right">
  <p className="text-xs text-slate-500 font-bold uppercase">Total Due</p>
- <p className="text-xl font-bold text-red-600">?{supplier.outstanding.toLocaleString()}</p>
+ <p className="text-xl font-bold text-red-600">₹{supplier.outstanding.toLocaleString()}</p>
  </div>
  </div>
 
@@ -770,7 +770,7 @@ const Reports: React.FC = () => {
  <tr key={inv.id}>
  <td className="p-3 font-medium text-slate-700">{inv.invoiceNo}</td>
  <td className="p-3 text-slate-500">{inv.date}</td>
- <td className="p-3 font-medium">?{inv.totalAmount.toLocaleString()}</td>
+ <td className="p-3 font-medium">₹{inv.totalAmount.toLocaleString()}</td>
  <td className="p-3">
  <span className={`text-xs px-2 py-0.5 rounded font-bold ${inv.paymentStatus === 'Unpaid' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}`}>
  {inv.paymentStatus}
@@ -808,4 +808,5 @@ const Reports: React.FC = () => {
 };
 
 export default Reports;
+
 

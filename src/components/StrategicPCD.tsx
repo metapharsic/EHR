@@ -223,7 +223,7 @@ const StrategicPCD: React.FC = () => {
         apiClient.get('/pcd/dashboard/summary'),
         apiClient.get('/pcd/partners?limit=200'),
         apiClient.get('/pcd/targets'),
-        apiClient.get(`/pcd/transactions?${fromQ}${toQ}`),
+        apiClient.get(`/pcd/transactionsâ‚¹${fromQ}${toQ}`),
         apiClient.get('/pcd/mrs'),
         apiClient.get('/pcd/commissions'),
         apiClient.get('/pcd/receivables'),
@@ -1238,7 +1238,7 @@ const StrategicPCD: React.FC = () => {
             <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
-                <input type="text" placeholder="Search name, territory, license…"
+                <input type="text" placeholder="Search name, territory, licenseï¿½"
                   className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary outline-none text-sm"
                   value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               </div>
@@ -1263,7 +1263,7 @@ const StrategicPCD: React.FC = () => {
 
           {networkLoading ? (
             <div className="flex items-center justify-center py-16 text-slate-400 bg-white rounded-xl border border-slate-200">
-              <RefreshCcw size={22} className="animate-spin mr-2" /> Loading partners…
+              <RefreshCcw size={22} className="animate-spin mr-2" /> Loading partnersï¿½
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -1284,7 +1284,7 @@ const StrategicPCD: React.FC = () => {
                           </div>
                           <div>
                             <h3 className="font-bold text-slate-800 leading-tight">{p.name}</h3>
-                            <p className="text-xs text-slate-500">{p.territory}{p.state ? ` · ${p.state}` : ''}</p>
+                            <p className="text-xs text-slate-500">{p.territory}{p.state ? ` ï¿½ ${p.state}` : ''}</p>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
@@ -1306,9 +1306,9 @@ const StrategicPCD: React.FC = () => {
                       </div>
 
                       <div className="mt-3 flex gap-3 text-xs text-slate-500">
-                        <span>Credit: <strong className="text-slate-700">?{Number(p.credit_limit || 0).toLocaleString('en-IN')}</strong></span>
+                        <span>Credit: <strong className="text-slate-700">â‚¹{Number(p.credit_limit || 0).toLocaleString('en-IN')}</strong></span>
                         <span>Discount: <strong className="text-slate-700">{p.discount_percentage}%</strong></span>
-                        <span>Business: <strong className="text-sky-700">?{Number(p.total_business || 0).toLocaleString('en-IN')}</strong></span>
+                        <span>Business: <strong className="text-sky-700">â‚¹{Number(p.total_business || 0).toLocaleString('en-IN')}</strong></span>
                       </div>
                     </div>
 
@@ -1340,7 +1340,7 @@ const StrategicPCD: React.FC = () => {
             <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-y-auto">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-auto">
                 <div className="bg-slate-900 text-white px-5 py-4 flex justify-between items-center rounded-t-xl">
-                  <h3 className="font-bold flex items-center gap-2"><Pencil size={16} /> Edit Partner — {editPartner.name}</h3>
+                  <h3 className="font-bold flex items-center gap-2"><Pencil size={16} /> Edit Partner ï¿½ {editPartner.name}</h3>
                   <button onClick={() => setEditPartner(null)} className="hover:bg-slate-700 p-1 rounded"><X size={18} /></button>
                 </div>
                 <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
@@ -1391,7 +1391,7 @@ const StrategicPCD: React.FC = () => {
                     className="flex-1 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-white">Cancel</button>
                   <button onClick={handleSaveEdit} disabled={editSaving}
                     className="flex-1 py-2 bg-sky-600 text-white rounded-lg text-sm font-medium hover:bg-sky-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                    {editSaving ? <><RefreshCcw size={14} className="animate-spin" /> Saving…</> : <><CheckCircle size={14} /> Save Changes</>}
+                    {editSaving ? <><RefreshCcw size={14} className="animate-spin" /> Savingï¿½</> : <><CheckCircle size={14} /> Save Changes</>}
                   </button>
                 </div>
               </div>
@@ -1408,7 +1408,7 @@ const StrategicPCD: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-800">Remove Partner</h3>
-                    <p className="text-sm text-slate-500">This is a soft delete — data is retained</p>
+                    <p className="text-sm text-slate-500">This is a soft delete ï¿½ data is retained</p>
                   </div>
                 </div>
                 <p className="text-sm text-slate-700 mb-5 bg-slate-50 rounded-lg p-3 border border-slate-200">
@@ -1419,7 +1419,7 @@ const StrategicPCD: React.FC = () => {
                     className="flex-1 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
                   <button onClick={handleDeletePartner} disabled={deleting}
                     className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                    {deleting ? <><RefreshCcw size={14} className="animate-spin" /> Removing…</> : <><Trash2 size={14} /> Remove</>}
+                    {deleting ? <><RefreshCcw size={14} className="animate-spin" /> Removingï¿½</> : <><Trash2 size={14} /> Remove</>}
                   </button>
                 </div>
               </div>
