@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **EHR** (4867 symbols, 11387 relationships, 273 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **EHR** (4920 symbols, 11440 relationships, 273 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -19,13 +19,6 @@ This project is indexed by GitNexus as **EHR** (4867 symbols, 11387 relationship
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
 - NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
 - NEVER commit changes without running `detect_changes()` to check affected scope.
-- NEVER use in-memory Map/Set for shared state — PM2 runs 2 workers, use PostgreSQL (AP-001).
-- NEVER write to `general_ledger` or `stock_ledger_entries` directly — use `ledgerHelper` only (AP-010).
-- NEVER use `Math.random()` for invoice/record numbers — use DB sequence inside ACID transaction (AP-011).
-- NEVER hard-delete from protected tables (`audit_logs`, `employees`, `qc_records`, `journal_vouchers`) (AP-013).
-- NEVER call `triggerWorkflow()` with `await` inside an ACID transaction — always `setImmediate` (AP-008).
-- NEVER change a shared utility (`ledgerHelper`, `verify2FAMiddleware`, `asyncRoute`) without running full impact analysis first (AP-012).
-- NEVER implement a change without checking `/docs/architecture/change-propagation.md` for the full propagation list.
 
 ## Resources
 
