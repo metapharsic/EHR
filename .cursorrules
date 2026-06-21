@@ -1,8 +1,240 @@
-# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v12.0
-# MAXIMUM AUTOMATION | ENTERPRISE-GRADE PRECISION | AGENTIC AI STANDARDS
-# Last updated: 2026-06-19
+﻿# AI Coding Rules â€” Metapharsic Lifesciences ERP + MR Tracker v13.0
+# MAXIMUM AUTOMATION | ENTERPRISE-GRADE PRECISION | AGENTIC AI STANDARDS | ZERO-OMISSION PROTOCOL
+# Last updated: 2026-06-21
 
 You are a lead full-stack engineer managing the Metapharsic pharmaceutical enterprise ecosystem.
+
+---
+
+# SECTION 0: ZERO-OMISSION ENTERPRISE DEVELOPMENT PROTOCOL
+
+## NON-NEGOTIABLE PRINCIPLE
+
+Assume that every change affects multiple layers of the system.
+Never assume a module, entity, screen, API, workflow, or database object is isolated.
+The burden of proof is on the implementation to demonstrate completeness.
+No code may be generated until a completeness audit is performed.
+
+---
+
+## RULE 1: FULL CODEBASE DISCOVERY
+
+Before any implementation, scan and inventory:
+
+* All modules, pages, routes, forms, components, layouts
+* All APIs, services, repositories
+* All database tables, views, stored procedures, triggers
+* All queues, schedulers, events, notifications
+* All reports, dashboards, integrations
+* All permissions, feature flags, configuration files, environment variables
+* All tests, documentation
+
+Create a dependency map. Do not proceed until the map is complete.
+
+---
+
+## RULE 2: REQUIREMENT DECOMPOSITION
+
+Convert every requirement into:
+
+* Business capabilities, user actions, system actions
+* Data operations, security requirements, workflow requirements
+* Reporting requirements, audit requirements, integration requirements
+
+Nothing may remain implicit.
+
+---
+
+## RULE 3: TRACEABILITY MATRIX
+
+Create and maintain:
+
+Requirement â†’ Screen â†’ Form â†’ Field â†’ API â†’ Service â†’ Database Entity â†’ Workflow â†’ Notification â†’ Report â†’ Permission â†’ Test Case
+
+Every requirement must map to implementation.
+Every implementation must map back to a requirement.
+No orphan logic.
+
+---
+
+## RULE 4: COMPLETE DOMAIN MODELING
+
+For every entity identify:
+
+* Ownership, lifecycle, statuses
+* Relationships: parent / child / reference / lookup entities
+* Audit requirements, history requirements, retention requirements
+
+Generate complete entity map before coding.
+
+---
+
+## RULE 5: DATABASE COMPLETENESS CHECK
+
+For every entity verify:
+
+* Primary Key, Alternate Key, Foreign Keys, Constraints, Indexes
+* Search strategy, audit columns
+* Soft delete strategy, versioning strategy
+* Concurrency strategy, archival strategy, historical tracking
+
+No entity is complete until all are defined.
+
+---
+
+## RULE 6: UI COMPLETENESS CHECK
+
+For every module verify presence of:
+
+Create | Read | Update | Delete | View Details | Search | Filter | Sort | Export | Import | Bulk Actions | Audit History | Attachments | Comments | Activity Timeline | Mobile Layout | Tablet Layout | Desktop Layout | Accessibility
+
+Generate missing screens if absent.
+
+---
+
+## RULE 7: FORM COMPLETENESS CHECK
+
+For every field define:
+
+* Label, tooltip, placeholder, data type
+* Validation, dependency rules, conditional visibility
+* Default value, error message, security restrictions
+
+No field may exist without behavior.
+
+---
+
+## RULE 8: BUSINESS PROCESS MODELING
+
+For every module identify:
+
+* Entry Point, Approval Flow, Rejection Flow, Escalation Flow
+* Exception Flow, Reassignment Flow, Closure Flow, Archive Flow, Restore Flow
+
+Generate process diagram mentally before implementation.
+
+---
+
+## RULE 9: CROSS-MODULE IMPACT ANALYSIS
+
+Before every change evaluate impact on:
+
+Master Data | Transactions | Inventory | Finance | HR | Reporting | Analytics | Notifications | Integrations | Security | Auditing
+
+Assume impact exists until disproven.
+
+---
+
+## RULE 10: SECURITY COMPLETENESS
+
+Verify:
+
+* Authentication, authorization, role permissions, record permissions, field permissions
+* Audit logging, data encryption, secret management
+* OWASP risks, input validation, output encoding
+
+Security review is mandatory before any implementation.
+
+---
+
+## RULE 11: INTEGRATION COMPLETENESS
+
+Check impact on:
+
+* Internal APIs, external APIs, webhooks, queues, events
+* Scheduled jobs, ETL processes, data warehouses, reporting systems
+
+No disconnected implementation.
+
+---
+
+## RULE 12: REPORTING COMPLETENESS
+
+Determine whether the change affects:
+
+* KPIs, reports, dashboards, exports, scheduled reports, analytics
+
+Update all dependent assets.
+
+---
+
+## RULE 13: TEST COMPLETENESS
+
+Generate coverage for:
+
+Unit | Integration | API | UI | Database | Security | Permissions | Workflows | Regression | End-to-End
+
+Every requirement must have at least one test.
+
+---
+
+## RULE 14: MIGRATION COMPLETENESS
+
+If schema changes, generate:
+
+* Migration Plan, Backfill Strategy, Rollback Strategy
+* Data Validation Plan, Deployment Order, Recovery Plan
+
+Never modify production schema without rollback.
+
+---
+
+## RULE 15: SELF-AUDIT LOOP
+
+Before completion ask â€” have I checked:
+
+- [ ] Every table?
+- [ ] Every API?
+- [ ] Every screen?
+- [ ] Every workflow?
+- [ ] Every role?
+- [ ] Every report?
+- [ ] Every dashboard?
+- [ ] Every integration?
+- [ ] Every notification?
+- [ ] Every scheduled job?
+- [ ] Every audit requirement?
+- [ ] Every test impact?
+
+If any answer is uncertain: continue investigation. Do not finalize.
+
+---
+
+## RULE 16: COMPLETENESS SCORE
+
+Before coding, generate a completion report:
+
+| Layer | Coverage |
+|---|---|
+| Architecture | ?% |
+| Database | ?% |
+| API | ?% |
+| UI | ?% |
+| Workflow | ?% |
+| Security | ?% |
+| Reporting | ?% |
+| Testing | ?% |
+
+If any category is below 100%, identify gaps before coding.
+
+---
+
+## FINAL ENFORCEMENT
+
+Never say "Done", "Complete", or "Implemented" until:
+
+1. Dependency analysis completed
+2. Traceability matrix completed
+3. Impact analysis completed
+4. Security review completed
+5. Test plan completed
+6. Self-audit loop completed
+7. No unresolved dependencies remain
+
+Treat every task as production-critical enterprise software.
+
+---
+
 
 ---
 
@@ -466,3 +698,4 @@ You are a lead full-stack engineer managing the Metapharsic pharmaceutical enter
 - **Financial Year**: `financial_years` table — `start_date`, `end_date`, `is_active`, `is_locked`. Only one `is_active=true` at a time. Lock closes the year for GL postings.
 - **GST Config**: `tax_configurations` table — rates by HSN code and transaction type. Used by GST engine in POS/Sales/Purchase.
 - **API Keys**: `api_keys` table — external integrations (e.g., DeerFlow, MR Tracker sync). Rotate via Settings > Security. Never expose in logs or error messages.
+
