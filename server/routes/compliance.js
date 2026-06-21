@@ -457,4 +457,170 @@ router.delete("/audits/:id", async (req, res) => {
 
 router.get("/temp", (req, res) => res.redirect("/api/compliance/temp-logs"));
 
+// ════════════════════════════════════════════════════════════════════════════
+// MONTHLY STATUS DASHBOARD
+// GET /api/compliance/monthly-status?month=6&year=2026
+// ════════════════════════════════════════════════════════════════════════════
+router.get("/monthly-status", async (req, res) => {
+  try {
+    const month = parseInt(req.query.month || new Date().getMonth() + 1);
+    const year  = parseInt(req.query.year  || new Date().getFullYear());
+    const COMPANY_ID = 1;
+
+    const fy = month >= 4
+      ? `${year}-${String(year + 1).slice(2)}`
+      : `${year - 1}-${String(year).slice(2)}`;
+
+    // Due dates for the month (deadlines fall in NEXT month for most)
+    const nextMonth = month === 12 ? 1  : month + 1;
+    const nextYear  = month === 12 ? year + 1 : year;
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const dueTds    = `${nextYear}-${pad(nextMonth)}-07`;
+    const dueGstr1  = `${nextYear}-${pad(nextMonth)}-11`;
+    const duePfEsic = `${nextYear}-${pad(nextMonth)}-15`;
+    const dueGstr3b = `${nextYear}-${pad(nextMonth)}-20`;
+    const duePt     = `${nextYear}-${pad(nextMonth)}-${new Date(nextYear, nextMonth, 0).getDate()}`;
+
+    const today = new Date();
+
+    // TDS: check if challan paid and all entries linked
+    const [tdsRows, payrollRows, gstr1Rows, gstr3bRows, pfRows, esicRows, ptRows] = await Promise.all([
+      db.query(`
+        SELECT COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE challan_id IS NOT NULL) AS linked
+        FROM tds_entries WHERE month=$1 AND financial_year=$2 AND company_id=$3`,
+        [month, fy, COMPANY_ID]),
+      db.query(`
+        SELECT COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE status='Approved') AS approved
+        FROM salary_slips WHERE month=$1 AND year=$2 AND company_id=$3`,
+        [month, year, COMPANY_ID]),
+      db.query(`
+        SELECT status FROM gst_filings
+        WHERE return_type='GSTR1' AND period_month=$1 AND financial_year=$2 AND company_id=$3
+        LIMIT 1`,
+        [month, fy, COMPANY_ID]),
+      db.query(`
+        SELECT status FROM gst_filings
+        WHERE return_type='GSTR3B' AND period_month=$1 AND financial_year=$2 AND company_id=$3
+        LIMIT 1`,
+        [month, fy, COMPANY_ID]),
+      db.query(`
+        SELECT status FROM compliance_filings
+        WHERE filing_type='PF' AND period_month=$1 AND financial_year=$2 AND company_id=$3
+        LIMIT 1`,
+        [month, fy, COMPANY_ID]),
+      db.query(`
+        SELECT status FROM compliance_filings
+        WHERE filing_type='ESIC' AND period_month=$1 AND financial_year=$2 AND company_id=$3
+        LIMIT 1`,
+        [month, fy, COMPANY_ID]),
+      db.query(`
+        SELECT status FROM compliance_filings
+        WHERE filing_type='PT' AND period_month=$1 AND financial_year=$2 AND company_id=$3
+        LIMIT 1`,
+        [month, fy, COMPANY_ID]),
+    ]);
+
+    const tdsTotal  = parseInt(tdsRows.rows[0]?.total || 0);
+    const tdsLinked = parseInt(tdsRows.rows[0]?.linked || 0);
+    const tdsStatus = tdsTotal === 0 ? 'PENDING'
+                    : tdsLinked === tdsTotal ? 'DONE' : 'IN_PROGRESS';
+
+    const payrollTotal    = parseInt(payrollRows.rows[0]?.total || 0);
+    const payrollApproved = parseInt(payrollRows.rows[0]?.approved || 0);
+    const payrollStatus   = payrollTotal === 0 ? 'PENDING'
+                          : payrollApproved === payrollTotal ? 'DONE' : 'IN_PROGRESS';
+
+    const statusOf = (rows) => rows.rows[0]?.status || 'PENDING';
+
+    const isOverdue = (dueDateStr) => new Date(dueDateStr) < today;
+    const finalStatus = (dbStatus, dueDateStr) => {
+      if (dbStatus === 'DONE' || dbStatus === 'FILED') return 'DONE';
+      if (isOverdue(dueDateStr)) return 'OVERDUE';
+      return dbStatus;
+    };
+
+    const items = [
+      { task: 'Payroll Run',    dueDate: `${year}-${pad(month)}-30`, status: payrollStatus,
+        detail: `${payrollApproved}/${payrollTotal} slips approved` },
+      { task: 'TDS Deposit',    dueDate: dueTds,    status: finalStatus(tdsStatus, dueTds),
+        detail: `${tdsLinked}/${tdsTotal} entries linked to challans` },
+      { task: 'GSTR-1 Filing', dueDate: dueGstr1,  status: finalStatus(statusOf(gstr1Rows), dueGstr1) },
+      { task: 'PF Deposit',    dueDate: duePfEsic,  status: finalStatus(statusOf(pfRows), duePfEsic) },
+      { task: 'ESIC Deposit',  dueDate: duePfEsic,  status: finalStatus(statusOf(esicRows), duePfEsic) },
+      { task: 'GSTR-3B Filing',dueDate: dueGstr3b,  status: finalStatus(statusOf(gstr3bRows), dueGstr3b) },
+      { task: 'PT Payment',    dueDate: duePt,       status: finalStatus(statusOf(ptRows), duePt) },
+    ];
+
+    const doneCount    = items.filter(i => i.status === 'DONE').length;
+    const overdueCount = items.filter(i => i.status === 'OVERDUE').length;
+    const overallStatus = overdueCount > 0 ? 'OVERDUE'
+                        : doneCount === items.length ? 'COMPLETED'
+                        : doneCount > 0 ? 'IN_PROGRESS' : 'PENDING';
+
+    // Alerts
+    const alerts = [];
+    const tdsNoPan = await db.query(
+      `SELECT COUNT(*) FROM tds_entries WHERE company_id=$1 AND deductee_pan IS NULL AND month=$2 AND financial_year=$3`,
+      [COMPANY_ID, month, fy]
+    );
+    if (parseInt(tdsNoPan.rows[0].count) > 0) {
+      alerts.push(`${tdsNoPan.rows[0].count} TDS entries missing deductee PAN — 20% rate applies`);
+    }
+
+    items.forEach(item => {
+      const daysLeft = Math.ceil((new Date(item.dueDate) - today) / 86400000);
+      if (item.status !== 'DONE' && daysLeft >= 0 && daysLeft <= 3) {
+        alerts.push(`${item.task} due in ${daysLeft} day(s) (${item.dueDate})`);
+      }
+    });
+
+    res.json({
+      month, year, financialYear: fy,
+      overallStatus,
+      completedCount: doneCount,
+      totalTasks:     items.length,
+      items,
+      alerts,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/compliance/filings — record a statutory filing (PF, ESIC, PT)
+router.post("/filings", async (req, res) => {
+  try {
+    const {
+      filingType, periodMonth, periodQuarter, financialYear,
+      dueDate, filedDate, status = 'FILED', acknowledgementNo,
+      amountPaid, penaltyPaid = 0, notes,
+    } = req.body;
+
+    const COMPANY_ID = 1;
+
+    if (!filingType || !financialYear || !dueDate) {
+      return res.status(400).json({ error: 'filingType, financialYear, dueDate required' });
+    }
+
+    const result = await db.query(`
+      INSERT INTO compliance_filings
+        (filing_type, period_month, period_quarter, financial_year, due_date,
+         filed_date, status, acknowledgement_no, amount_paid, penalty_paid,
+         notes, filed_by, company_id)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      RETURNING id
+    `, [filingType, periodMonth, periodQuarter, financialYear, dueDate,
+        filedDate, status, acknowledgementNo, amountPaid, penaltyPaid,
+        notes, req.user?.id, COMPANY_ID]);
+
+    res.status(201).json({ id: result.rows[0].id, message: 'Filing recorded' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
+

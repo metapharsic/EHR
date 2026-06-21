@@ -204,11 +204,13 @@ const voucherRoutes = require('./routes/vouchers');
 const settingsRoutes = require('./routes/settings');
 const geospatialRoutes = require('./routes/geospatial');
 const gstRoutes = require('./routes/gst');
+const tdsRoutes = require('./routes/tds');
 const taskRoutes = require('./routes/tasks');
 
 app.use('/api/pcd/geospatial', geospatialRoutes);
 app.use('/api/pcd', pcdRoutes);
 app.use('/api/gst', gstRoutes);
+app.use('/api/tds', tdsRoutes);
 app.use('/api/analytics', analyticRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/inventory', inventoryRoutes);

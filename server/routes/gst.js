@@ -297,4 +297,146 @@ router.get('/gstr3b', asyncRoute(async (req, res) => {
     }
 }));
 
+// ════════════════════════════════════════════════════════════════════════════
+// GST Filings — record and retrieve filed return status
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /api/gst/filings?financial_year=2025-26&return_type=GSTR3B
+router.get('/filings', asyncRoute(async (req, res) => {
+  const { financial_year, return_type } = req.query;
+  const COMPANY_ID = 1;
+
+  const conditions = ['company_id = $1'];
+  const params     = [COMPANY_ID];
+  let   p          = 2;
+
+  if (financial_year) { conditions.push(`financial_year = $${p++}`); params.push(financial_year); }
+  if (return_type)    { conditions.push(`return_type = $${p++}`);    params.push(return_type); }
+
+  const result = await db.query(`
+    SELECT
+      id, return_type AS "returnType", period_month AS "periodMonth",
+      financial_year AS "financialYear", filing_date AS "filingDate",
+      status, acknowledgement_no AS "acknowledgementNo",
+      total_tax AS "totalTax", igst_paid AS "igstPaid",
+      cgst_paid AS "cgstPaid", sgst_paid AS "sgstPaid",
+      itc_utilized AS "itcUtilized", created_at AS "createdAt"
+    FROM gst_filings
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY financial_year DESC, period_month DESC
+  `, params);
+
+  res.json(result.rows);
+}));
+
+// POST /api/gst/filings — record a filed GST return
+router.post('/filings', asyncRoute(async (req, res) => {
+  const {
+    returnType, periodMonth, financialYear, filingDate, status = 'FILED',
+    acknowledgementNo, totalTax, igstPaid = 0, cgstPaid = 0, sgstPaid = 0, itcUtilized = 0,
+  } = req.body;
+  const COMPANY_ID = 1;
+
+  if (!returnType || !financialYear) {
+    return res.status(400).json({ error: 'returnType and financialYear required' });
+  }
+
+  // Upsert — one filing record per return_type + period_month + financial_year
+  const result = await db.query(`
+    INSERT INTO gst_filings
+      (return_type, period_month, financial_year, filing_date, status,
+       acknowledgement_no, total_tax, igst_paid, cgst_paid, sgst_paid,
+       itc_utilized, company_id, created_by)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+    ON CONFLICT DO NOTHING
+    RETURNING id
+  `, [returnType, periodMonth, financialYear, filingDate, status,
+      acknowledgementNo, totalTax, igstPaid, cgstPaid, sgstPaid,
+      itcUtilized, COMPANY_ID, req.user?.id]);
+
+  res.status(201).json({ id: result.rows[0]?.id, message: 'Filing recorded' });
+}));
+
+// GET /api/gst/reconciliation-report?month=6&year=2026
+router.get('/reconciliation-report', asyncRoute(async (req, res) => {
+  const month = parseInt(req.query.month || new Date().getMonth() + 1);
+  const year  = parseInt(req.query.year  || new Date().getFullYear());
+  const COMPANY_ID = 1;
+
+  // Summary of gst_reconciliation table for the period
+  const summary = await db.query(`
+    SELECT
+      match_status AS "matchStatus",
+      COUNT(*)                      AS "count",
+      COALESCE(SUM(erp_igst),0)     AS "erpIgst",
+      COALESCE(SUM(erp_cgst),0)     AS "erpCgst",
+      COALESCE(SUM(erp_sgst),0)     AS "erpSgst",
+      COALESCE(SUM(portal_igst),0)  AS "portalIgst",
+      COALESCE(SUM(portal_cgst),0)  AS "portalCgst",
+      COALESCE(SUM(portal_sgst),0)  AS "portalSgst",
+      COALESCE(SUM(difference),0)   AS "difference"
+    FROM gst_reconciliation
+    WHERE company_id = $1 AND period_month = $2
+      AND financial_year = (
+        CASE WHEN $2 >= 4 THEN $3 || '-' || RIGHT(($3+1)::TEXT,2)
+             ELSE ($3-1) || '-' || RIGHT($3::TEXT,2) END
+      )
+    GROUP BY match_status
+  `, [COMPANY_ID, month, year]);
+
+  const rows = summary.rows;
+  const byStatus = {};
+  for (const r of rows) byStatus[r.matchStatus] = r;
+
+  const matched     = parseInt(byStatus['MATCHED']?.count || 0);
+  const onlyPortal  = parseInt(byStatus['ONLY_IN_PORTAL']?.count || 0);
+  const onlyErp     = parseInt(byStatus['ONLY_IN_ERP']?.count || 0);
+  const mismatch    = parseInt(byStatus['MISMATCH_AMOUNT']?.count || 0);
+  const gstinMismatch = parseInt(byStatus['GSTIN_MISMATCH']?.count || 0);
+
+  res.json({
+    period: `${month}/${year}`,
+    summary: {
+      totalPortalEntries: matched + onlyPortal + mismatch + gstinMismatch,
+      matched, onlyInPortal: onlyPortal, onlyInErp: onlyErp,
+      amountMismatch: mismatch, gstinMismatch,
+    },
+    note: rows.length === 0 ? 'No GSTR-2B data imported yet. Use POST /api/gst/import-2b' : undefined,
+    byStatus,
+  });
+}));
+
+// POST /api/gst/import-2b — import GSTR-2B JSON from portal
+router.post('/import-2b', asyncRoute(async (req, res) => {
+  const { month, year, data } = req.body;
+  const COMPANY_ID = 1;
+
+  if (!month || !year || !Array.isArray(data)) {
+    return res.status(400).json({ error: 'month, year, and data[] required' });
+  }
+
+  const fy = month >= 4 ? `${year}-${String(year+1).slice(2)}` : `${year-1}-${String(year).slice(2)}`;
+
+  // Store raw entries in gst_portal_data (existing table) and create reconciliation records
+  let inserted = 0;
+  for (const entry of data) {
+    try {
+      await db.query(`
+        INSERT INTO gst_portal_data
+          (period_month, period_year, supplier_gstin, invoice_no, invoice_date,
+           invoice_value, taxable_value, igst_amount, cgst_amount, sgst_amount,
+           company_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        ON CONFLICT DO NOTHING
+      `, [month, year, entry.gstin, entry.invoiceNo, entry.invoiceDate,
+          entry.invoiceValue, entry.taxableValue,
+          entry.igst || 0, entry.cgst || 0, entry.sgst || 0, COMPANY_ID]);
+      inserted++;
+    } catch (_) { /* skip duplicate */ }
+  }
+
+  res.json({ imported: inserted, total: data.length, financialYear: fy });
+}));
+
 module.exports = router;
+
