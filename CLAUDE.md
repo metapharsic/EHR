@@ -45,6 +45,30 @@ This project is indexed by GitNexus as **EHR** (4759 symbols, 11202 relationship
 
 ---
 
+# Documentation Structure
+
+This project uses a `/docs/` directory for detailed artifacts. Always read relevant docs before coding:
+
+| Document | Read For |
+|---|---|
+| `/docs/architecture/system-architecture.md` | Stack, deployment, critical rules, DeerFlow pattern |
+| `/docs/architecture/module-map.md` | All 26 modules, route inventory, invoice number conventions |
+| `/docs/architecture/dependency-map.md` | Cross-module dependencies, shared utilities, GST engine rules |
+| `/docs/database/entities.md` | All DB tables, column requirements, mandatory fields |
+| `/docs/database/relationships.md` | All FK relationships, soft-delete patterns, key invariants |
+| `/docs/database/erd.md` | Domain cluster diagrams, cross-domain bridges |
+| `/docs/workflows/approval-flow.md` | OMS, CRM, JV, Manufacturing, QC, Payroll, DMS state machines |
+| `/docs/workflows/sales-flow.md` | POS, wholesale, PCD, return credit note flows |
+| `/docs/workflows/inventory-flow.md` | Stock IN/OUT, adjustment, expiry, FSN, valuation flows |
+| `/docs/security/roles.md` | Role hierarchy, route guards, 2FA requirements, OWASP checklist |
+| `/docs/security/permissions.md` | Module access matrix, field-level security, audit write requirements |
+| `/docs/reports/dashboards.md` | Dashboard widgets, async report jobs, result shape |
+| `/docs/reports/kpis.md` | All KPIs, formulas, source tables, report routes |
+
+If documentation and code conflict, report the conflict before implementing.
+
+---
+
 # Zero-Omission Protocol — GitNexus Workflow Integration
 
 Every GitNexus session on this project MUST follow this sequence before writing any code:
@@ -52,14 +76,18 @@ Every GitNexus session on this project MUST follow this sequence before writing 
 ## Pre-Implementation Checklist (run in order)
 
 ```
-1. gitnexus_query("full module inventory")          → map all modules, routes, APIs
-2. gitnexus_query("database tables and entities")   → map all DB entities
-3. impact({target: "<symbol>", direction: "upstream"}) → blast radius for the target
-4. gitnexus_query("<feature area> workflow")        → trace existing process flows
-5. gitnexus_context({name: "<symbol>"})             → callers + callees + processes
+1. Read /docs/architecture/module-map.md            → verify module + route already exists
+2. Read /docs/database/entities.md                  → verify entity already exists
+3. Read /docs/database/relationships.md             → verify relationship already exists
+4. Read /docs/architecture/dependency-map.md        → map cross-module impact
+5. Read /docs/security/permissions.md               → verify security requirements
+6. gitnexus_query("full module inventory")          → find symbols in live code
+7. impact({target: "<symbol>", direction: "upstream"}) → blast radius for the target
+8. gitnexus_query("<feature area> workflow")        → trace existing process flows
+9. gitnexus_context({name: "<symbol>"})             → callers + callees + processes
 ```
 
-Only after steps 1–5 are complete may implementation begin.
+Only after steps 1–9 are complete may implementation begin.
 
 ## Cross-Module Impact Query Pattern
 
