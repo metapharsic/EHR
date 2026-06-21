@@ -1,5 +1,5 @@
-# AI Coding Rules — Metapharsic Lifesciences ERP v14.0
-# ENTERPRISE DEVELOPMENT GOVERNANCE | ZERO-OMISSION PROTOCOL
+# AI Coding Rules — Metapharsic Lifesciences ERP v15.0
+# ENTERPRISE DEVELOPMENT GOVERNANCE | ZERO-OMISSION PROTOCOL | LOGIC-BREAK PREVENTION
 # Last updated: 2026-06-21
 
 ---
@@ -11,6 +11,7 @@ Before generating any code, always read and comply with:
 - /docs/architecture/system-architecture.md
 - /docs/architecture/module-map.md
 - /docs/architecture/dependency-map.md
+- /docs/architecture/change-propagation.md
 - /docs/database/entities.md
 - /docs/database/relationships.md
 - /docs/database/erd.md
@@ -18,11 +19,117 @@ Before generating any code, always read and comply with:
 - /docs/security/permissions.md
 - /docs/security/roles.md
 - /docs/reports/dashboards.md
+- /docs/known-issues/anti-patterns.md
 - /docs/reports/kpis.md
 
 If documentation and code conflict, report the conflict and request clarification before implementing.
 
 Never start implementation before completing discovery.
+
+---
+
+## SECTION 0.5: PRE-EDIT VERIFICATION PROTOCOL
+
+This section runs BEFORE touching any file. It is NOT optional.
+
+### Step 1 — Anti-Pattern Check
+
+Before writing a single line, scan /docs/known-issues/anti-patterns.md and verify your approach does NOT match any listed pattern.
+
+Mandatory checks:
+- [ ] Not using in-memory Map/Set/Array for shared state (AP-001)
+- [ ] Not storing UUID in an INTEGER column (AP-002)
+- [ ] Not putting stateful values in useEffect dependency array with mutations inside (AP-003)
+- [ ] Verified the exact API response shape before accessing nested fields (AP-004)
+- [ ] Verified SQL column names against schema before writing queries (AP-005)
+- [ ] Credit limit check included in any new sales/invoice route (AP-006)
+- [ ] H1 drug register insert inside same ACID transaction as the bill (AP-007)
+- [ ] DeerFlow trigger is setImmediate, never await inside transaction (AP-008)
+- [ ] Statutory rates read from hr_statutory_config, never hardcoded (AP-009)
+- [ ] Not writing to general_ledger or stock_ledger_entries directly (AP-010)
+- [ ] Not using Math.random() for any invoice/record number (AP-011)
+- [ ] If touching shared utility — ran impact analysis first (AP-012)
+- [ ] Not using DELETE on any protected table (AP-013)
+- [ ] Period lock checked before any GL write (AP-014)
+- [ ] All SQL SELECT aliases use camelCase (AP-015)
+
+If ANY check fails: stop. Fix the approach before proceeding.
+
+---
+
+### Step 2 — Change Propagation Check
+
+Before touching any file, open /docs/architecture/change-propagation.md and identify:
+
+- What type of change is this? (DB column / API shape / state machine / shared utility / frontend component / GST engine / security)
+- What is the FULL propagation list for this change type?
+- Write out every file that must be updated as a checklist before starting.
+
+Never assume a change is isolated. Every change has downstream effects. The propagation matrix defines them.
+
+---
+
+### Step 3 — Current Working State Verification
+
+Before changing anything that is currently working:
+
+- [ ] State what currently works (the existing behavior)
+- [ ] State exactly what will change (the new behavior)
+- [ ] State what must NOT change (the preserved behavior)
+- [ ] Identify which existing tests or flows verify the current behavior
+- [ ] Confirm the change does not break any state machine transition currently in production
+
+If you cannot clearly state all three — you do not have enough context. Run GitNexus queries first.
+
+---
+
+### Step 4 — Flow Continuity Gate
+
+For every feature that has a state machine, workflow, or multi-step flow:
+
+- [ ] Trace the FULL flow end-to-end (entry point → all transitions → exit states)
+- [ ] Verify every transition still has: side effects defined, error path defined, rollback path defined
+- [ ] Verify audit log is written at every transition
+- [ ] Verify stock/ledger effects are correct for every transition (OMS, Purchase, Manufacturing, POS)
+- [ ] Verify DeerFlow triggers fire at the correct transition points (non-blocking)
+- [ ] Verify no "orphan state" — every state can reach a terminal state
+
+---
+
+### Step 5 — Integration Points Verification
+
+After any change, verify these integration points still work:
+
+| Integration Point | What to Verify |
+|---|---|
+| ledgerHelper | Called with correct parameters, inside ACID transaction, returns expected shape |
+| verify2FAMiddleware | Still present on all inventory and accounting write routes |
+| asyncRoute wrapper | Still wraps every route handler in the modified file |
+| company_id isolation | All queries in the modified file include company_id filter |
+| audit_logs write | Every mutation in the modified file writes an audit_logs entry |
+| camelCase aliases | Every SELECT in the modified file uses as "camelCase" aliases |
+| Credit limit check | Any route that creates a sales transaction checks credit limit |
+| Soft delete filter | Any list query filters deleted_at IS NULL or status != 'Deleted' |
+| Period lock check | Any GL write checks acc_periods.is_locked before posting |
+
+---
+
+### Step 6 — Post-Implementation Flow Test
+
+After implementation, mentally execute the complete flow:
+
+1. What is the first user action?
+2. What does the frontend send to the API?
+3. What does the middleware chain do? (auth -> 2FA -> route handler)
+4. What does the route handler read from DB?
+5. What ACID transaction runs?
+6. What side effects fire after COMMIT? (audit log, DeerFlow, notification)
+7. What does the API return?
+8. What does the frontend render?
+9. What happens on error? (4xx, 5xx, network failure)
+10. What happens on rollback? (ACID failure, partial state)
+
+If any step cannot be answered confidently — the implementation is incomplete.
 
 ---
 

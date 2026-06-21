@@ -19,6 +19,13 @@ This project is indexed by GitNexus as **EHR** (4867 symbols, 11387 relationship
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
 - NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
 - NEVER commit changes without running `detect_changes()` to check affected scope.
+- NEVER use in-memory Map/Set for shared state — PM2 runs 2 workers, use PostgreSQL (AP-001).
+- NEVER write to `general_ledger` or `stock_ledger_entries` directly — use `ledgerHelper` only (AP-010).
+- NEVER use `Math.random()` for invoice/record numbers — use DB sequence inside ACID transaction (AP-011).
+- NEVER hard-delete from protected tables (`audit_logs`, `employees`, `qc_records`, `journal_vouchers`) (AP-013).
+- NEVER call `triggerWorkflow()` with `await` inside an ACID transaction — always `setImmediate` (AP-008).
+- NEVER change a shared utility (`ledgerHelper`, `verify2FAMiddleware`, `asyncRoute`) without running full impact analysis first (AP-012).
+- NEVER implement a change without checking `/docs/architecture/change-propagation.md` for the full propagation list.
 
 ## Resources
 
@@ -63,6 +70,8 @@ This project uses a `/docs/` directory for detailed artifacts. Always read relev
 | `/docs/security/permissions.md` | Module access matrix, field-level security, audit write requirements |
 | `/docs/reports/dashboards.md` | Dashboard widgets, async report jobs, result shape |
 | `/docs/reports/kpis.md` | All KPIs, formulas, source tables, report routes |
+| `/docs/architecture/change-propagation.md` | "If you touch X, update Y" — full propagation matrix |
+| `/docs/known-issues/anti-patterns.md` | 15 real bugs from this codebase — patterns to never repeat |
 
 If documentation and code conflict, report the conflict before implementing.
 
@@ -75,18 +84,20 @@ Every GitNexus session on this project MUST follow this sequence before writing 
 ## Pre-Implementation Checklist (run in order)
 
 ```
-1. Read /docs/architecture/module-map.md            → verify module + route already exists
-2. Read /docs/database/entities.md                  → verify entity already exists
-3. Read /docs/database/relationships.md             → verify relationship already exists
-4. Read /docs/architecture/dependency-map.md        → map cross-module impact
-5. Read /docs/security/permissions.md               → verify security requirements
-6. gitnexus_query("full module inventory")          → find symbols in live code
-7. impact({target: "<symbol>", direction: "upstream"}) → blast radius for the target
-8. gitnexus_query("<feature area> workflow")        → trace existing process flows
-9. gitnexus_context({name: "<symbol>"})             → callers + callees + processes
+1.  Read /docs/known-issues/anti-patterns.md        → confirm approach is not a known failure pattern
+2.  Read /docs/architecture/module-map.md           → verify module + route already exists
+3.  Read /docs/database/entities.md                 → verify entity already exists
+4.  Read /docs/database/relationships.md            → verify relationship already exists
+5.  Read /docs/architecture/dependency-map.md       → map cross-module impact
+6.  Read /docs/architecture/change-propagation.md  → build full propagation checklist for this change type
+7.  Read /docs/security/permissions.md              → verify security requirements
+8.  gitnexus_query("full module inventory")         → find symbols in live code
+9.  impact({target: "<symbol>", direction: "upstream"}) → blast radius for the target
+10. gitnexus_query("<feature area> workflow")       → trace existing process flows
+11. gitnexus_context({name: "<symbol>"})            → callers + callees + processes
 ```
 
-Only after steps 1–9 are complete may implementation begin.
+Only after steps 1–11 are complete may implementation begin.
 
 ## Cross-Module Impact Query Pattern
 
