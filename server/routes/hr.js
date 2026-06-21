@@ -1786,8 +1786,40 @@ router.post(['/payroll/run', '/payroll/process-bulk'], verifyTokenMiddleware, ve
   const empRes = await db.query(`SELECT * FROM employees WHERE status='Active'`);
   const employees = empRes.rows;
 
-  const statutoryRes = await db.query(`SELECT * FROM hr_statutory_config LIMIT 1`);
-  const statutory = statutoryRes.rows[0] || {};
+  // BUG-1 FIX: fetch ALL statutory config rows and build proper engine config object.
+  // Previously LIMIT 1 returned one raw row; engine expects pfConfig/esicConfig/ptSlabs/tdsConfig.
+  const statutoryRes = await db.query(
+    `SELECT config_type, state, config_data FROM hr_statutory_config
+     WHERE company_id = $1 AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
+     ORDER BY effective_from DESC`,
+    [company_id || 1]
+  );
+  const sRows = statutoryRes.rows;
+  const findCfg = (type) => sRows.find(r => r.config_type === type)?.config_data || {};
+
+  // GL accounts from chart_of_accounts (looked up once per payroll run)
+  const glAccRes = await db.query(
+    `SELECT id, account_code FROM chart_of_accounts
+     WHERE account_code IN ('5100','2300') AND company_id = $1`,
+    [company_id || 1]
+  );
+  const glAccounts   = glAccRes.rows;
+  const salaryExpAcc = glAccounts.find(a => a.account_code === '5100')?.id || null;
+  const salaryPayAcc = glAccounts.find(a => a.account_code === '2300')?.id || null;
+
+  // Build base statutory — PT slabs resolved per employee below (BUG-5)
+  const baseStatutory = {
+    pfConfig:   findCfg('PF_CEILING'),
+    esicConfig: findCfg('ESIC_CEILING'),
+    tdsConfig:  findCfg('TDS_SLAB'),
+    // ptSlabs injected per employee based on work_location
+  };
+  // Map state → PT slabs for quick lookup
+  const ptSlabsByState = {};
+  for (const r of sRows.filter(r => r.config_type === 'PT_SLAB')) {
+    const key = (r.state || 'DEFAULT').toUpperCase();
+    ptSlabsByState[key] = r.config_data?.slabs || [];
+  }
 
   const slipsProcessed = [];
   const voucherIds = [];
@@ -1849,7 +1881,14 @@ router.post(['/payroll/run', '/payroll/process-bulk'], verifyTokenMiddleware, ve
       `, [emp.id, String(month), parseInt(year)]);
       const reimbAmount = parseFloat(reimRes.rows[0]?.reimb_amount || 0);
 
-      // 7. Compute payslip
+      // 7. Compute payslip — BUG-5 FIX: inject employee state-specific PT slabs
+      const empState = (emp.work_location || 'MAHARASHTRA').toUpperCase();
+      const ptSlabs  = ptSlabsByState[empState]
+                    || ptSlabsByState['MAHARASHTRA']
+                    || ptSlabsByState['DEFAULT']
+                    || [];
+      const statutory = { ...baseStatutory, ptSlabs };
+
       const payslip = payrollEngine.computeFullPayslip(
         emp,
         structure,
@@ -1857,7 +1896,7 @@ router.post(['/payroll/run', '/payroll/process-bulk'], verifyTokenMiddleware, ve
         {
           overtime_hours: parseFloat(ot.total_ot_hours),
           overtime_amount: parseFloat(ot.total_ot_amount),
-          leave_encash_days: 0, // could fetch from encRes if needed
+          leave_encash_days: 0,
           bonus: bonusAmount,
           reimbursement: reimbAmount,
         },
@@ -1929,35 +1968,49 @@ router.post(['/payroll/run', '/payroll/process-bulk'], verifyTokenMiddleware, ve
       ]);
 
       // 10. Post GL journal
+      // BUG-2 FIX: use salaryExpAcc/salaryPayAcc from chart_of_accounts (resolved once above)
+      // BUG-3 FIX: engine returns netPay not netSalary
+      // BUG-4 FIX: check acc_periods.is_locked before writing to GL
       const voucherId = uuidv4();
       const vDate = new Date(`${year}-${String(month).padStart(2, '0')}-28`);
-      const glClient = await db.getClient();
-      try {
-        await glClient.query('BEGIN');
-        const salaryExpAccount = statutory.salary_expense_account_id;
-        const salaryPayableAccount = statutory.salary_payable_account_id;
-        if (salaryExpAccount && salaryPayableAccount) {
-          await ledgerHelper.postToGeneralLedger(glClient, {
-            accountId: salaryExpAccount, voucherId, voucherType: 'Payroll',
-            transactionDate: vDate, debit: payslip.grossSalary || 0,
-            narration: `Salary expense ${emp.name} ${month}/${year}`,
-          });
-          await ledgerHelper.postToGeneralLedger(glClient, {
-            accountId: salaryPayableAccount, voucherId, voucherType: 'Payroll',
-            transactionDate: vDate, credit: payslip.netSalary || 0,
-            narration: `Net salary payable ${emp.name} ${month}/${year}`,
-          });
+
+      if (salaryExpAcc && salaryPayAcc) {
+        const glClient = await db.getClient();
+        try {
+          // AP-014: check period lock
+          const periodCheck = await glClient.query(
+            `SELECT is_locked FROM acc_periods
+             WHERE start_date <= $1 AND end_date >= $1 LIMIT 1`,
+            [vDate]
+          );
+          if (periodCheck.rows[0]?.is_locked) {
+            anomalies.push({ employee_id: emp.id, name: emp.name, issue: `GL skipped — period ${month}/${year} is locked` });
+          } else {
+            await glClient.query('BEGIN');
+            await ledgerHelper.postToGeneralLedger(glClient, {
+              accountId: salaryExpAcc, voucherId, voucherType: 'Payroll',
+              transactionDate: vDate, debit: payslip.grossSalary || 0,
+              narration: `Salary expense ${emp.name} ${month}/${year}`,
+            });
+            await ledgerHelper.postToGeneralLedger(glClient, {
+              accountId: salaryPayAcc, voucherId, voucherType: 'Payroll',
+              transactionDate: vDate, credit: payslip.netPay || 0,
+              narration: `Net salary payable ${emp.name} ${month}/${year}`,
+            });
+            await glClient.query('COMMIT');
+            voucherIds.push(voucherId);
+          }
+        } catch (glErr) {
+          await glClient.query('ROLLBACK');
+          anomalies.push({ employee_id: emp.id, name: emp.name, issue: `GL posting failed: ${glErr.message}` });
+        } finally {
+          glClient.release();
         }
-        await glClient.query('COMMIT');
-        voucherIds.push(voucherId);
-      } catch (glErr) {
-        await glClient.query('ROLLBACK');
-        anomalies.push({ employee_id: emp.id, name: emp.name, issue: `GL posting failed: ${glErr.message}` });
-      } finally {
-        glClient.release();
+      } else {
+        logger.warn(`Payroll GL skipped for ${emp.name} — accounts 5100/2300 not found in chart_of_accounts`);
       }
 
-      slipsProcessed.push({ employee_id: emp.id, name: emp.name, net: payslip.netSalary });
+      slipsProcessed.push({ employee_id: emp.id, name: emp.name, net: payslip.netPay });
     } catch (empErr) {
       logger.error(`Payroll processing failed for employee ${emp.id}`, { error: empErr.message });
       anomalies.push({ employee_id: emp.id, name: emp.name, issue: empErr.message });
@@ -1969,8 +2022,21 @@ router.post(['/payroll/run', '/payroll/process-bulk'], verifyTokenMiddleware, ve
 
 router.get('/payroll/slips/:id', verifyTokenMiddleware, asyncRoute(async (req, res) => {
   const result = await db.query(`
-    SELECT s.*, e.name AS employee_name, e.employee_code, e.department_id, e.designation_id,
-           d.name AS department_name, dg.name AS designation_name
+    SELECT
+      s.id, s.employee_id AS "employeeId", s.month, s.year,
+      s.gross_salary AS "grossSalary", s.net_pay AS "netPay",
+      s.pf_employee AS "pfEmployee", s.pf_employer AS "pfEmployer",
+      s.esic_employer AS "esicEmployer", s.professional_tax AS "professionalTax",
+      s.tds, s.bonus_amount AS "bonusAmount",
+      s.reimbursement_amount AS "reimbursementAmount",
+      s.overtime_amount AS "overtimeAmount",
+      s.leave_encashment_amount AS "leaveEncashmentAmount",
+      s.lop_days AS "lopDays", s.lop_deduction AS "lopDeduction",
+      s.payment_status AS "paymentStatus", s.bank_transfer_ref AS "bankTransferRef",
+      s.paid_at AS "paidAt", s.created_at AS "createdAt",
+      e.name AS "employeeName", e.employee_code AS "employeeCode",
+      e.department_id AS "departmentId", e.designation_id AS "designationId",
+      d.name AS "departmentName", dg.name AS "designationName"
     FROM salary_slips s
     LEFT JOIN employees e ON e.id = s.employee_id
     LEFT JOIN hr_departments d ON d.id = e.department_id
