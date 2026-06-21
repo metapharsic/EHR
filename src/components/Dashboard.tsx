@@ -6,17 +6,15 @@ import { DASHBOARD_STATS, MOCK_SALES_DATA } from '../constants';
 import { getAllEmployees, getEmployeePerformanceStats, initializeSampleData, getAllTasks } from '../services/databaseService';
 import { generateSmartInsights } from '../services/geminiService';
 import { useAuth } from '../context/AuthContext';
+import { useAppStore } from '../store/useAppStore';
 import { Tab, Task, MedicalRepresentative } from '../types';
 
-interface DashboardProps {
-  onNavigate: (tab: Tab) => void;
-}
-
-const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+const Dashboard: React.FC = () => {
   const [insightQuery, setInsightQuery] = useState('');
   const [insightResult, setInsightResult] = useState<string | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
   const { user, hasPermission } = useAuth();
+  const { setActiveTab: onNavigate } = useAppStore();
 
   // Task State
   const [tasks, setTasks] = useState<Task[]>([]);

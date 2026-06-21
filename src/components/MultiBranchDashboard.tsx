@@ -86,11 +86,11 @@ const MultiBranchDashboard: React.FC = () => {
  <tr key={b.id} className="hover:bg-slate-50 transition-colors group">
  <td className="px-6 py-4">
  <div className="font-bold text-slate-700">{b.name}</div>
- <div className="text-[10px] text-slate-400 uppercase tracking-tighter">{b.type} � {b.city}</div>
+ <div className="text-[10px] text-slate-400 uppercase tracking-tighter">{b.type} � {b.city}</div>
  </td>
  <td className="px-6 py-4 text-slate-600 font-medium italic">{b.manager}</td>
- <td className="px-6 py-4 text-right font-bold text-accent">{(Math.random() * 5000).toFixed(0)}</td>
- <td className="px-6 py-4 text-right font-bold text-amber-600">{(Math.random() * 200).toFixed(0)}</td>
+ <td className="px-6 py-4 text-right font-bold text-accent">{(b as any).totalStock ?? '—'}</td>
+ <td className="px-6 py-4 text-right font-bold text-amber-600">{(b as any).inTransit ?? '—'}</td>
  <td className="px-6 py-4 text-center">
  <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[9px] font-bold uppercase">Active</span>
  </td>

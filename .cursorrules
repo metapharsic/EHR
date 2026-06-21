@@ -1,6 +1,6 @@
-# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v10.0
+# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v12.0
 # MAXIMUM AUTOMATION | ENTERPRISE-GRADE PRECISION | AGENTIC AI STANDARDS
-# Last updated: 2026-06-11
+# Last updated: 2026-06-19
 
 You are a lead full-stack engineer managing the Metapharsic pharmaceutical enterprise ecosystem.
 
@@ -9,47 +9,173 @@ You are a lead full-stack engineer managing the Metapharsic pharmaceutical enter
 ## 1. Core Architectural & Functional Mandates
 
 ### A. Transactional Integrity (ACID)
-- **Financial/Inventory Safety**: ALL multi-table mutations MUST use `BEGIN/COMMIT/ROLLBACK`.
+- **Financial/Inventory Safety**: ALL multi-table mutations MUST use `BEGIN/COMMIT/ROLLBACK` via `db.getClient()`.
+- **Pattern**: `const client = await db.getClient(); try { await client.query('BEGIN'); ... await client.query('COMMIT'); } catch(e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }`
 - **Side Effects**: Use `setImmediate()` or a Job Queue for non-blocking side effects (Logging, Webhooks, Notifications).
-- **Idempotency**: All `POST` operations that create critical records must include a client-generated `id` or use unique composite keys to prevent double-creation.
+- **Idempotency**: All `POST` operations that create critical records must use deterministic composite keys or sequence-based IDs. NEVER use `Math.random()` for invoice/record numbers.
 
 ### B. Business Logic & Date Handling
 - **Request-Time Dates**: ALWAYS compute `new Date()` inside the request handler. NEVER use module-level constants.
 - **FSN Inventory**: Velocity = `units_sold_90_days / 90`. Categorize as: Fast (>0.1), Slow (>0), Non-Moving (0).
 - **Deterministic KPIs**: ROI and Efficiency scores must use weighted linear formulas. No `Math.random()`.
+- **GST Engine**: Always compare `company.state` vs `party.state` — same state → CGST+SGST (split 50/50); different state → IGST full. Use `tax_configurations` table for rates.
+
+### C. DB ↔ API Naming
+- **DB columns**: `snake_case` always.
+- **Frontend JSON**: `camelCase` always.
+- **Backend translation**: Use SQL column aliases (`column_name as "camelCaseName"`) in every SELECT. Never send raw snake_case to the frontend.
+
+### D. asyncRoute Pattern
+- Wrap every Express handler: `const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);`
+- All route files already use this — never use bare `async (req, res)` without the wrapper unless the file already has no wrapper.
 
 ---
 
-## 2. Module-Specific Implementation Standards
+## 2. Revenue & Sales Module Standards
 
-### 🛡️ PCD (Franchise & Field Force)
-- **Authoritative Data**: MR Master lives in ERP `medical_representatives`. Visit activity lives in MR Tracker `visit_schedules`.
-- **Geospatial**: `pcd_geospatial_insights` MUST be updated when MR visits are marked 'Completed' via MR Tracker.
-- **Schemes**: Quarterly bonus logic must evaluate `pcd_schemes` against `total_shipped_value` in the `orders` table.
+### 💬 CRM (Leads)
+- **Tables**: `leads`, `lead_activities`, `lead_product_interests`, `lead_sample_requests`, `crm_leads`, `crm_opportunities`, `crm_pipeline_stages`
+- **Routes**: `GET /api/crm/stats`, `GET /api/crm/leads`, `POST /api/crm/leads`, `PUT /api/crm/leads/:id`, `DELETE /api/crm/leads/:id`, `POST /api/crm/convert/:id`, `GET /api/crm/leads/:id/activities`, `POST /api/crm/leads/:id/activities`
+- **Conversion Flow**: `POST /api/crm/convert/:id` — ACID transaction: create `parties` record + `pcd_partners` record (if pharmaceutical lead) + update `leads.status='Converted'` + log `lead_activities` entry. Rollback all on error.
+- **Lead Status Machine**: `New → Contacted → Qualified → Proposal → Negotiation → Converted | Lost`. Reject invalid transitions.
+- **Follow-up Queue**: `GET /api/crm/leads?queue=today_and_overdue` filters `next_follow_up <= CURRENT_DATE AND status NOT IN ('Converted','Lost')`.
+- **AI Scoring**: `PUT /api/crm/leads/:id/ai-score` — score stored in `leads.ai_score`. Use weighted formula: recency + value + engagement. Never random.
+- **Activity Log**: Every status change MUST write a `lead_activities` row with `activity_type`, `note`, `performed_by` (user ID from JWT).
+- **Company Scoping**: All `leads` queries MUST filter by `company_id = req.user.companyId || 1`.
+- **Kanban**: Status change via `PUT /api/crm/leads/:id` with `{ status }` — write status + `lead_activities` log in same transaction.
+- **Frontend camelCase aliases required**: `l.assigned_to as "assignedTo"`, `l.next_follow_up as "nextFollowUp"`, `l.estimated_value as "estimatedValue"`, `l.ai_score as "aiScore"`.
 
-### 📦 OMS (Distribution & Fulfillment)
-- **The 3-Way Match**: Purchases require a matching PO, GRN (`goods_received_notes`), and Supplier Invoice.
-- **Reservation**: `reserved_stock` is created at 'Approved' status. Clear it and update `stock_ledger_entries` at 'Shipped'.
-- **Return Logic**: Sales returns MUST create a `status='CreditNote'` invoice and restore batch stock using `ledgerHelper.postToStockLedger(IN)`.
+### 🏢 PCD Network (Franchise Partners)
+- **Tables**: `pcd_partners`, `pcd_transactions`, `pcd_schemes`, `pcd_targets`, `pcd_commissions`, `pcd_geospatial_insights`, `pcd_mr_assignments`, `pcd_receivables`, `pcd_partner_documents`, `pcd_broadcast_messages`
+- **Routes**: `GET/POST /api/pcd/partners`, `GET/PUT /api/pcd/partners/:id`, `POST /api/pcd/partners/:id/activate`
+- **Partner → Party Sync**: When a partner status changes to `ACTIVE` or `APPROVED`, call `syncPartnerToParty(client, partnerId)` — this upserts to `parties` table (type=`Debtor`) and writes back `pcd_partners.converted_party_id`. This MUST happen inside the ACID transaction.
+- **Drug License Validation**: `drug_license_expiry` must be in future. Warn (not block) if within 30 days.
+- **Territory Monopoly**: `monopoly_territory = true` means no other active partner can share the same `territory + state` combo. Check before INSERT.
+- **Scheme Evaluation**: Quarterly bonus = `SUM(pcd_transactions.order_amount)` vs `pcd_schemes.min_order_value` for the quarter. Write result to `pcd_commissions`.
+- **Geospatial**: When an MR visit (`visit_schedules` in MR Tracker) is marked `Completed` for a PCD territory, upsert `pcd_geospatial_insights` with `last_visit_date`, `visit_count`.
+- **Grade Logic**: Partner grades (`A`, `B`, `C`) based on `total_business` (from `pcd_transactions` SUM). A: >500k, B: >100k, C: else.
+- **camelCase aliases**: `p.contact_number as "contactNumber"`, `p.drug_license_no as "drugLicenseNo"`, `p.partner_grade as "partnerGrade"`, `p.converted_party_id as "convertedPartyId"`.
 
-### 👥 HRMS (Employee Lifecycle)
-- **Statutory Compliance**: Payroll engine MUST pull from `hr_statutory_config` for PF, ESIC, and PT calculations.
-- **Salary Structure**: `salary_slips` generation must cross-reference `hr_attendance` (actual vs scheduled days).
-- **Document Management**: Employee docs (PAN, Aadhaar) MUST be stored with soft-delete in `hr_employee_documents` and filtered from AI.
+### 📦 OMS — Order Management
+- **Tables**: `orders`, `order_items`, `order_status_history`, `reserved_stock`, `order_shipments`, `order_shipment_items`, `order_returns`, `order_return_items`, `oms_sla_rules`, `goods_received_notes`
+- **Routes**: `GET /api/oms/orders`, `POST /api/oms/orders`, `PUT /api/oms/orders/:id/status`, `GET /api/oms/orders/:id`, `POST /api/oms/orders/:id/ship`, `POST /api/oms/orders/:id/return`
+- **State Machine** (strict — reject any other transition):
+  ```
+  Pending Approval → Approved | Rejected | Cancelled | Hold
+  Approved → Processing | Shipped | Hold | Cancelled
+  Processing → Shipped | Hold | Cancelled
+  Shipped → Delivered
+  Delivered → Invoiced
+  Hold → Approved | Processing | Cancelled
+  ```
+- **Stock Reservation** (`Approved` event): FIFO across `batches` by `expiry_date ASC`. INSERT into `reserved_stock`, UPDATE `batches.reserved_qty`. Use `SELECT FOR UPDATE` on batches rows.
+- **Shipment** (`Shipped` event): Convert reservations → physical OUT via `ledgerHelper.postToStockLedger('OUT')`. DELETE `reserved_stock` rows. UPDATE `batches.stock`. Write `order_status_history`.
+- **Cancellation**: If order was `Approved`/`Processing`, call `releaseOrderReservations(client, orderId)` — DELETE `reserved_stock` + restore `batches.reserved_qty`. All inside ACID transaction.
+- **SLA Breach**: Check `oms_sla_rules` thresholds; flag orders where `(CURRENT_TIMESTAMP - created_at) > sla_hours` for the current status. Exposed via `GET /api/oms/orders?sla_breach=true`.
+- **Order Number**: `SO-YYYYMMDD-NNNN` (sequence from COUNT of orders on that date + 1, computed inside transaction).
+- **3-Way Match** (Purchase Receipt): PO + GRN (`goods_received_notes`) + Supplier Invoice must all exist before `purchase_orders.status` can become `Completed`. Endpoint: `GET /api/purchase/3-way-match`.
+- **camelCase aliases**: `o.order_number as "orderNumber"`, `o.total_amount as "totalAmount"`, `o.party_id as "partyId"`, `oi.product_id as "productId"`, `oi.approved_quantity as "approvedQuantity"`.
 
-### 📋 Compliance & Regulatory
-- **H1 Register**: Every sale of Schedule H1 drugs must be entry-logged to `h1_register` with Patient/Doctor/Batch details.
-- **QC Integration**: `batches.stock` becomes "Available" only after a `qc_records.status='Passed'` entry.
-- **DMS**: All SOPs and licenses must use `dms_versions` for change tracking. Soft-delete only (`status='Deleted'`).
+### 🏪 POS / Billing
+- **Tables**: `pos_bills`, `pos_bill_items`, `pos_payments`, `pos_sessions`, `batches`, `pdc_cheques`, `pdc_register`, `bank_reconciliation`
+- **Routes**: `GET /api/pos/invoices`, `POST /api/pos/invoices`, `GET /api/pos/parties`, `GET /api/pos/products`, `GET /api/pos/dashboard-summary`, `POST /api/pos/returns`, `GET /api/pos/invoices/stats`
+- **Invoice Number**: `INV-YYYY-NNNN` (sequence). POS invoices ONLY. NOT the same as WHO- or PCD- invoices.
+- **Concurrency**: Use `SELECT FOR UPDATE` on `batches` rows when deducting stock during high-volume POS sessions. Pattern: `SELECT id, stock FROM batches WHERE id=$1 FOR UPDATE`.
+- **Tax Engine**: Auto-calculate CGST/SGST vs IGST by comparing `companies.state` vs `parties.state`. Store both values in `pos_bill_items`.
+- **PDC Cheques**: Post-dated cheques stored in `pdc_cheques` + `pdc_register`. Reconcile via `bank_reconciliation` when cheque clears. DO NOT delete PDC entries — use `status='Cleared'` or `status='Bounced'`.
+- **Return Flow**: `POST /api/pos/returns` — ACID: create `CreditNote` invoice in `sales_invoices`, restore batch stock via `ledgerHelper.postToStockLedger('IN')`, write `stock_ledger_entries`.
+- **Sessions**: `pos_sessions` tracks daily open/close. KPIs (`dashboard-summary`) aggregate from `pos_bills` where `session_id = current_session`.
+- **H1 Drugs**: Any `pos_bill_item` for a Schedule H1 product MUST log to `h1_register` (patient name, doctor, batch, qty) inside the same ACID transaction as the bill.
 
-### 💳 POS & Billing
-- **Concurrency**: Use `SELECT FOR UPDATE` on `batches` when deducting stock during high-volume POS sessions.
-- **Tax Engine**: Auto-calculate CGST/SGST vs IGST by comparing `company_id.state` vs `party_id.state`.
-- **Payment Reconciliation**: PDC (Post-Dated Cheques) must be tracked in `pdc_cheques` and reconciled via `bank_reconciliation`.
+### 📋 Sales Register (All Invoice Types)
+- **Tables**: `sales_invoices`, `sales_invoice_items`, `parties`, `batches`, `stock_ledger_entries`
+- **Invoice Prefix Convention** (critical — drives all list filtering):
+  - `INV-YYYY-NNNN` → POS retail bills
+  - `PCD-YYYYMMDD-NNNN` → PCD partner invoices
+  - `WHO-YYYYMMDD-NNNN` → Wholesale invoices
+- **Filter Rule**: `GET /api/sales` returns only `WHERE invoice_number LIKE 'PCD-%' OR invoice_number LIKE 'WHO-%'`. POS bills (`INV-`) are separate.
+- **Stats Route**: `GET /api/sales/stats` aggregates `SUM(net_amount)`, `COUNT(*)`, monthly breakdown across both PCD and WHO invoices.
+- **Ledger Posting**: Every `sales_invoice` creation MUST write matching `stock_ledger_entries` (OUT) and `general_ledger` debit/credit entries. Use `ledgerHelper`.
+- **camelCase aliases**: `si.invoice_number as "invoiceNumber"`, `si.net_amount as "netAmount"`, `si.sub_total as "subTotal"`, `si.total_gst as "totalGst"`, `si.party_id as "partyId"`.
+
+### 🏬 Wholesale Sales
+- **Tables**: `sales_invoices` (prefix `WHO-`), `sales_invoice_items`, `parties`
+- **Routes**: `GET /api/sales`, `POST /api/sales`, `GET /api/sales/stats`, `GET /api/sales/dropdown`, `GET /api/sales/products`
+- **Invoice Number**: `WHO-YYYYMMDD-NNNN` — generate inside ACID transaction using `SELECT COUNT(*) FROM sales_invoices WHERE invoice_number LIKE 'WHO-' || to_char(NOW(),'YYYYMMDD') || '-%'` + 1.
+- **Products Endpoint**: `GET /api/sales/products` — `SELECT id, name, COALESCE(ptr, selling_rate, 0) as "ptr", COALESCE(mrp, 0) as mrp, COALESCE(gst, 12) as gst FROM products WHERE is_active = true ORDER BY name`.
+- **Per-Item GST**: Each `sales_invoice_items` row has its own `gst_percent` (from product master). Never apply flat rate.
+- **GST Calculation**: `taxable_amount = quantity * rate`. `gst_amount = taxable_amount * gst_percent / 100`. `total_amount = taxable_amount + gst_amount`.
+- **Party Validation**: `party_id` must exist in `parties` table with `type IN ('Debtor','Both')`.
+- **Credit Limit Check**: `parties.current_balance + invoice_total > parties.credit_limit` → return 400 with `{ error: 'Credit limit exceeded', limit: ..., current: ... }`.
+- **Stock Deduction**: After invoice INSERT, deduct batch stock via `ledgerHelper.postToStockLedger('OUT')` in same ACID transaction.
 
 ---
 
-## 3. UI/UX Functional Standards
+## 3. Supply Chain & Operations Module Standards
+
+### 📦 Inventory Hub
+- **Tables**: `products`, `batches`, `stock_ledger_entries`, `stock_ledger_detailed`, `godowns`, `reserved_stock`, `stock_movement_reasons`, `dead_stock_analysis`, `abc_analysis`, `inventory_turnover_analysis`
+- **Routes**: `GET /api/inventory`, `POST /api/inventory` (new product), `PUT /api/inventory/:id`, `DELETE /api/inventory/:id`, `GET /api/inventory/:id/batches`, `POST /api/inventory/batch`, `POST /api/inventory/adjust`, `GET /api/inventory/valuation`, `GET /api/inventory/lists/dropdown`
+- **Stock Source of Truth**: `batches.stock` is the live available quantity. `products.current_stock` is a DENORMALIZED cache — always recompute from `SUM(batches.stock) WHERE product_id=$id` for accurate reads.
+- **Batch Rule**: `available_qty = batches.stock - COALESCE(batches.reserved_qty, 0)`. Never sell/reserve more than `available_qty`.
+- **QC Gate**: `batches.stock` becomes available ONLY after `qc_records.status='Passed'` for that batch. Pending QC batches → `batches.status='QC_Pending'`.
+- **Expiry Rules**: `EXPIRING` = expiry within 30 days; `EXPIRED` = past expiry. Flag on every read. NEVER allow POS or OMS to dispatch expired batches.
+- **FSN Categorization**: Fast: `units_sold_90_days/90 > 0.1`; Slow: `> 0`; Non-Moving: `= 0`. Stored in `abc_classification`.
+- **Stock Adjustment**: `POST /api/inventory/adjust` — ACID: update `batches.stock`, write `stock_ledger_entries` with `movement_type='Adjustment'` and `reason_id`.
+- **Valuation**: Use FIFO. `GET /api/inventory/valuation` sums `batches.cost_price * batches.stock` per product.
+- **2FA Required**: `inventory.js` applies `verify2FAMiddleware` on all write routes (POST/PUT/DELETE). Do not remove.
+- **camelCase aliases**: `p.current_stock as "currentStock"`, `p.reorder_level as "reorderLevel"`, `p.generic_name as "genericName"`, `b.expiry_date as "expiryDate"`, `b.available_qty as "availableQty"`.
+
+### 🛒 Purchase
+- **Tables**: `purchase_orders`, `purchase_order_items`, `goods_received_notes`, `grn_items`, `supplier_invoices`, `purchase_invoice_items`, `three_way_matches`, `vendor_ratings`, `purchase_budgets`, `purchase_invoices`, `purchases`
+- **Routes**: `GET /api/purchase`, `POST /api/purchase`, `GET /api/purchase/:id`, `PUT /api/purchase/:id`, `POST /api/purchase/:id/receive` (GRN), `GET /api/purchase/3-way-match`, `PUT /api/purchase/3-way-match/:id`, `GET /api/purchase/vendor-ratings`, `GET /api/purchase/reorder-alerts`, `GET /api/purchase/approvals`
+- **PO Number**: `PO-YYYYMMDD-NNNN` sequence inside transaction.
+- **3-Way Match Gate**: A PO can only reach `Completed` when all 3 exist: `purchase_orders` (PO), `goods_received_notes` (GRN), `supplier_invoices` (invoice). Mismatch in quantity or amount → flag in `three_way_matches.discrepancy`.
+- **GRN Flow** (`POST /api/purchase/:id/receive`): ACID transaction — insert `goods_received_notes` + `grn_items`, update `purchase_orders.status='Received'`, update batch stock via `ledgerHelper.postToStockLedger('IN')`, write `stock_ledger_entries`.
+- **QC Integration**: After GRN insert, create `qc_records` row with `status='Pending'` for each batch received. Stock is NOT available until QC passes.
+- **Reorder Alerts**: `GET /api/purchase/reorder-alerts` — products where `products.current_stock <= products.reorder_level AND is_active = true`.
+- **Budget Check**: Before approving PO, verify `purchase_budgets.remaining_amount >= purchase_orders.total_amount`. Warn if over budget.
+- **Vendor Rating**: Updated via `PUT /api/purchase/vendor-ratings/:id` — score 1-5 based on `delivery_accuracy`, `quality_score`, `price_compliance`.
+- **Role Guard**: All purchase mutations require `PURCHASE_MANAGER` or `ADMIN` role.
+- **camelCase aliases**: `po.po_number as "poNumber"`, `po.supplier_id as "supplierId"`, `poi.product_id as "productId"`, `grn.received_date as "receivedDate"`.
+
+### 🚚 Logistics
+- **Tables**: `dispatches`, `order_shipments`, `order_shipment_items`
+- **Routes**: `GET /api/logistics`, `POST /api/logistics`, `GET /api/logistics/:id`, `PUT /api/logistics/:id`, `DELETE /api/logistics/:id`, `GET /api/logistics/stats`, `GET /api/logistics/dropdown`
+- **Dispatch Record**: Created when an OMS order moves to `Shipped`. Fields: `invoice_no`, `customer_name`, `lr_number` (Lorry Receipt), `eway_bill_no`, `transporter`, `dispatch_date`, `expected_delivery_date`, `status`.
+- **Status Flow**: `Pending → In Transit → Delivered | Returned`. `actual_delivery_date` set on `Delivered`.
+- **E-way Bill**: `eway_bill_no` + `eway_bill_date` required for shipments > ₹50,000 value. Warn if missing above threshold.
+- **Temperature Control**: `temperature_controlled = true` dispatches must have `temperature_logs` entries within 6 hours. Flag breach if logs missing.
+- **COD**: `cod_amount > 0` → flag for collection. Mark collected via PUT with `cod_collected = true`.
+- **Sorting**: Default `ORDER BY created_at DESC`. Allow sort by `dispatch_date`, `status`, `invoice_no`, `customer_name`. Whitelist sort fields server-side (SQL injection prevention).
+- **camelCase aliases**: All already aliased in logistics.js — preserve all `as "camelCase"` aliases on any modification.
+
+### 🏭 Assets & Maintenance
+- **Tables**: `fixed_assets`, `asset_categories`, `asset_maintenance_logs`, `asset_alerts`, `asset_insurance_policies`, `asset_transfers`, `hr_asset_allocations`
+- **Routes**: `GET /api/assets`, `POST /api/assets`, `GET /api/assets/:id`, `PUT /api/assets/:id`, `DELETE /api/assets/:id`
+- **Depreciation**: Calculated at read time using `purchase_cost`, `purchase_date`, `useful_life_years` (straight-line: `annual_depreciation = purchase_cost / useful_life_years`). Never store pre-computed depreciation unless explicitly asked.
+- **Maintenance Schedule**: `asset_alerts` drives upcoming maintenance. Alert triggered when `next_service_date <= CURRENT_DATE + 7 days`.
+- **Allocation**: Link to `hr_asset_allocations` (employee → asset). An asset in `status='Allocated'` cannot be `Disposed` without first de-allocating.
+- **Insurance**: `asset_insurance_policies` tracks policy expiry. Warn (not block) when within 30 days of expiry.
+- **Disposal Rule**: Set `status='Disposed'`, `disposal_date=NOW()`, `disposal_value`. DO NOT delete records — fixed assets are audit-critical.
+- **Category Scoping**: `fixed_assets.category_id` → `asset_categories.id`. All reads must LEFT JOIN `asset_categories`.
+- **Company Scoping**: All `fixed_assets` queries filter `company_id = req.user.companyId || 1`.
+
+### 📄 Document Management (DMS)
+- **Tables**: `dms_documents`, `dms_versions`, `dms_folders`, `dms_audit_trail`, `dms_workflows`, `document_categories`
+- **Routes**: `GET /api/dms`, `POST /api/dms` (upload), `GET /api/dms/:id`, `PUT /api/dms/:id`, `DELETE /api/dms/:id`
+- **Version Control**: Every edit to `dms_documents` MUST create a new row in `dms_versions` with the old content reference and increment `current_version`. Never overwrite the previous version file.
+- **Soft Delete ONLY**: Set `dms_documents.status='Deleted'` + write `dms_audit_trail` entry. NEVER `DELETE FROM dms_documents`.
+- **File Storage**: Files stored at `/u01/apps/Metapharsic_ERP/uploads/dms/`. Filename pattern: `DOC-{timestamp}-{random}.{ext}`. Max 50MB (multer limit enforced).
+- **Expiry Tracking**: `expiry_date` on documents. Flag `status='Expiring'` when within 30 days. Block re-use of expired compliance documents.
+- **Audit Trail**: Every read, create, update, and delete of a document MUST write to `dms_audit_trail` with `user_id`, `action`, `document_id`, `timestamp`.
+- **Workflow**: `dms_workflows` tracks approval chains for regulated documents (SOPs, drug licenses). Status: `Draft → Under Review → Approved | Rejected`.
+- **Category Filter**: `GET /api/dms?category=SOP` filters by `dms_documents.category`. Valid categories from `document_categories` table.
+- **File Type Validation**: Accept only `pdf`, `doc`, `docx`, `xls`, `xlsx`, `jpg`, `png`. Reject others at upload.
+
+---
+
+## 4. UI/UX Functional Standards
 
 ### A. Layout & Aesthetics (Tailwind v4)
 - **Glassmorphism**: Use `backdrop-blur-lg` + `bg-white/70` for modals and card overlays.
@@ -58,42 +184,285 @@ You are a lead full-stack engineer managing the Metapharsic pharmaceutical enter
 
 ### B. Interactive Patterns
 - **Quick Actions**: Top-right "Plus" button for high-frequency tasks (Add Sale, Create Lead, Clock In).
-- **Standardized Icons**:
+- **Standardized Icons** (Lucide React):
   - `CheckCircle` = Success/Approved
   - `AlertTriangle` = Pending/Review
-  - `XCircle` = Rejected/Overdue
+  - `XCircle` = Rejected/Overdue/Error
   - `TrendingUp` = Performance
-- **Skeleton Grids**: All `useDataFetch` components must show matching skeleton rows during `isLoading`.
+  - `Package` = Inventory/Products
+  - `Truck` = Logistics/Dispatch
+  - `FileText` = Invoices/Documents
+  - `Users` = CRM/Leads/Parties
+- **Skeleton Grids**: All `useDataFetch` components MUST show matching skeleton rows during `isLoading`.
+- **Empty State**: Show icon + message + primary action CTA when data array is empty.
+- **Error State**: Show `AlertTriangle` + error message when `error` is non-null. Never show raw error objects.
 
-### C. State Management (Zustand)
-- **Persistence**: Store `activeCompanyId`, `activeFinancialYear`, and `sidebarCollapsed` in `persist` storage.
-- **Context**: Use `useAppStore` for global notifications and auth state. Avoid Prop Drilling beyond 2 levels.
+### C. State Management
+- **useDataFetch hook**: Auto-unwraps `{ success, data }` responses → `data` field is returned as the `data` state. If API returns non-2xx, `data` is null and `error` is set.
+- **Persistence** (Zustand): Store `activeCompanyId`, `activeFinancialYear`, `sidebarCollapsed` in `persist` storage.
+- **Context**: Use `useAppStore` for global notifications and auth state. Avoid prop drilling beyond 2 levels.
+
+### D. Form Standards
+- **Controlled Inputs**: All form fields use `useState` or `useReducer`. No uncontrolled refs for forms.
+- **Validation**: Client-side required-field check before POST. Show inline error below the field (not alert/toast for field errors).
+- **Optimistic Update**: For status changes (Kanban drag, approve/reject), update local state immediately, revert on API error.
 
 ---
 
-## 4. Database Master Invariants
+## 5. Database Master Invariants
 
 - **Master Schema**: `server/schema.sql` is the source of truth.
 - **Column Integrity**:
   - `users` MUST have `risk_score` and `two_factor_enabled`.
-  - `products` MUST have `selling_rate`, `mrp`, and `is_active`.
-  - `parties` MUST have `company_id` and `current_balance`.
-- **Naming**: Use snake_case for DB columns, camelCase for Frontend JSON. Backend translates using mapping layers.
+  - `products` MUST have `selling_rate`, `mrp`, `is_active`, `ptr`, `pts`, `gst`, `reorder_level`.
+  - `parties` MUST have `company_id`, `current_balance`, `credit_limit`, `type` (Debtor/Creditor/Both).
+  - `batches` MUST have `stock`, `reserved_qty`, `available_qty`, `expiry_date`, `cost_price`, `product_id`.
+  - `sales_invoices` MUST have `invoice_number`, `net_amount`, `sub_total`, `total_gst`, `party_id`, `company_id`.
+- **Soft Delete Pattern**: Use `deleted_at IS NULL` filter (products, employees, documents). Never hard-delete financial records.
+- **Company Isolation**: Every multi-tenant query MUST include `WHERE company_id = $N` or join to a table that carries `company_id`.
+- **Naming**: snake_case for DB columns, camelCase for Frontend JSON. Backend translates via SQL aliases.
 
 ---
 
-## 5. Testing & Validation (4-Tier Model)
+## 6. Testing & Validation (4-Tier Model)
 
 1. **Reproduction Test**: Before fixing a bug, add a failing case to `server/__tests__/`.
 2. **Integration (Tier 2)**: Backend API endpoints must return 200/201 and valid JSON schema.
 3. **Component (Tier 3)**: RTL tests for `Loading`, `Empty`, and `Error` states.
-4. **E2E (Tier 4)**: Playwright "Happy Path" (Login -> Create Invoice -> Verify Ledger).
+4. **E2E (Tier 4)**: Playwright "Happy Path" (Login → Create Invoice → Verify Ledger).
 
 ---
 
-## 6. Environment & Troubleshooting
+## 7. Environment & Troubleshooting
 
-- **VPS URL**: https://erp.metapharsic.cloud (Port 3002).
-- **Master Bypass**: `admin` / `Admin@1234`.
-- **Sync**: GitHub `master` → `git pull` on VPS → `pm2 restart metapharsic-erp`.
-- **Logs**: Monitor with `pm2 logs metapharsic-erp --lines 50`.
+- **VPS**: root@187.127.169.217 | App: `/u01/apps/Metapharsic_ERP` | Port: 5000 → nginx → `erp.metapharsic.cloud`
+- **Master Bypass**: `admin` / `Admin@1234`
+- **DB**: `erp_user` / `Erp@Metapharsic2026` / `metapharsic_erp` at `127.0.0.1:5432`
+- **pg module**: `/u01/apps/Metapharsic_ERP/server/node_modules/pg` (required for standalone scripts)
+- **Sync**: `git pull` on VPS → `pm2 restart metapharsic-erp --update-env` (backend) → `npm run build` + restart (frontend changes)
+- **Logs**: `pm2 logs metapharsic-erp --lines 50`
+- **HTTPS**: Server enforces HTTP→HTTPS redirect globally via `httpsRedirect` middleware. Always test via `https://erp.metapharsic.cloud/api/...`
+- **PM2 Cluster**: `metapharsic-erp` runs 2 workers (IDs 14 & 15). Both must be `online` after restart.
+- **Frontend Build**: `cd /u01/apps/Metapharsic_ERP && npm run build` (Vite, ~6s, ~2.5MB bundle). Required for any `.tsx` change.
+- **File Upload Scripts**: Write to local file → `pscp` upload to `/tmp/` → `plink node /tmp/script.js` with correct CWD for module resolution.
+
+---
+
+## 8. Cross-Module Integration Rules
+
+- **Ledger Helper** (`server/utils/ledgerHelper.js`): MUST be used for all stock movements. Methods: `postToStockLedger('IN'|'OUT', client, data)`. Never write to `stock_ledger_entries` directly from routes.
+- **ledgerHelper.postToLedger**: For all financial transactions (invoices, payments, returns), post GL entries via ledgerHelper inside the same ACID transaction.
+- **MR Tracker Bridge**: `medical_representatives` table is the authoritative source for MR data in ERP. Visit data lives in MR Tracker (`visit_schedules`). Do not duplicate visit records in ERP.
+- **GST Returns**: `gst_portal_data` table is populated by the GST module from `sales_invoices` and `purchase_invoices`. Never write to it from sales/purchase routes directly.
+- **Audit Logs**: All user-initiated mutations MUST write to `audit_logs` (or module-specific `crm_audit_log`, `dms_audit_trail`). Include `user_id`, `action`, `table_name`, `record_id`, `old_value`, `new_value`.
+- **H1 Drug Gate**: In POS (`pos.js`) and Wholesale (`sales.js`), check `products.schedule` before inserting invoice items. If `schedule = 'H1'`, the transaction MUST also insert to `h1_register`. Missing H1 log = legal violation.
+
+---
+
+## 9. Manufacturing & Quality Module Standards
+
+### 🏭 Manufacturing
+- **Tables**: `boms`, `production_orders`, `raw_materials`, `products`, `batches`
+- **Routes**: `GET/POST /api/manufacturing/bom` (alias `/boms`), `PUT/DELETE /api/manufacturing/bom/:id`, `GET/POST /api/manufacturing/production-orders`, `GET /api/manufacturing/raw-materials`
+- **BOM Fields**: `boms` stores `product_id`, `product_name`, `batch_size`, `version`, `status`, `ingredients` (JSONB array), `bom_name`, `std_cost`. `ingredients` format: `[{ name, quantity, unit, cost_per_unit }]`.
+- **BOM Resolution**: If `product_id` is not supplied on POST, auto-resolve via `SELECT id FROM products WHERE name = $1`. Never 400 if only `product_name` is given — attempt lookup first.
+- **BOM Versioning**: When a BOM is edited, increment `version` (semver `1.0`, `1.1`, `2.0`). Old versions set `status='Superseded'`, new version set `status='Active'`. Only ONE `Active` BOM per `product_id`.
+- **Production Order Fields**: `production_orders` has `order_number` (`PO-YYYYMMDD-NNNN`), `bom_id`, `product_name`, `quantity`, `planned_start`, `planned_end`, `actual_start`, `actual_end`, `status`, `batch_number`, `yield_qty`, `waste_qty`.
+- **Production Status Machine**: `Draft → Scheduled → In Progress → QC Pending → Completed | Cancelled`. Write `audit_logs` on every transition.
+- **Batch Creation on Complete**: When production order reaches `Completed`, ACID transaction: insert new row to `batches` (with `product_id`, `batch_number`, `stock=yield_qty`, `status='QC_Pending'`), write `stock_ledger_entries` IN movement. Stock becomes available only after QC Passes.
+- **Raw Materials**: `raw_materials` tracks consumables. Deduct from `raw_materials.quantity` when production order starts. Write `stock_ledger_entries` OUT for each material consumed.
+- **DeerFlow Trigger**: On production order `Completed`, call `triggerWorkflow({ workflowId: 'PRODUCTION_COMPLETE', moduleId: 'manufacturing', userId })`.
+- **Role Guard**: BOM create/edit/delete requires `PRODUCTION_MANAGER` or `ADMIN`. Production order status changes require same.
+- **camelCase aliases**: `bom_name as "bomName"`, `batch_size as "batchSize"`, `std_cost as "stdCost"`, `product_id as "productId"`, `order_number as "orderNumber"`, `yield_qty as "yieldQty"`, `waste_qty as "wasteQty"`.
+
+### 🔬 Quality Control
+- **Tables**: `qc_records`, `qc_parameters`, `qc_reports`, `qc_test_results`, `batches`
+- **Routes**: `GET /api/qc`, `POST /api/qc`, `GET /api/qc/parameters`, `GET /api/qc/dropdown`, `GET /api/qc/:id`
+- **QC Record Fields**: `batch_number`, `product_name`, `test_date`, `tested_by`, `final_status` (`Passed`|`Failed`|`Pending`), `coa_generated` (bool), `remarks`.
+- **Parameter Results**: Each QC record links to `qc_test_results` (one row per parameter). Parameters fetched from `qc_parameters` table.
+- **ACID on Pass/Fail**: When `final_status='Passed'`, ACID transaction: UPDATE `batches.status='Active'` (makes stock available) + write `audit_logs`. When `Failed`: UPDATE `batches.status='Rejected'`, write `audit_logs`, trigger `INVENTORY_SYNC` deerflow.
+- **COA Generation**: `coa_generated=true` only after `final_status='Passed'`. Never generate COA for failed/pending batches.
+- **Product Name Resolution**: If `product_name` is null, resolve from `products WHERE id=$product_id`. Store the resolved name on the QC record.
+- **Cascade to Inventory**: A batch flagged `Rejected` must have `batches.stock = 0` set inside the same ACID transaction. Never allow rejected batches to appear in available stock.
+- **No Hard Delete**: QC records are regulatory documents. Soft-delete only via `status='Voided'`. NEVER `DELETE FROM qc_records`.
+- **camelCase aliases**: `batch_number as "batchNumber"`, `product_name as "productName"`, `test_date as "testDate"`, `final_status as "finalStatus"`, `coa_generated as "coaGenerated"`.
+
+### 🧪 R&D Lab
+- **Tables**: `rnd_formulations`, `rnd_experiments`
+- **Routes**: `GET/POST /api/rnd/formulations`, `GET/POST /api/rnd/experiments`
+- **Formulation Fields**: `product_name`, `dosage_form`, `version` (default `1.0`), `stage` (`Ideation`|`Development`|`Stability`|`Scale-Up`|`Approved`), `start_date`, `ingredients` (JSONB), `target_cost`, `created_by`.
+- **Stage Gate**: `stage='Approved'` requires at least one linked `rnd_experiment` with `status='Completed'` and `result_data` present. Check before updating stage.
+- **Experiment → BOM Pipeline**: When a formulation reaches `stage='Approved'`, auto-suggest BOM creation by returning the formulation's `ingredients` array in the approved response. The BOM must be created manually by `PRODUCTION_MANAGER` — do not auto-create.
+- **Experiment Fields**: `formulation_id`, `test_name`, `start_date`, `end_date`, `assigned_to`, `status` (`Scheduled`|`In Progress`|`Completed`|`Aborted`), `result_data` (JSONB).
+- **Version Control**: When a formulation is edited, bump `version` (e.g. `1.0` → `1.1`). Preserve old version via `rnd_formulations` row — set old row `stage='Superseded'`, insert new row.
+- **Company Scoping**: `rnd_formulations` and `rnd_experiments` must be associated with `created_by` (user ID from JWT). Add `company_id` filter if not already present.
+
+---
+
+## 10. Human Capital Module Standards
+
+### 👥 HRMS (AI-Era)
+- **Tables**: `employees`, `hr_departments`, `hr_designations`, `hr_salary_structures`, `hr_attendance`, `hr_leaves`, `hr_leave_balances`, `hr_leave_policies`, `hr_employee_documents`, `hr_onboarding_tasks`, `hr_onboarding_checklists`, `hr_offboarding_checklists`, `hr_job_requisitions`, `hr_candidates`, `hr_candidate_stages`, `hr_asset_allocations`, `hr_shifts`, `hr_employee_shifts`, `hr_timesheet_entries`, `hr_reimbursement_claims`, `hr_incidents`, `hr_performance_reviews` (if present), `hr_employee_timeline`
+- **Routes** (all under `/api/hr/`): `GET/POST /employees`, `GET/PUT/DELETE /employees/:id`, `GET/POST /departments`, `GET /departments/tree`, `GET/POST /designations`, `GET/POST /salary-structures`, `GET/POST /attendance`, `GET/POST /leaves`, `GET/POST /leave-policies`, `GET /performance-stats`, `GET/POST /recruitment/jobs`, `GET/POST /recruitment/candidates`, `POST /payroll/run`, `GET /payroll/slips`, `PUT /payroll/slips/:id/mark-paid`
+- **Employee UUID**: `employees.id` is a UUID (v4). Always use `uuidv4()` from the `uuid` package for new employee IDs. Validate with `isUUID()` helper before DB queries.
+- **Department Hierarchy**: `hr_departments` is a recursive tree via `parent_dept_id`. Use CTE (`WITH RECURSIVE dept_hierarchy`) for tree queries. Never flatten manually.
+- **Status Lifecycle**: `employees.status`: `Active` | `On Leave` | `Terminated` | `Resigned`. Terminated/Resigned employees must have `exit_date` set. Do NOT delete employee records.
+- **Document Upload**: Employee docs (PAN, Aadhaar, offer letter) stored via multer at `uploads/hr/{employee_id}/`. Reference path in `hr_employee_documents`. Soft-delete only via `status='Deleted'`.
+- **Onboarding DeerFlow**: On employee creation (`POST /hr/employees`), call `triggerWorkflow({ workflowId: 'EMPLOYEE_ONBOARDING_INITIATED', moduleId: 'hr', userId: newEmployee.id })`. This is already in hr.js at line 269.
+- **Leave Balance**: `hr_leave_balances` tracks remaining leaves by type per employee per financial year. Always UPDATE `hr_leave_balances.remaining` when a leave is approved. Never compute remaining from raw leave rows.
+- **Shift Assignment**: `hr_employee_shifts` links employee → `hr_shifts`. One active shift per employee. Use `hr_shifts.effective_from` / `effective_to` for schedule windows.
+- **Attendance Source of Truth**: `hr_attendance` is authoritative. `hr_timesheet_entries` is supplementary (project-based). Payroll uses `hr_attendance` (actual days vs scheduled).
+- **Asset Link**: `hr_asset_allocations` links employee ↔ `fixed_assets`. Check allocation before asset disposal.
+- **AI Agent**: `server/services/aiHrAgent.js` provides AI-powered HR insights. Only call for analytics endpoints, not for CRUD operations.
+- **Performance Stats**: `GET /api/hr/performance-stats` — aggregates from `employees` table: `totalEmployees`, `activeEmployees`, `starPerformers` (target_achievement ≥ 100), `attentionNeeded` (< 80), `averageAchievement`.
+- **camelCase aliases**: `e.department_id as "departmentId"`, `e.designation_id as "designationId"`, `e.joining_date as "joiningDate"`, `e.exit_date as "exitDate"`, `e.target_achievement as "targetAchievement"`.
+
+### 💰 HR & Payroll
+- **Engine**: `server/utils/hrPayrollEngine.js` — methods: `computeFullPayslip(employee, month, year, attendance, statutory)`, `computeTDS(employee, { regime, financial_year })`, `computeOvertimePay(salary, extra_hours)`.
+- **Payroll Run** (`POST /api/hr/payroll/run` or `/payroll/process-bulk`): Role: `ADMIN` or `HR_MANAGER`. ACID transaction per employee: compute payslip via `payrollEngine.computeFullPayslip`, INSERT `salary_slips`, write GL entries via `ledgerHelper.postToLedger`. Rollback entire batch on error.
+- **Statutory Config**: ALWAYS pull PF, ESIC, PT rates from `hr_statutory_config` — NEVER hardcode percentages. PF = 12% of Basic (employee) + 13% (employer); ESIC = 0.75% (employee) + 3.25% (employer) if gross ≤ ₹21,000; PT = state-specific slab from `hr_statutory_config`.
+- **Salary Structure**: `hr_salary_structures` defines component breakdown (Basic, HRA, DA, Special Allowance, etc.). `salary_slips` stores monthly computed values. `salary_slips.status`: `Draft` → `Approved` → `Paid`.
+- **TDS**: `POST /api/hr/payroll/tds/compute/:empId` — uses `payrollEngine.computeTDS`. Store results in `hr_tds_workings`. Compute under Old or New tax regime based on `regime` param.
+- **Mark Paid**: `PUT /api/hr/payroll/slips/:id/mark-paid` — update `salary_slips.status='Paid'`, set `payment_date=NOW()`. Write `payment_vouchers` entry via `ledgerHelper`.
+- **Registers** (statutory read-only): `GET /api/hr/payroll/pf-register` → `hr_pf_registers`; `/esic-register` → `hr_esic_registers`; `/pt-register` → `hr_pt_registers`. These are generated from `salary_slips`.
+- **Overtime**: `hr_overtime_requests` → approved → `payrollEngine.computeOvertimePay`. Add to payslip's `other_allowances`.
+- **Bonus**: `hr_employee_bonuses` linked to `hr_bonus_schemes`. Scheme defines eligibility (target_achievement threshold). Bonuses added to salary slip in bonus month.
+- **Anomaly Detection**: `GET /api/hr/payroll/anomalies` — flags salary slips where `net_pay` deviates > 20% from previous month for same employee. Store in `acc_anomalies`.
+- **Cost Summary**: `GET /api/hr/payroll/cost-summary` — department-wise payroll cost aggregated from `salary_slips` for the given month.
+
+---
+
+## 11. Finance & Governance Module Standards
+
+### 📊 Accounts (General Accounting)
+- **Tables**: `chart_of_accounts`, `general_ledger`, `journal_vouchers`, `journal_voucher_entries`, `acc_periods`, `acc_ratios_cache`, `acc_bank_statements`, `acc_bank_statement_lines`, `acc_cash_flow_forecast`, `financial_years`, `cost_centers`, `budgets`, `bank_reconciliations`, `forex_rates`, `recurring_entries`, `tds_entries`
+- **Routes** (all under `/api/accounting/`): `GET/POST/PUT/DELETE /chart-of-accounts`, `GET/POST/PUT/DELETE /journal-vouchers`, `POST /journal-vouchers/:id/post`, `POST /journal-vouchers/:id/reverse`, `GET /general-ledger/:accountId`, `GET /ledger/party/:partyId`, `POST /trial-balance`, `POST /balance-sheet`, `POST /profit-loss`, `POST /cash-flow`, `POST /aging-analysis`, `GET/POST /cost-center`, `GET /daybook`, `GET /audit-logs`, `GET /daily-sales-analytics`
+- **2FA on ALL accounting writes**: `chart-of-accounts`, `journal-vouchers` mutations and financial report generation MUST go through `verify2FAMiddleware`. Do NOT remove this middleware.
+- **Chart of Accounts**: `chart_of_accounts` has `account_type` (Asset/Liability/Income/Expense/Equity), `account_code`, `parent_id` (tree structure). Leaf accounts only can have GL entries — parent accounts aggregate children.
+- **Double-Entry Enforcement**: Every `journal_vouchers` POST must have entries where `SUM(debit_amount) = SUM(credit_amount)`. Reject with 400 if unbalanced. Stored in `journal_voucher_entries`.
+- **Journal Voucher Lifecycle**: `Draft → Posted → Reversed`. Only `Posted` JVs affect GL. `POST /journal-vouchers/:id/post` — ACID: write to `general_ledger`, update account balances. `POST /:id/reverse` — create equal-and-opposite JV in same ACID transaction.
+- **Period Locking**: `acc_periods` has `is_locked`. Any attempt to post to a locked period must return 400 with `{ error: 'Period is locked', period: ... }`. Check period before any GL write.
+- **Financial Statements**: Balance Sheet, P&L, Cash Flow computed from `general_ledger` entries filtered by `financial_year` and `company_id`. NEVER pre-aggregate — always compute fresh from GL.
+- **Bank Reconciliation**: `bank_reconciliations` / `acc_bank_statement_lines` — match bank statement lines to `journal_voucher_entries`. Unmatched lines flagged as reconciling items.
+- **Forex**: `forex_rates` table. All multi-currency JVs must store `currency_code`, `exchange_rate`, `base_amount`. Revaluation via `acc_fx_revaluation_log`.
+- **Aging Analysis**: Debtors/Creditors aging from `general_ledger` + `parties`. Buckets: 0-30, 31-60, 61-90, 90+ days.
+- **Role Guards**: Chart of accounts mutations: `ADMIN | FINANCE_MANAGER | ACCOUNTANT`. Journal posting/reversal: `ADMIN | FINANCE_MANAGER`. All require 2FA.
+- **DeerFlow Trigger**: On JV posted, call `triggerWorkflow({ workflowId: 'JOURNAL_VOUCHER_CREATED', moduleId: 'accounting' })`.
+
+### 📒 Ledger Creation
+- **Tables**: `chart_of_accounts`, `general_ledger`, `parties`, `cost_centers`
+- **Account Code Convention**: `1xxx` = Assets, `2xxx` = Liabilities, `3xxx` = Equity, `4xxx` = Income, `5xxx` = Expenses. Sub-accounts: `1001`, `1001.01`, etc.
+- **Account Types**: `Asset` (debit-normal), `Liability` (credit-normal), `Equity` (credit-normal), `Income` (credit-normal), `Expense` (debit-normal). Balance = debit-normal ? debits - credits : credits - debits.
+- **Party Ledger**: `GET /api/accounting/ledger/party/:partyId` — aggregates all GL entries tagged with `party_id` for a party's statement of account. Used for outstanding balance view.
+- **Ledger Helper** (`server/utils/ledgerHelper.js`): Method `findAccount(client, companyId, accountName)` resolves account ID by name. Method `postToGeneralLedger(client, data)` writes debit/credit entries. ALWAYS use these — never write raw INSERT to `general_ledger` from route handlers.
+- **Cost Center Allocation**: Optional `cost_center_id` on GL entries for departmental P&L. `cost_centers` table is flat (no hierarchy). Report via `GET /api/accounting/cost-center`.
+- **Daybook**: `GET /api/accounting/daybook` — all GL entries for a given date, grouped by voucher. Default to today. Used for daily accounting summary.
+
+### 🧾 Voucher Setup
+- **Tables**: `voucher_types`, `journal_vouchers`, `journal_voucher_entries`, `payment_vouchers`, `receipt_vouchers`, `receipt_allocations`
+- **Routes** (under `/api/vouchers/`): `POST /receipt`, `POST /payment`, `POST /contra`, `POST /sales-return`, `POST /purchase-return`, `GET/POST/PUT /types`
+- **Voucher Types** (`voucher_types` table): `Receipt`, `Payment`, `Contra`, `Journal`, `Sales`, `Purchase`, `Credit Note`, `Debit Note`. Fetched via `GET /api/pos/voucher-types`.
+- **Receipt Voucher** (`POST /api/vouchers/receipt`): Money IN from party. Debit Cash/Bank account, Credit party's Debtors ledger. Required: `voucher_no`, `voucher_date`, `party_id`, `account_id` (Cash/Bank), `amount`.
+- **Payment Voucher** (`POST /api/vouchers/payment`): Money OUT to party. Debit party's Creditors ledger, Credit Cash/Bank. Same required fields as Receipt.
+- **Contra Voucher** (`POST /api/vouchers/contra`): Bank ↔ Cash transfer. Debit destination account, Credit source account. Both must be Cash or Bank type accounts.
+- **Sales/Purchase Return**: `POST /api/vouchers/sales-return` / `purchase-return` — create Credit Note or Debit Note in `sales_invoices` / `purchase_invoices` with negative `net_amount`. ACID: reverse stock via `ledgerHelper`, post reverse GL entries.
+- **All Vouchers ACID**: Every voucher POST uses `db.pool.connect()` (raw client), `BEGIN/COMMIT/ROLLBACK`. `ledgerHelper.processVoucher` handles GL posting — always call it inside the transaction.
+- **Voucher Number**: Client-supplied `voucher_no` for user-facing vouchers. Must be unique per `voucher_type` per `company_id`. Check uniqueness inside transaction.
+- **No Deletion**: Vouchers are never deleted. Reverse a posted voucher with an equal-and-opposite entry and set `status='Reversed'`.
+
+### 📋 Compliance
+- **Tables**: `drug_licenses`, `compliance_audits`, `compliance_checklists`, `compliance_checklist_items`, `compliance_checklist_templates`, `h1_register`, `temperature_logs`, `compliance_notification_settings`, `compliance_notification_log`
+- **Routes** (under `/api/compliance/`): `GET /stats`, `GET/POST/PUT/DELETE /licenses`, `POST /licenses/:id/upload`, `GET /licenses/:id/certificate`, `POST /licenses/:id/send-alert`, `GET /risk-score`, `GET/POST /h1`, `DELETE /h1/:id`, `GET/POST /temp-logs`, `GET /audits`, `GET/POST /notification-settings`
+- **License Expiry States**: `valid` (expiry > 30 days), `expiring` (0–30 days), `expired` (past), `suspended`. Stats aggregated from `drug_licenses WHERE status != 'Revoked'`.
+- **Certificate Upload**: Stored at `uploads/certificates/`. Filename: `{timestamp}_{originalname_sanitized}`. Allowed types: `jpeg`, `png`, `webp`, `pdf`. Max 10MB.
+- **H1 Register**: `GET /api/compliance/h1` reads from `h1_register`. `POST` creates entry — required: `drug_name`, `batch_number`, `patient_name`, `doctor_name`, `quantity`, `entry_date`. DELETE is allowed (administrative correction only) — leave `audit_logs` entry.
+- **Risk Score**: `GET /api/compliance/risk-score` — composite score from license expiry, temp breaches, and H1 violations. Returned as numeric 0–100. Lower = higher risk. Formula: weighted sum of sub-scores.
+- **Temperature Logs**: `POST /api/compliance/temp-logs` — log `equipment_id`, `temperature`, `log_date`, `status` (`Normal`|`Warning`|`Critical`). Breaches (Warning/Critical) trigger `complianceNotificationService.sendExpiryAlerts`.
+- **Notification Service**: `server/services/complianceNotificationService.js` — `sendExpiryAlerts()` and `sendTestNotification()`. Called from compliance routes on expiry/breach events. Reads settings from `compliance_notification_settings`.
+- **Audit Checklist**: `compliance_audits` stores scored audit results. `compliance_checklists` maps to `compliance_checklist_templates`. `score_percentage` drives risk dashboard.
+- **Send Alert Endpoint**: `POST /api/compliance/licenses/:id/send-alert` — manually triggers expiry notification for a specific license via `complianceNotificationService`.
+
+### 👤 Customer DB (Parties)
+- **Tables**: `parties`, `pdc_cheques`, `pdc_register`, `receipt_allocations`, `general_ledger`
+- **Routes**: Primarily via `/api/pos/parties` and `/api/pcd/partners`. Direct party CRUD via accounting module.
+- **Party Types**: `Debtor` (customer), `Creditor` (supplier), `Both`. Type determines which side of GL ledger they appear on.
+- **Balance Integrity**: `parties.current_balance` is a DENORMALIZED sum of all outstanding GL entries for the party. Update it on every invoice/receipt/payment that affects the party. Never compute it from raw GL at query time for lists (too slow) — recompute only on party detail view.
+- **Credit Limit Enforcement**: `current_balance + new_invoice_amount > credit_limit` → block with 400. Applies in POS (`pos.js`), Wholesale (`sales.js`), and OMS approval.
+- **Outstanding Ledger**: `GET /api/accounting/ledger/party/:partyId` — full transaction history for a party. Used in party profile for statement of account.
+- **PDC Tracking**: `pdc_cheques` links to `party_id`. Status: `Pending` → `Cleared` | `Bounced`. Bounced PDC must reverse the original receipt GL entry and flag `parties.current_balance`.
+- **Merge Rule**: Never merge two party records in DB. If a PCD partner is converted to a party, use `syncPartnerToParty` — do not create a second party row.
+
+---
+
+## 12. Intelligence & Admin Module Standards
+
+### 📈 Dashboard (ERP Home)
+- **Routes** (under `/api/reports/`): `GET /dashboard-summary`, `GET /inventory`, `GET /sales`, `GET /purchase`, `GET /kpi`, `POST /ai-generate`
+- **Dashboard Summary**: `GET /api/reports/dashboard-summary` — aggregates: sales today/month (`sales_invoices`), purchase today/month (`purchase_orders`), low-stock products (`products WHERE current_stock <= reorder_level`), pending orders (`orders WHERE status NOT IN ('Delivered','Invoiced','Cancelled')`), expiring batches (within 30 days).
+- **KPI Route**: `GET /api/reports/kpi` — reads from `kpi_dashboard_data` cache table. Regenerated periodically or on demand. KPIs: revenue growth MoM, gross margin %, inventory turnover, order fill rate, customer acquisition rate.
+- **AI Generate**: `POST /api/reports/ai-generate` — triggers AI-generated insight summary. Writes to `kpi_dashboard_data`. Response: `{ summary, charts, recommendations }`. Must not block — use `setImmediate` for heavy computations.
+- **Data Freshness**: Dashboard widgets use `useDataFetch` with `refetchInterval` (e.g., 30s for KPIs). Backend must include `generated_at` timestamp in all dashboard responses.
+- **Company Scoping**: ALL dashboard queries MUST filter `company_id = req.user.companyId || 1`. Cross-company data leakage is a critical bug.
+
+### 🤖 Intelligence Center
+- **Routes** (under `/api/analytics/`): `GET /inventory/comprehensive`, `GET /financial/summary`, `GET /customers/drift`, `POST /inventory/optimize`, `GET /reports/status/:jobId`
+- **Tables used**: `abc_analysis`, `inventory_turnover_analysis`, `dead_stock_analysis`, `forecast_demand`, `regional_pharmaceutical_demand`, `kpi_dashboard_data`, `acc_ratios_cache`
+- **Comprehensive Inventory** (`GET /api/analytics/inventory/comprehensive`): Requires `verify2FAMiddleware`. Returns FSN classification, ABC analysis, dead stock analysis, reorder recommendations. Data from `abc_analysis` + `inventory_turnover_analysis`.
+- **Financial Summary** (`GET /api/analytics/financial/summary`): P&L snapshot, gross margin, working capital. Computed from `general_ledger` for current financial year.
+- **Customer Drift** (`GET /api/analytics/customers/drift`): Identifies customers with declining order frequency. Compares this quarter vs last. Used to trigger CRM follow-up.
+- **Demand Forecast**: `forecast_demand` table pre-populated by AI model. `regional_pharmaceutical_demand` stores demand data by region/product.
+- **Async Reports**: `POST /api/analytics/reports/generate` queues a heavy report. Returns `{ jobId }`. Client polls `GET /api/analytics/reports/status/:jobId`. Status: `queued` | `processing` | `completed` | `failed`.
+- **2FA**: Comprehensive inventory analytics require `verify2FAMiddleware` (enforced in analytics.js line 11).
+- **Ratio Cache**: `acc_ratios_cache` stores pre-computed financial ratios (current ratio, quick ratio, debt-equity). Refresh on GL close or period end.
+
+### 🦌 Deerflow Control
+- **Service**: `server/services/deerflowClient.js` — `triggerWorkflow(payload)` + `getWorkflowStatus(workflowId)`.
+- **Routes** (under `/api/deerflow/`): `GET /workflows`, `GET /workflows/:workflowId/status`, `POST /workflows/trigger`
+- **Workflow Log**: ALL `triggerWorkflow` calls write to `audit_logs` first (`INSERT INTO audit_logs` with `status='IN_PROGRESS'`). This is the source of truth when `DEERFLOW_BASE_URL` is not set.
+- **External Service**: Only fires actual HTTP POST to `DEERFLOW_BASE_URL/workflows/trigger` if `process.env.DEERFLOW_BASE_URL` is configured. Otherwise, logs-only mode (graceful degradation).
+- **Known Workflow IDs**: `EMPLOYEE_ONBOARDING_INITIATED`, `JOURNAL_VOUCHER_CREATED`, `LEAD_CONVERTED`, `INVENTORY_SYNC`, `OMS_SLA_BREACH`, `PAYROLL_RUN`, `GST_FILING_TRIGGERED`, `PRODUCTION_COMPLETE`. Use these exact strings for consistency across modules.
+- **Dashboard Source**: `GET /api/deerflow/workflows` reads from `audit_logs` — filters by the known workflow IDs + entries where `details->>'source' = 'deerflow'`. Displayed in Deerflow Control panel.
+- **Trigger Pattern** (in route handlers): `setImmediate(() => triggerWorkflow({ workflowId: '...', moduleId: '...', userId: req.user.userId }))` — always non-blocking side effect. Never `await triggerWorkflow` inside an ACID transaction.
+- **Timeout**: `deerflowClient` axios instance has 5s timeout. On timeout/error, logs warning and returns `{ status: 'IN_PROGRESS', logged: true }`. Never propagate DeerFlow errors to the API caller.
+
+### 📑 Reports
+- **Routes** (under `/api/reports/` and `/api/gst/`): `GET /reports/inventory`, `GET /reports/sales`, `GET /reports/purchase`, `GET /gst/gstr1`, `GET /gst/gstr2`, `GET /gst/gstr3b`
+- **Inventory Report**: `GET /api/reports/inventory` — stock valuation by product (FIFO cost × qty), low-stock list, expiry report, FSN summary. Aggregated from `products` + `batches`.
+- **Sales Report**: `GET /api/reports/sales` — date-range filter. Aggregates `sales_invoices` by period, product, party. Returns `revenue`, `cogs`, `gross_profit`, `gross_margin_pct`. Computed from `daily_sales` CTE pattern (as in accounting.js diagnostic route).
+- **Purchase Report**: `GET /api/reports/purchase` — date-range filter. Aggregates `purchase_orders` + `purchase_order_items`. Returns spend by supplier, category, MoM trend.
+- **GST Reports**:
+  - `GSTR-1` (`GET /api/gst/gstr1`): Outward supplies. Filters `sales_invoices` by month+year + `status='Completed'` + `company_id`. Groups by party GSTIN. Returns `taxable_value`, `total_cgst`, `total_sgst`, `total_igst` per invoice. B2C entries use `partyGstin='B2C'`.
+  - `GSTR-2` (`GET /api/gst/gstr2`): Inward supplies. From `purchase_invoices`. Supports `recon=true` param for 2A/2B reconciliation.
+  - `GSTR-3B` (`GET /api/gst/gstr3b`): Summary return. Aggregates GSTR-1 output tax and GSTR-2 input tax credit. Returns net tax payable.
+- **Date Params**: All reports accept `?from=YYYY-MM-DD&to=YYYY-MM-DD` or `?month=M&year=YYYY`. Default: current month. Validate dates server-side (reject future dates for completed-status reports).
+- **Export**: Reports should support `?format=csv` param — return CSV with `Content-Type: text/csv` and `Content-Disposition: attachment; filename="report_YYYYMMDD.csv"`.
+
+### 🔍 Audit Logs
+- **Tables**: `audit_logs`, `crm_audit_log`, `dms_audit_trail`, `financial_audit_log`
+- **Routes** (under `/api/audit/`): `GET /` (paginated list with search/module filter), `GET /dropdown`
+- **Module Filter**: `?module=ALL` returns all; specific module (e.g. `?module=CRM`) filters by `audit_logs.module` or derives from `SPLIT_PART(action, '_', 1)`.
+- **Required Fields on Write**: `user_id` (from JWT), `action` (verb_NOUN format e.g. `INVOICE_CREATED`), `module`, `status` (`SUCCESS`|`FAILED`|`IN_PROGRESS`), `ip_address` (from `req.ip`), `details` (JSONB with old/new values).
+- **Immutable**: NEVER UPDATE or DELETE from `audit_logs`. It is an append-only table. Corrections are new entries with `action='CORRECTION'`.
+- **Pagination**: Default `limit=50`, `ORDER BY created_at DESC`. Support `?page=N&limit=N`. Return `{ data, total, page }`.
+- **Search**: Searches across `action`, `user.name`, `user.email`, `error_message`, `details::text`. Use ILIKE with `%search%`.
+- **User Join**: Always LEFT JOIN `users` on `user_id`. Display `COALESCE(u.name, u.email, 'System')` as the user field — null user_id = system action.
+- **Financial Audit**: `financial_audit_log` is a separate high-security table for accounting mutations. Written by `ledgerHelper` on every GL post. Never write to it directly from routes.
+
+---
+
+## 13. Enterprise Hub Standards
+
+### ⚙️ Settings
+- **Tables**: `erp_settings` (key-value store), `users`, `financial_years`, `tax_configurations`, `branches`, `api_keys`
+- **Routes** (under `/api/settings/`): `GET/PUT /company`, `GET/PUT /parameters`, `GET/PUT /notifications`, `GET/PUT /security`, `GET/PUT /appearance`, `GET /export`, `POST /import`, `POST /reset`
+- **Storage Pattern**: `erp_settings` is a key-value table (`key VARCHAR PK`, `value TEXT as JSON`). Use `getSetting(key)` / `saveSetting(key, value)` helpers — never raw SQL from outside settings.js.
+- **Bootstrap**: settings.js auto-creates `erp_settings` table on startup (idempotent `CREATE TABLE IF NOT EXISTS`). Safe to call at module load.
+- **Company Profile** (`GET/PUT /api/settings/company`): Stores `{ name, address, gstin, state, logo_url, phone, email }` under key `'company'`. Used by GST engine and invoice headers.
+- **Parameters** (`GET/PUT /api/settings/parameters`): Stores `{ financialYearStart, gstEnabled, posMode, inventoryAlertDays, creditLimitEnforcement }`. These drive module behavior globally.
+- **Security Policy** (`GET/PUT /api/settings/security`): Stores `{ sessionTimeout, maxLoginAttempts, twoFactorRequired, passwordPolicy }`. `twoFactorRequired=true` → `verify2FAMiddleware` is mandatory on all write routes.
+- **Factory Reset** (`POST /api/settings/reset`): ADMIN only. Deletes all `erp_settings` rows. Does NOT touch any business data tables. Requires explicit `{ confirm: true }` in request body.
+- **Export** (`GET /api/settings/export`): Returns full settings JSON. Used for backup/migration. Exclude sensitive keys (`GMAIL_APP_PASSWORD`, `JWT_SECRET`).
+- **Import** (`POST /api/settings/import`): Validates JSON structure before writing. Each key must match known settings schema. Reject unknown keys.
+- **Financial Year**: `financial_years` table — `start_date`, `end_date`, `is_active`, `is_locked`. Only one `is_active=true` at a time. Lock closes the year for GL postings.
+- **GST Config**: `tax_configurations` table — rates by HSN code and transaction type. Used by GST engine in POS/Sales/Purchase.
+- **API Keys**: `api_keys` table — external integrations (e.g., DeerFlow, MR Tracker sync). Rotate via Settings > Security. Never expose in logs or error messages.

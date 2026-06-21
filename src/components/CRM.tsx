@@ -42,7 +42,8 @@ const KanbanColumn: React.FC<{
   leads: Lead[];
   onView: (l: Lead) => void;
   status: string;
-}> = ({ title, leads, onView, status }) => {
+  onDrop?: (leadId: string, newStatus: string) => void;
+}> = ({ title, leads, onView, status, onDrop }) => {
   const getPriorityColor = (p: string) => {
     switch(p) {
       case 'Urgent': return 'bg-rose-500';
@@ -61,7 +62,12 @@ const KanbanColumn: React.FC<{
   };
 
   return (
-    <div className="flex flex-col min-w-[320px] max-w-[320px] bg-slate-50/50 rounded-2xl border border-slate-200/60 h-full overflow-hidden shadow-sm">
+    <div
+      className="flex flex-col min-w-[320px] max-w-[320px] bg-slate-50/50 rounded-2xl border-2 border-slate-200/60 h-full overflow-hidden shadow-sm transition-colors"
+      onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400', 'bg-blue-50/20'); }}
+      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50/20'); }}
+      onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50/20'); const id = e.dataTransfer.getData('leadId'); if (id && onDrop) onDrop(id, status); }}
+    >
       <div className="p-4 border-b border-slate-200/60 bg-white/80 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${leads.length > 0 ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-300'}`}></div>
@@ -74,8 +80,10 @@ const KanbanColumn: React.FC<{
         {leads.map(lead => (
           <div 
             key={lead.id}
+            draggable
+            onDragStart={e => { e.dataTransfer.setData('leadId', lead.id); e.dataTransfer.effectAllowed = 'move'; }}
             onClick={() => onView(lead)}
-            className="group bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-pointer animate-fadeIn active:scale-[0.98]"
+            className="group bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all cursor-grab animate-fadeIn active:scale-[0.98]"
           >
             <div className="flex justify-between items-start mb-3">
               <div className={`w-1 h-8 rounded-full ${getPriorityColor(lead.priority)} mr-3`}></div>
@@ -189,8 +197,8 @@ const CRM: React.FC = () => {
         crmService.getStats(),
         crmService.getAnalytics(),
         crmService.getLeads({ queue: 'today_and_overdue' }),
-        fetch('/api/users').then(r => r.json()).catch(() => []),
-        fetch('/api/products?limit=200').then(r => r.json()).catch(() => []),
+        crmService.getUsers().catch(() => ({})),
+        crmService.getProducts().catch(() => []),
       ]);
       setLeads(leadsRes);
       setStats(statsRes);
@@ -275,6 +283,32 @@ const CRM: React.FC = () => {
       addNotification({ title: 'Error', message: err.message || 'Failed to discard opportunity', type: 'error', priority: 'high' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleMoveLead = async (leadId: string, newStatus: string) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead || lead.status === newStatus) return;
+    try {
+      await crmService.updateLead(leadId, {
+        name: lead.name,
+        companyName: (lead as any).company_name,
+        email: lead.email,
+        contact: lead.contact,
+        location: lead.location,
+        status: newStatus,
+        priority: lead.priority,
+        source: lead.source,
+        nextFollowUp: (lead as any).next_follow_up || null,
+        estimatedValue: (lead as any).estimated_value,
+        assignedTo: (lead as any).assigned_to || null,
+        notes: lead.notes,
+        industryType: (lead as any).industry_type || null,
+      });
+      addNotification({ title: 'Moved', message: `${lead.name} moved to ${newStatus}`, type: 'success', priority: 'low' });
+      fetchAllData();
+    } catch {
+      addNotification({ title: 'Error', message: 'Failed to move lead', type: 'error', priority: 'high' });
     }
   };
 
@@ -516,6 +550,7 @@ const CRM: React.FC = () => {
                 status={col}
                 leads={filteredLeads.filter(l => l.status === col)}
                 onView={(l) => { setSelectedLead(l); setShowDetailModal(true); }}
+                onDrop={handleMoveLead}
               />
             ))}
             <KanbanColumn
@@ -625,9 +660,9 @@ const CRM: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`text-[10px] font-black px-2 py-1 rounded ${
-                        new Date(lead.next_follow_up!) < new Date() ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'
+                        (lead.next_follow_up ? lead.next_follow_up.slice(0,10) < new Date().toLocaleDateString('en-CA') : false) ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'
                       }`}>
-                        {formatDate(lead.next_follow_up!)}
+                        {lead.next_follow_up ? formatDate(lead.next_follow_up) : 'Not set'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -701,7 +736,21 @@ const CRM: React.FC = () => {
                     {['New','Contacted','Qualified','Proposal','Negotiation'].filter(s => s !== selectedLead.status).map(s => (
                       <button key={s} onClick={async () => {
                         try {
-                          const updated = await crmService.updateLead(selectedLead.id, { ...selectedLead, status: s });
+                          const updated = await crmService.updateLead(selectedLead.id, {
+                            name: selectedLead.name,
+                            companyName: (selectedLead as any).company_name,
+                            email: selectedLead.email,
+                            contact: selectedLead.contact,
+                            location: selectedLead.location,
+                            status: s,
+                            priority: selectedLead.priority,
+                            source: selectedLead.source,
+                            nextFollowUp: (selectedLead as any).next_follow_up || null,
+                            estimatedValue: (selectedLead as any).estimated_value,
+                            assignedTo: (selectedLead as any).assigned_to || null,
+                            notes: selectedLead.notes,
+                            industryType: (selectedLead as any).industry_type || null,
+                          });
                           setSelectedLead(updated);
                           fetchAllData();
                         } catch { addNotification({ title: 'Error', message: 'Status update failed', type: 'error', priority: 'high' }); }

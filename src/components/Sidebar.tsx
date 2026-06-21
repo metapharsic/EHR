@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Truck, FileBarChart, Users, Settings,
   ShieldCheck, CreditCard, LogOut, Map, Factory, Briefcase,
   UserPlus, ClipboardCheck, Activity, FileText, Database, Layers, TrendingUp, Globe, Plus, Sparkles,
-  History, Brain
+  History, Brain, Warehouse
 } from 'lucide-react';
 import { Tab } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -46,6 +46,7 @@ const MENU_STRUCTURE = [
       { id: Tab.LOGISTICS, label: 'Logistics', icon: <Truck size={18} /> },
       { id: Tab.ASSETS, label: 'Assets & Maint.', icon: <Database size={18} /> },
       { id: Tab.DOCUMENTS, label: 'Documents (DMS)', icon: <FileText size={18} /> },
+      { id: Tab.GODOWN_MASTER, label: 'Godown Master', icon: <Warehouse size={18} /> },
     ]
   },
   {

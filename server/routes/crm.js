@@ -82,7 +82,7 @@ router.get('/leads', verifyTokenMiddleware, asyncRoute(async (req, res) => {
         let paramIdx = 2;
 
         if (queue === 'today_and_overdue') {
-            query += ` AND l.next_follow_up <= CURRENT_DATE AND l.status NOT IN ('Converted', 'Lost')`;
+            query += ` AND (l.next_follow_up IS NULL OR l.next_follow_up <= CURRENT_DATE) AND l.status NOT IN ('Converted', 'Lost')`;
         }
 
         if (status && status !== 'All') {
@@ -230,7 +230,7 @@ router.put('/leads/:id', verifyTokenMiddleware, asyncRoute(async (req, res) => {
             WHERE id = $14 AND company_id = $15 RETURNING *`,
             [
                 name, companyName, email, contact, location, status, priority,
-                source, nextFollowUp, estimatedValue, assignedTo, notes, industryType, req.params.id, req.user.companyId || 1
+                source, nextFollowUp || null, estimatedValue, assignedTo, notes, industryType, req.params.id, req.user.companyId || 1
             ]
         );
         if (rows.length === 0) return res.status(404).json({ error: 'Lead not found' });

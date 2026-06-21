@@ -303,7 +303,7 @@ const StrategicPOS: React.FC = () => {
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Invoices Generated</p>
             <h3 className="text-xl font-black text-slate-800">{posDashboardSummary.invoicesGenerated}</h3>
-            <p className="mt-1 text-[10px] font-bold text-slate-400">Total items sold: {posDashboardSummary.itemsSoldToday}</p>
+            <p className="mt-1 text-[10px] font-bold text-slate-400">Total items sold: {posDashboardSummary.itemsSoldToday} (all time)</p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3 text-slate-600"><Receipt size={20} /></div>
         </button>
@@ -327,7 +327,7 @@ const StrategicPOS: React.FC = () => {
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Monthly Revenue</p>
             <h3 className="text-xl font-black text-emerald-600">{formatCurrency(posDashboardSummary.monthlyRevenue)}</h3>
-            <p className="mt-1 text-[10px] font-bold text-emerald-600">This month from billing</p>
+            <p className="mt-1 text-[10px] font-bold text-emerald-600">Last 30 days from billing</p>
           </div>
           <div className="rounded-lg bg-emerald-50 p-3 text-emerald-600"><TrendingUp size={20} /></div>
         </button>

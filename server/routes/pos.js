@@ -845,36 +845,58 @@ router.delete('/invoices/:id', async (req, res) => {
  */
 router.get('/dashboard-summary', async (req, res) => {
     try {
-        const todayResult = await db.query("SELECT COALESCE(SUM(net_amount), 0) as revenue, COUNT(*) as count FROM sales_invoices WHERE date::date = CURRENT_DATE AND invoice_number NOT LIKE 'PCD-%'");
-        const yesterdayResult = await db.query("SELECT COALESCE(SUM(net_amount), 0) as revenue FROM sales_invoices WHERE date::date = CURRENT_DATE - INTERVAL '1 day' AND invoice_number NOT LIKE 'PCD-%'");
-        const monthlyResult = await db.query("SELECT COALESCE(SUM(net_amount), 0) as revenue FROM sales_invoices WHERE date >= date_trunc('month', CURRENT_DATE) AND invoice_number NOT LIKE 'PCD-%'");
-        const itemsResult = await db.query(`
-            SELECT COALESCE(SUM(quantity), 0) as items 
-            FROM sales_invoice_items sii 
-            JOIN sales_invoices si ON sii.invoice_id = si.id 
-            WHERE si.date::date = CURRENT_DATE AND si.invoice_number NOT LIKE 'PCD-%'
-        `);
-        const recentResult = await db.query(`
-            SELECT si.*, u.name as created_by_name 
-            FROM sales_invoices si 
-            LEFT JOIN users u ON si.created_by = u.id 
-            WHERE si.invoice_number NOT LIKE 'PCD-%'
-            ORDER BY si.created_at DESC LIMIT 10
-        `);
+        // Today's revenue & invoice count
+        const todayResult = await db.query(
+            "SELECT COALESCE(SUM(net_amount), 0) as revenue, COUNT(*) as count FROM sales_invoices WHERE date::date = CURRENT_DATE AND invoice_number NOT LIKE 'PCD-%'"
+        );
+        // Yesterday for % change
+        const yesterdayResult = await db.query(
+            "SELECT COALESCE(SUM(net_amount), 0) as revenue FROM sales_invoices WHERE date::date = CURRENT_DATE - INTERVAL '1 day' AND invoice_number NOT LIKE 'PCD-%'"
+        );
+        // Last 30 days revenue (more meaningful than calendar month)
+        const monthlyResult = await db.query(
+            "SELECT COALESCE(SUM(net_amount), 0) as revenue FROM sales_invoices WHERE date >= CURRENT_DATE - INTERVAL '30 days' AND invoice_number NOT LIKE 'PCD-%'"
+        );
+        // Total invoices all-time for the Invoices Generated card
+        const totalInvoicesResult = await db.query(
+            "SELECT COUNT(*) as count FROM sales_invoices WHERE invoice_number NOT LIKE 'PCD-%'"
+        );
+        // Total items sold all-time
+        const totalItemsResult = await db.query(`SELECT COALESCE(SUM(sii.quantity), 0) as items
+             FROM sales_invoice_items sii
+             JOIN sales_invoices si ON sii.invoice_id = si.id
+             WHERE si.invoice_number NOT LIKE 'PCD-%'`
+        );
+        // Pending drafts — real query
+        const draftsResult = await db.query(
+            "SELECT COUNT(*) as count FROM sales_invoices WHERE status = 'Draft' AND invoice_number NOT LIKE 'PCD-%'"
+        );
+        // Recent invoices with party name
+        const recentResult = await db.query(`SELECT si.*,
+                    COALESCE(p.name, 'Walk-in Customer') as party_name,
+                    u.name as created_by_name
+             FROM sales_invoices si
+             LEFT JOIN parties p ON si.party_id = p.id
+             LEFT JOIN users u ON si.created_by = u.id
+             WHERE si.invoice_number NOT LIKE 'PCD-%'
+             ORDER BY si.created_at DESC LIMIT 10`
+        );
 
         const todayRevenue = parseFloat(todayResult.rows[0]?.revenue || 0);
         const yesterdayRevenue = parseFloat(yesterdayResult.rows[0]?.revenue || 0);
-        const changePercent = yesterdayRevenue > 0 ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100 : 0;
+        const changePercent = yesterdayRevenue > 0
+            ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100
+            : 0;
 
         res.json({
             success: true,
             data: {
                 todayRevenue,
                 yesterdayRevenue,
-                revenueChangePercent: changePercent,
-                invoicesGenerated: parseInt(todayResult.rows[0]?.count || 0),
-                itemsSoldToday: parseInt(itemsResult.rows[0]?.items || 0),
-                pendingDrafts: 0,
+                revenueChangePercent: Math.round(changePercent * 10) / 10,
+                invoicesGenerated: parseInt(totalInvoicesResult.rows[0]?.count || 0),
+                itemsSoldToday: parseInt(totalItemsResult.rows[0]?.items || 0),
+                pendingDrafts: parseInt(draftsResult.rows[0]?.count || 0),
                 monthlyRevenue: parseFloat(monthlyResult.rows[0]?.revenue || 0),
                 recentInvoices: recentResult.rows,
                 tables: ['sales_invoices', 'sales_invoice_items', 'parties']

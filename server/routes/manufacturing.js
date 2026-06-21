@@ -201,12 +201,17 @@ router.delete(['/bom/:id', '/boms/:id'], verifyTokenMiddleware, verifyRoleMiddle
 router.get('/production-orders', verifyTokenMiddleware, async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT id, batch_number as "batchNumber", product_id as "productId", 
-              product_name as "productName", bom_id as "bomId", 
-              planned_quantity as "plannedQuantity", start_date as "startDate", 
-              status, current_stage as "currentStage" 
-       FROM production_orders 
-       ORDER BY start_date DESC`
+`SELECT id, 
+              COALESCE(batch_number, order_no) as "batchNumber",
+              product_id as "productId",
+              product_name as "productName",
+              bom_id as "bomId",
+              COALESCE(planned_quantity, quantity) as "plannedQuantity",
+              start_date as "startDate",
+              status,
+              COALESCE(current_stage, 'Pending') as "currentStage"
+       FROM production_orders
+       ORDER BY created_at DESC`
     );
     res.json({ success: true, data: result.rows });
   } catch (error) {
@@ -244,8 +249,8 @@ router.post('/production-orders', verifyTokenMiddleware, verifyRoleMiddleware(['
     }
 
     const result = await db.query(
-      `INSERT INTO production_orders (batch_number, product_id, product_name, bom_id, planned_quantity, start_date, status, current_stage, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending', $8) RETURNING *`,
+`INSERT INTO production_orders (order_no, batch_number, product_id, product_name, bom_id, quantity, planned_quantity, start_date, status, current_stage, created_by)
+       VALUES ($1, $1, $2, $3, $4, $5, $5, $6, $7, 'Pending', $8) RETURNING *`,
       [finalBatchNumber, finalProductId, finalProductName, finalBomId, finalQty, finalStart, orderStatus || 'Planned', req.user.userId]
     );
     

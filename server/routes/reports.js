@@ -82,7 +82,7 @@ router.get('/dashboard-summary', verifyTokenMiddleware, async (req, res) => {
             COUNT(*) FILTER (WHERE p.status = 'Active' OR p.status = 'ACTIVE')::int AS active_partners,
             COUNT(*)::int AS total_partners,
             COUNT(DISTINCT p.territory)::int AS total_territories,
-            COALESCE(SUM(CASE WHEN t.order_status = 'Verified' OR t.order_status = 'VERIFIED' THEN t.amount ELSE 0 END), 0) AS verified_sales, 
+            COALESCE(SUM(CASE WHEN t.order_status = 'Verified' OR t.order_status = 'VERIFIED' THEN t.order_amount ELSE 0 END), 0) AS verified_sales, 
             COUNT(*) FILTER (WHERE t.order_status = 'Verified' OR t.order_status = 'VERIFIED')::int AS verified_transactions
           FROM pcd_partners p
           LEFT JOIN pcd_transactions t

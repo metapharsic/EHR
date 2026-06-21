@@ -147,4 +147,97 @@ router.get('/dropdown', async (req, res) => {
   }
 });
 
+
+/**
+ * GET /api/sales/products
+ * Active products for wholesale invoice item selection
+ */
+router.get('/products', async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT id, name,
+             COALESCE(ptr, selling_rate, 0) as "ptr",
+             COALESCE(mrp, 0) as mrp,
+             COALESCE(gst, 12) as gst,
+             packing, uom
+      FROM products
+      WHERE is_active = true
+      ORDER BY name
+    `);
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    logger.error('Failed to fetch products for sales', { error: error.message });
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/sales
+ * Create a new wholesale invoice (ACID transaction, WHO- prefix)
+ */
+router.post('/', async (req, res) => {
+  const { party_id, party_name, invoice_date, payment_mode = 'Credit', items } = req.body;
+
+  if (!party_id) return res.status(400).json({ success: false, error: 'Distributor is required' });
+  if (!items || items.length === 0) return res.status(400).json({ success: false, error: 'Add at least one item' });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Deterministic invoice number: WHO-YYYYMMDD-SEQ
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const { rows: seqRows } = await client.query(
+      "SELECT COUNT(*)+1 AS seq FROM sales_invoices WHERE invoice_number LIKE $1",
+      ['WHO-' + dateStr + '-%']
+    );
+    const seq = String(seqRows[0].seq).padStart(4, '0');
+    const invoiceNumber = 'WHO-' + dateStr + '-' + seq;
+
+    const sub_total = items.reduce((s, i) => s + parseFloat(i.quantity) * parseFloat(i.rate), 0);
+    const total_gst = items.reduce((s, i) => {
+      const taxable = parseFloat(i.quantity) * parseFloat(i.rate);
+      return s + taxable * (parseFloat(i.gst_percent) || 12) / 100;
+    }, 0);
+    const net_amount = parseFloat((sub_total + total_gst).toFixed(2));
+
+    const { rows: [inv] } = await client.query(`
+      INSERT INTO sales_invoices
+        (invoice_number, party_id, customer_name, date, payment_mode,
+         sub_total, taxable_value, total_gst, net_amount, status, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, 'Completed', $9)
+      RETURNING id, invoice_number
+    `, [invoiceNumber, party_id, party_name,
+        invoice_date || new Date().toISOString().split('T')[0],
+        payment_mode, sub_total, total_gst, net_amount,
+        req.user ? req.user.id : null]);
+
+    for (const item of items) {
+      const qty = parseFloat(item.quantity);
+      const rate = parseFloat(item.rate);
+      const gst_pct = parseFloat(item.gst_percent) || 12;
+      const taxable = parseFloat((qty * rate).toFixed(2));
+      const total = parseFloat((taxable * (1 + gst_pct / 100)).toFixed(2));
+
+      await client.query(`
+        INSERT INTO sales_invoice_items
+          (invoice_id, sales_invoice_id, product_id, quantity, rate, selling_rate,
+           mrp, gst_percent, taxable_value, total_amount)
+        VALUES ($1, $1, $2, $3, $4, $4, $5, $6, $7, $8)
+      `, [inv.id, item.product_id || null, qty, rate,
+          parseFloat(item.mrp) || 0, gst_pct, taxable, total]);
+    }
+
+    await client.query('COMMIT');
+    logger.info('Wholesale invoice created', { invoiceNumber, net_amount });
+    res.status(201).json({ success: true, data: { id: inv.id, invoice_number: inv.invoice_number } });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    logger.error('Failed to create wholesale invoice', { error: err.message });
+    res.status(500).json({ success: false, error: 'Failed to create wholesale invoice' });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "codegraph": {
+      "command": "npx",
+      "args": ["-y", "@astudioplus/codegraph-mcp", "--workspace", "/u01/apps/Metapharsic_ERP"]
+    }
+  }
+}

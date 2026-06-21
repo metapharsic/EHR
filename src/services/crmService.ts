@@ -65,6 +65,8 @@ export const crmService = {
   generateStrategy: () => apiClient.post<any>('/crm/ai/strategy', {}),
   getAnalytics: () => apiClient.get<{ velocity: any[]; distribution: any[] }>('/crm/analytics'),
 
+  getProducts: () => apiClient.get<any[]>('/products'),
+  getUsers: () => apiClient.get('/hr/employees'),
   // Interests
   getInterests: (id: string) => apiClient.get<LeadProductInterest[]>(`/crm/leads/${id}/interests`),
   addInterest: (id: string, data: { productId: string; interestLevel?: string; notes?: string }) => 
