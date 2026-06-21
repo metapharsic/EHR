@@ -1,4 +1,4 @@
-﻿# AI Coding Rules â€” Metapharsic Lifesciences ERP + MR Tracker v13.0
+﻿# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v13.0
 # MAXIMUM AUTOMATION | ENTERPRISE-GRADE PRECISION | AGENTIC AI STANDARDS | ZERO-OMISSION PROTOCOL
 # Last updated: 2026-06-21
 
@@ -49,7 +49,7 @@ Nothing may remain implicit.
 
 Create and maintain:
 
-Requirement â†’ Screen â†’ Form â†’ Field â†’ API â†’ Service â†’ Database Entity â†’ Workflow â†’ Notification â†’ Report â†’ Permission â†’ Test Case
+Requirement → Screen → Form → Field → API → Service → Database Entity → Workflow → Notification → Report → Permission → Test Case
 
 Every requirement must map to implementation.
 Every implementation must map back to a requirement.
@@ -181,7 +181,7 @@ Never modify production schema without rollback.
 
 ## RULE 15: SELF-AUDIT LOOP
 
-Before completion ask â€” have I checked:
+Before completion ask — have I checked:
 
 - [ ] Every table?
 - [ ] Every API?
