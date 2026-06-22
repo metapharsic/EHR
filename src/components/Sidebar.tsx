@@ -2,7 +2,7 @@
 import React from 'react';
 import {
   LayoutDashboard, ShoppingCart, Package, Truck, FileBarChart, Users, Settings,
-  ShieldCheck, CreditCard, LogOut, Map, Factory, Briefcase,
+  ShieldCheck, CreditCard, LogOut, Map, Factory,
   UserPlus, ClipboardCheck, Activity, FileText, Database, Layers, TrendingUp, Globe, Plus, Sparkles,
   History, Brain, Warehouse
 } from 'lucide-react';
@@ -61,7 +61,6 @@ const MENU_STRUCTURE = [
     section: SECTION_HEADERS.PEOPLE,
     items: [
       { id: Tab.HRMS, label: 'HRMS (AI-Era)', icon: <Brain size={18} className="text-indigo-500" /> },
-      { id: Tab.EMPLOYEES, label: 'HR & Payroll', icon: <Briefcase size={18} /> },
     ]
   },
   {

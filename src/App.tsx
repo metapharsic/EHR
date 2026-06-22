@@ -9,7 +9,7 @@ import PurchaseEnhanced from './components/PurchaseEnhanced';
 import Reports from './components/Reports';
 import Accounts from './components/Accounts';
 import StrategicPCD from './components/StrategicPCD';
-import HR from './components/HR';
+// HR component retired — Tab.EMPLOYEES now redirects to HRMS
 import HRMS from './components/HRMS';
 import Settings from './components/Settings';
 import Login from './components/Login';
@@ -83,7 +83,7 @@ const AppContent: React.FC = () => {
       case Tab.ASSETS: return <Assets />;
       case Tab.DOCUMENTS: return <Documents />;
       case Tab.HRMS: return <HRMS />;
-      case Tab.EMPLOYEES: return <HR />;
+      case Tab.EMPLOYEES: return <HRMS />; // redirected — HR.tsx retired, HRMS is canonical
       case Tab.REPORTS: return <Reports />;
       case Tab.COMPLIANCE: return <Compliance />;
       case Tab.AUDIT: return <AuditLog />;
