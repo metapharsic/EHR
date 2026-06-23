@@ -8,7 +8,7 @@ import React, { useState, useMemo } from 'react';
 import { 
  FileText, User, Plus, TrendingUp, RefreshCcw, BookOpen,
  Grid, Shield, Zap, LayoutDashboard, Package, Scale, Landmark, Calculator,
- ArrowUpRight, ArrowDownLeft, Wallet, PieChart, X, Pencil, Trash2
+ ArrowUpRight, ArrowDownLeft, Wallet, PieChart, X, Pencil, Trash2, Eye
 } from 'lucide-react';
 
 // Standardized Layout Components
@@ -69,6 +69,7 @@ const Accounts: React.FC = () => {
  accountFormat: 'debit', group: ''
  });
  const [isSubmitting, setIsSubmitting] = useState(false);
+ const [viewingAccount, setViewingAccount] = useState<any>(null);
 
  const { data: parties, loading: loadingParties, refetch: refetchParties } = useDataFetch<Party[]>(
  `/api/accounting/chart-of-accounts${accountTypeFilter !== 'All' ? `?type=${accountTypeFilter}` : ''}`,
@@ -330,13 +331,15 @@ const Accounts: React.FC = () => {
  { key: 'account_type', label: 'Type', width: '15%', format: (v) => <Badge value={v} variant={v === 'Asset' || v === 'Income' ? 'success' : 'danger'} /> },
  { key: 'account_group', label: 'Group', width: '15%' },
  { key: 'current_balance', label: 'Live Balance', width: '20%', align: 'right', format: (v, row) => `₹${Math.abs(v || (row as any).opening_balance || 0).toLocaleString()} ${(v || 0) >= 0 ? 'Dr' : 'Cr'}` },
- { key: 'actions', label: 'Actions', width: '15%', align: 'center', format: (_, row) => (
- <div className="flex justify-center gap-3">
- <button onClick={() => { setSelectedPartyId(row.id); openTab('LEDGER', 'General Ledger'); }} className="text-accent hover:underline font-bold text-xs uppercase tracking-widest">Detail</button>
+ { key: 'actions', label: 'Actions', width: '18%', align: 'center', format: (_, row) => (
+ <div className="flex justify-center gap-1">
+ <button title="View" onClick={() => setViewingAccount(row)} className="p-1.5 text-slate-400 hover:text-accent hover:bg-accent/10 rounded transition-colors"><Eye size={13} /></button>
+ <button title="Ledger" onClick={() => { setSelectedPartyId(row.id); openTab('GENERAL_LEDGER', 'General Ledger'); }} className="text-[10px] font-bold text-accent hover:underline px-1">GL</button>
  {canEdit && (
  <>
- <button onClick={() => handleEditAccount(row)} className="text-slate-500 hover:text-blue-600 font-bold text-xs uppercase tracking-widest"><Pencil size={14} /></button>
- <button onClick={() => handleDeleteAccount(row.id)} className="text-slate-500 hover:text-red-600 font-bold text-xs uppercase tracking-widest"><Trash2 size={14} /></button>
+ <button title="Edit" onClick={() => handleEditAccount(row)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"><Pencil size={13} /></button>
+ <button title="Append sub-account" onClick={() => { setEditingAccountId(null); setAccountForm({ accountCode: '', accountName: '', accountType: row.account_type || 'Asset', openingBalance: 0, accountFormat: row.account_format || 'debit', group: row.account_group || '' }); setIsAddModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"><Plus size={13} /></button>
+ <button title="Deactivate" onClick={() => handleDeleteAccount(row.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"><Trash2 size={13} /></button>
  </>
  )}
  </div>
@@ -412,7 +415,38 @@ const Accounts: React.FC = () => {
  </div>
  </div>
  )}
- 
+
+ {viewingAccount && (
+ <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+ <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-200">
+ <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+ <h3 className="text-base font-bold text-slate-800">Account Detail</h3>
+ <button onClick={() => setViewingAccount(null)} className="text-slate-400 hover:text-red-500"><X size={20} /></button>
+ </div>
+ <div className="p-5 space-y-3 text-sm">
+ {[
+ ['Code', viewingAccount.account_code],
+ ['Name', viewingAccount.account_name],
+ ['Type', viewingAccount.account_type],
+ ['Group', viewingAccount.account_group || '—'],
+ ['Opening Balance', `₹${Number(viewingAccount.opening_balance || 0).toLocaleString()}`],
+ ['Live Balance', `₹${Math.abs(Number(viewingAccount.current_balance || 0)).toLocaleString()} ${Number(viewingAccount.current_balance || 0) >= 0 ? 'Dr' : 'Cr'}`],
+ ['Status', viewingAccount.status || 'Active'],
+ ].map(([label, val]) => (
+ <div key={label} className="flex justify-between border-b border-slate-50 pb-2">
+ <span className="text-slate-500 font-medium">{label}</span>
+ <span className="font-bold text-slate-800">{val}</span>
+ </div>
+ ))}
+ </div>
+ <div className="p-4 border-t border-slate-100 flex gap-2">
+ {canEdit && <button onClick={() => { handleEditAccount(viewingAccount); setViewingAccount(null); }} className="flex-1 py-2 bg-accent text-white rounded-xl text-xs font-bold">Edit Account</button>}
+ <button onClick={() => { setSelectedPartyId(viewingAccount.id); openTab('GENERAL_LEDGER', 'General Ledger'); setViewingAccount(null); }} className="flex-1 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50">View Ledger</button>
+ </div>
+ </div>
+ </div>
+ )}
+
  </div>
  );
  

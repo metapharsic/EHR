@@ -266,17 +266,17 @@ router.put('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware
     }
 }));
 
-router.delete('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT']), verify2FAMiddleware, asyncRoute(async (req, res) => {
+router.delete('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT']), asyncRoute(async (req, res) => {
     try {
-        const { rows } = await db.query('DELETE FROM chart_of_accounts WHERE id = $1 RETURNING *', [req.params.id]);
+        const { rows } = await db.query(
+            `UPDATE chart_of_accounts SET status = 'Inactive' WHERE id = $1 RETURNING id`,
+            [req.params.id]
+        );
         if (rows.length === 0) return res.status(404).json({ error: 'Account not found' });
-        res.json({ success: true, message: 'Account deleted successfully' });
+        res.json({ success: true, message: 'Account deactivated successfully' });
     } catch (error) {
-        if (error.code === '23503') { // Foreign key violation
-            return res.status(400).json({ error: 'Cannot delete account because it is referenced in transactions.' });
-        }
-        logger.error('Failed to delete account', { error: error.message });
-        res.status(500).json({ error: 'Failed to delete account' });
+        logger.error('Failed to deactivate account', { error: error.message });
+        res.status(500).json({ error: 'Failed to deactivate account' });
     }
 }));
 
