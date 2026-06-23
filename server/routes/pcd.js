@@ -49,7 +49,7 @@ router.get("/partners", async (req, res) => {
     const offset = (parseInt(page)-1)*parseInt(limit);
     const companyId = req.user?.companyId || 1;
 
-    let where = "WHERE (p.company_id = $1 OR p.company_id IS NULL)";
+    let where = "WHERE (p.company_id = $1 OR p.company_id IS NULL) AND p.is_active = true";
     const params = [companyId];
 
     if (search.trim()) {
@@ -191,25 +191,25 @@ router.put("/partners/:id", async (req, res) => {
   try {
     const {
       name, territory, state, district, contact_person, contact_number, email,
-      drug_license_no, drug_license_expiry, gst_registration, credit_limit,
+      drug_license_no, drug_license_expiry, gst_registration, gstin_expiry, credit_limit,
       discount_percentage, status, partner_grade, join_date, monopoly_territory,
       assigned_mr_ids, address
     } = req.body;
 
     await client.query('BEGIN');
     const r = await client.query(
-      `UPDATE pcd_partners SET 
-        name=$1, territory=$2, state=$3, district=$4, contact_person=$5, 
-        contact_number=$6, email=$7, drug_license_no=$8, drug_license_expiry=$9, 
-        gst_registration=$10, credit_limit=$11, discount_percentage=$12, 
-        status=$13, partner_grade=$14, join_date=$15, monopoly_territory=$16,
-        assigned_mr_ids=$17, address=$18,
+      `UPDATE pcd_partners SET
+        name=$1, territory=$2, state=$3, district=$4, contact_person=$5,
+        contact_number=$6, email=$7, drug_license_no=$8, drug_license_expiry=$9,
+        gst_registration=$10, gstin_expiry=$11, credit_limit=$12, discount_percentage=$13,
+        status=$14, partner_grade=$15, join_date=$16, monopoly_territory=$17,
+        assigned_mr_ids=$18, address=$19,
         updated_at=NOW()
-      WHERE id=$19 RETURNING *`,
+      WHERE id=$20 RETURNING *`,
       [
         name, territory, state, district, contact_person, contact_number, email,
-        drug_license_no, drug_license_expiry || null, gst_registration, credit_limit,
-        discount_percentage, status, partner_grade, join_date || null,
+        drug_license_no, drug_license_expiry || null, gst_registration, gstin_expiry || null,
+        credit_limit, discount_percentage, status, partner_grade, join_date || null,
         monopoly_territory || null, assigned_mr_ids || [], address || null, req.params.id
       ]
     );
