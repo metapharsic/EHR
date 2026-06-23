@@ -174,6 +174,22 @@ router.get('/:id', async (req, res) => {
 });
 
 // ── PUT /api/customers/:id — update compliance fields ───────────────────────
+router.post('/', async (req, res) => {
+  try {
+    const companyId = req.user?.companyId || 1;
+    const { name, entity_type = null, mobile = null, email = null, city = null, type = 'Debtor' } = req.body;
+    if (!name) return res.status(400).json({ success: false, error: 'Name required' });
+    const { rows } = await db.query(
+      `INSERT INTO parties (company_id, name, entity_type, mobile, email, city, type, compliance_status, compliance_score)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'INCOMPLETE',0) RETURNING id, name`,
+      [companyId, name, entity_type, mobile, email, city, type]
+    );
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 router.put('/:id', async (req, res) => {
   try {
     const fields = [

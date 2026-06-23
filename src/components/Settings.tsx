@@ -22,7 +22,8 @@ type SettingsTab =
   | 'notifications'
   | 'appearance'
   | 'modules'
-  | 'about';
+  | 'about'
+  | 'parties';
 
 interface AppParameters {
   financialYear: string;
@@ -1243,6 +1244,172 @@ const AboutTab: React.FC = () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN SETTINGS COMPONENT
+// ── Party & Entity Manager ────────────────────────────────────────────────────
+const ENTITY_TYPES = ['Retail Chemist','Wholesale Dealer','Hospital','Clinic','Doctor','Government','Other'];
+
+const PartiesTab: React.FC = () => {
+  const token = localStorage.getItem('accessToken');
+  const hdr = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${token}` });
+
+  const [parties, setParties] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [entityFilter, setEntityFilter] = useState('All');
+  const [editing, setEditing] = useState<any>(null);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ name: '', entity_type: '', mobile: '', email: '', city: '', type: 'Debtor' });
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/customers?limit=200${entityFilter !== 'All' ? `&entity_type=${entityFilter}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`, { headers: hdr() });
+      const d = await r.json();
+      setParties(d.data || []);
+    } catch { setParties([]); }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [entityFilter, search]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      if (editing) {
+        await fetch(`/api/customers/${editing.id}`, { method: 'PUT', headers: hdr(), body: JSON.stringify({ entity_type: editing.entity_type }) });
+      } else {
+        await fetch('/api/customers', { method: 'POST', headers: hdr(), body: JSON.stringify(form) });
+      }
+      setEditing(null); setAdding(false); load();
+    } catch { /* notify handled by global */ }
+    setSaving(false);
+  };
+
+  const filtered = parties.filter(p =>
+    (!search || p.name?.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-bold text-slate-800">Party &amp; Entity Registry</h3>
+          <p className="text-xs text-slate-500 mt-0.5">All parties across CRM, PCD, POS, OMS — classify by entity type</p>
+        </div>
+        <button onClick={() => { setForm({ name:'',entity_type:'',mobile:'',email:'',city:'',type:'Debtor' }); setAdding(true); }}
+          className="px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-bold flex items-center gap-1">
+          <Users size={13}/> + Add Party
+        </button>
+      </div>
+
+      <div className="flex gap-2">
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name..."
+          className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-accent" />
+        <select value={entityFilter} onChange={e => setEntityFilter(e.target.value)}
+          className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-accent bg-white">
+          <option value="All">All Entities</option>
+          {ENTITY_TYPES.map(e => <option key={e}>{e}</option>)}
+          <option value="__null__">— Not Set —</option>
+        </select>
+        <button onClick={load} className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 hover:bg-slate-50">↺</button>
+      </div>
+
+      <div className="border border-slate-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-xs font-bold text-slate-500 uppercase">
+            <tr>
+              <th className="px-4 py-2 text-left">Name</th>
+              <th className="px-4 py-2 text-left w-36">Entity Type</th>
+              <th className="px-4 py-2 text-left w-28">Mobile</th>
+              <th className="px-4 py-2 text-left w-24">City</th>
+              <th className="px-4 py-2 w-20 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-xs">Loading…</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400 text-xs">No parties found</td></tr>
+            ) : filtered.map(p => (
+              <tr key={p.id} className="hover:bg-slate-50">
+                <td className="px-4 py-2 font-medium text-slate-800">{p.name}</td>
+                <td className="px-4 py-2">
+                  {p.entity_type
+                    ? <span className="inline-block bg-accent/10 text-accent text-[10px] font-bold px-2 py-0.5 rounded-full">{p.entity_type}</span>
+                    : <span className="text-slate-300 text-xs italic">not set</span>}
+                </td>
+                <td className="px-4 py-2 text-slate-500 text-xs">{p.mobile || '—'}</td>
+                <td className="px-4 py-2 text-slate-500 text-xs">{p.city || '—'}</td>
+                <td className="px-4 py-2 text-center">
+                  <button onClick={() => setEditing({ ...p })} className="text-xs text-accent font-bold hover:underline">Edit</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Edit entity type modal */}
+      {editing && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-80 border border-slate-200 p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="font-bold text-slate-800">Edit Entity Type</h4>
+              <button onClick={() => setEditing(null)} className="text-slate-400 hover:text-red-500"><X size={18}/></button>
+            </div>
+            <p className="text-sm font-medium text-slate-700">{editing.name}</p>
+            <select value={editing.entity_type || ''} onChange={e => setEditing({ ...editing, entity_type: e.target.value })}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-accent">
+              <option value="">— Select Entity Type —</option>
+              {ENTITY_TYPES.map(e => <option key={e}>{e}</option>)}
+            </select>
+            <button onClick={save} disabled={saving} className="w-full py-2 bg-accent text-white rounded-xl text-sm font-bold disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add party modal */}
+      {adding && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-96 border border-slate-200 p-6 space-y-3">
+            <div className="flex justify-between items-center">
+              <h4 className="font-bold text-slate-800">Add New Party</h4>
+              <button onClick={() => setAdding(false)} className="text-slate-400 hover:text-red-500"><X size={18}/></button>
+            </div>
+            {[['Name *','name','text'],['Mobile','mobile','text'],['Email','email','email'],['City','city','text']].map(([label, field, type]) => (
+              <div key={field}>
+                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">{label}</label>
+                <input type={type} value={(form as any)[field]} onChange={e => setForm({...form, [field]: e.target.value})}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"/>
+              </div>
+            ))}
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Entity Type</label>
+              <select value={form.entity_type} onChange={e => setForm({...form, entity_type: e.target.value})}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-accent">
+                <option value="">— Select —</option>
+                {ENTITY_TYPES.map(e => <option key={e}>{e}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Party Type</label>
+              <select value={form.type} onChange={e => setForm({...form, type: e.target.value})}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white outline-none focus:ring-2 focus:ring-accent">
+                <option>Debtor</option><option>Creditor</option><option>Both</option>
+              </select>
+            </div>
+            <button onClick={save} disabled={saving || !form.name} className="w-full py-2 bg-accent text-white rounded-xl text-sm font-bold disabled:opacity-50">
+              {saving ? 'Saving…' : 'Add Party'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const Settings: React.FC = () => {
@@ -1269,6 +1436,7 @@ const Settings: React.FC = () => {
     { id: 'security', icon: <Lock size={16} />, label: 'Security', group: 'Configuration' },
     { id: 'notifications', icon: <Bell size={16} />, label: 'Notifications', group: 'Configuration' },
     { id: 'appearance', icon: <Palette size={16} />, label: 'Appearance', group: 'Configuration' },
+    { id: 'parties', icon: <Users size={16} />, label: 'Party & Entities', group: 'Configuration' },
     { id: 'integrations', icon: <MessageCircle size={16} />, label: 'Integrations', group: 'System' },
     { id: 'backup', icon: <Database size={16} />, label: 'Backup & Restore', group: 'System' },
     { id: 'about', icon: <Info size={16} />, label: 'About', group: 'System' },
@@ -1285,6 +1453,7 @@ const Settings: React.FC = () => {
       case 'integrations': return <IntegrationsTab addNotification={addNotification} />;
       case 'backup': return <BackupTab addNotification={addNotification} onFactoryReset={handleFactoryReset} />;
       case 'about': return <AboutTab />;
+      case 'parties': return <PartiesTab />;
     }
   };
 
