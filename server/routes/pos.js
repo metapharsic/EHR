@@ -227,11 +227,12 @@ router.get('/parties/:id/ledger', async (req, res) => {
  */
 router.get('/invoices/stats', async (req, res) => {
     try {
-        const now = new Date(); // §5A: date computed at request time
+        const now = new Date();
+        const companyId = req.user?.companyId || 1;
         const { date_from, date_to } = req.query;
 
-        const params = [];
-        let where = "WHERE si.invoice_number NOT LIKE 'PCD-%'";
+        const params = [companyId];
+        let where = "WHERE si.company_id = $1 AND si.invoice_number NOT LIKE 'PCD-%'";
         if (date_from) { params.push(date_from); where += ` AND si.date::date >= $${params.length}`; }
         if (date_to)   { params.push(date_to);   where += ` AND si.date::date <= $${params.length}`; }
 

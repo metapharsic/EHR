@@ -17,20 +17,22 @@ router.get('/stats', verifyTokenMiddleware, asyncRoute(async (req, res) => {
     try {
         const companyId = req.user.companyId || 1;
         const statsQuery = `
-            SELECT 
+            SELECT
                 COUNT(*) as total_leads,
                 COUNT(*) FILTER (WHERE status = 'New') as new_leads,
                 COUNT(*) FILTER (WHERE status = 'Converted') as converted_leads,
                 COUNT(*) FILTER (WHERE priority = 'Urgent') as urgent_leads,
-                COALESCE(SUM(estimated_value), 0) as total_pipeline_value
-            FROM leads 
+                COUNT(*) FILTER (WHERE status NOT IN ('Converted','Lost','Closed','Rejected')) as active_pipeline_leads,
+                COALESCE(SUM(estimated_value) FILTER (WHERE status NOT IN ('Converted','Lost','Closed','Rejected')), 0) as total_pipeline_value
+            FROM leads
             WHERE company_id = $1
         `;
         const { rows } = await db.query(statsQuery, [companyId]);
         
         const stats = rows[0];
-        stats.conversion_rate = stats.total_leads > 0 
-            ? ((stats.converted_leads / stats.total_leads) * 100).toFixed(1) 
+        stats.total_leads = parseInt(stats.active_pipeline_leads) || 0;
+        stats.conversion_rate = stats.total_leads > 0
+            ? ((parseInt(stats.converted_leads) / (parseInt(stats.total_leads) + parseInt(stats.converted_leads))) * 100).toFixed(1)
             : 0;
 
         // Unified Growth Stats
@@ -49,7 +51,7 @@ router.get('/stats', verifyTokenMiddleware, asyncRoute(async (req, res) => {
         const tm = parseInt(velocityMoM.rows[0].this_month) || 0;
         const lm = parseInt(velocityMoM.rows[0].last_month) || 0;
         stats.lead_velocity = lm === 0
-            ? (tm > 0 ? 100 : 0)
+            ? (tm > 0 ? null : 0)
             : Math.round(((tm - lm) / lm) * 100);
 
         res.json(stats);

@@ -189,6 +189,7 @@ async function shipOrderStock(client, order, items, userId) {
 // ============================================
 router.get('/stats', verifyTokenMiddleware, asyncRoute(async (req, res) => {
     try {
+        const companyId = req.user.companyId || 1;
         const { rows } = await db.query(`
             SELECT
                 COUNT(*)::int AS total_orders,
@@ -200,8 +201,8 @@ router.get('/stats', verifyTokenMiddleware, asyncRoute(async (req, res) => {
                 COUNT(*) FILTER (WHERE ai_risk_level = 'High')::int AS at_risk_orders,
                 COALESCE(SUM(total_amount), 0) AS total_value,
                 COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('Rejected','Cancelled')), 0) AS open_value
-            FROM orders
-        `);
+            FROM orders WHERE company_id = $1
+        `, [companyId]);
         const s = rows[0];
         const fulfilled = (s.delivered_orders || 0) + (s.invoiced_orders || 0);
         s.fulfillment_rate = s.total_orders > 0 ? Number(((fulfilled / s.total_orders) * 100).toFixed(1)) : 0;

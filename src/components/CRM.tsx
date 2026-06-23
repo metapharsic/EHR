@@ -496,7 +496,7 @@ const CRM: React.FC = () => {
         {/* Unified Growth Metrics */}
         <StatCard label="PCD Network" value={stats?.active_pcd_partners || 0} icon={<MapPin className="text-rose-500" />} color="danger" trend="Active Partners" />
         <StatCard label="Recent Sales" value={`₹${(Number(stats?.monthly_sales_volume || 0) / 100000).toFixed(1)}L`} icon={<TrendingUp className="text-sky-500" />} color="info" trend="30d Volume" />
-        <StatCard label="Lead Velocity" value={stats ? `${(stats.lead_velocity || 0) >= 0 ? '+' : ''}${stats.lead_velocity || 0}%` : '—'} icon={<Zap className="text-amber-500" />} color="warning" trend="MoM Growth" />
+        <StatCard label="Lead Velocity" value={stats ? (stats.lead_velocity === null ? 'New' : `${stats.lead_velocity >= 0 ? '+' : ''}${stats.lead_velocity}%`) : '—'} icon={<Zap className="text-amber-500" />} color="warning" trend="MoM Growth" />
       </div>
 
       <Tabs 

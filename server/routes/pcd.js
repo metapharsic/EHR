@@ -797,7 +797,7 @@ router.get("/dashboard/summary", async (req, res) => {
       db.query("SELECT COUNT(*) FROM pcd_partners WHERE company_id = $1 AND status='ACTIVE'", [companyId]),
       db.query("SELECT COALESCE(SUM(order_amount),0) AS total FROM pcd_transactions WHERE company_id = $1", [companyId]),
       db.query("SELECT COUNT(*) FROM pcd_schemes WHERE company_id = $1 AND status='ACTIVE'", [companyId]),
-      db.query("SELECT COUNT(*) FROM pcd_partner_documents WHERE status='PENDING'"),
+      db.query("SELECT COUNT(*) FROM pcd_partner_documents pd JOIN pcd_partners pp ON pp.id = pd.partner_id WHERE pd.status='PENDING' AND pp.company_id = $1", [companyId]),
       db.query("SELECT COALESCE(AVG(CASE WHEN target_amount>0 THEN achieved_amount/target_amount*100 ELSE 0 END),0) AS avg_achievement FROM pcd_targets WHERE company_id = $1 AND status IN ('IN_PROGRESS','ACHIEVED','EXCEEDED')", [companyId]),
       db.query("SELECT COALESCE(SUM(outstanding_amount),0) AS total FROM pcd_receivables WHERE company_id = $1 AND status != 'CLOSED'", [companyId]),
       db.query(`SELECT
