@@ -573,7 +573,7 @@ const Dashboard: React.FC = () => {
               icon={<AlertTriangle size={24} />}
               color="bg-warning"
               type="danger"
-              onClick={() => onNavigate(Tab.INVENTORY)}
+              onClick={() => onNavigate(Tab.INVENTORY_HUB)}
             />
           )}
           {visibleWidgets.expiryAlerts && (
@@ -584,7 +584,7 @@ const Dashboard: React.FC = () => {
               icon={<AlertOctagon size={24} />}
               color="bg-danger"
               type="danger"
-              onClick={() => onNavigate(Tab.INVENTORY)}
+              onClick={() => onNavigate(Tab.INVENTORY_HUB)}
             />
           )}
         </div>

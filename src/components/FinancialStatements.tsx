@@ -4,7 +4,7 @@ import { Download, Printer, RefreshCw, AlertCircle, ChevronDown, ChevronRight, F
 
 type StatementType = 'BALANCE_SHEET' | 'PROFIT_LOSS' | 'TRIAL_BALANCE';
 
-export const FinancialStatements: React.FC<{ type: StatementType }> = ({ type }) => {
+export const FinancialStatements: React.FC<{ type: StatementType; onDrillDown?: (accountId: string) => void }> = ({ type, onDrillDown }) => {
  const [data, setData] = useState<any>(null);
  const [loading, setLoading] = useState(false);
  const [error, setError] = useState('');
@@ -146,7 +146,7 @@ export const FinancialStatements: React.FC<{ type: StatementType }> = ({ type })
  const closingBal = parseFloat(r.closingBalance || 0);
  const isDebit = closingBal >= 0;
  return (
- <tr key={i} className="hover:bg-blue-50/40 cursor-pointer group">
+ <tr key={i} className="hover:bg-blue-50/40 cursor-pointer group" onClick={() => onDrillDown && r.id && onDrillDown(String(r.id))}>
  <td className="p-2 border-r border-slate-100 font-mono text-slate-500">{r.accountCode}</td>
  <td className="p-2 border-r border-slate-100 font-bold text-[#1D3557] group-hover:underline">{r.accountName}</td>
  <td className="p-2 border-r border-slate-100 text-center text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{r.accountGroup || '-'}</td>

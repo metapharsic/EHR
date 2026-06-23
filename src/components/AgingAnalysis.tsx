@@ -13,7 +13,7 @@ interface AgingRecord {
  bucket_90_plus: number;
 }
 
-const AgingAnalysis: React.FC = () => {
+const AgingAnalysis: React.FC<{ onViewParty?: (name: string) => void }> = ({ onViewParty }) => {
  const [data, setData] = useState<AgingRecord[]>([]);
  const [loading, setLoading] = useState(false);
  const [partyType, setPartyType] = useState<'Debtor' | 'Creditor'>('Debtor');
@@ -40,7 +40,9 @@ const AgingAnalysis: React.FC = () => {
  };
 
  const columns = [
- { key: 'name', label: 'Party Name', width: '25%' },
+ { key: 'name', label: 'Party Name', width: '25%', format: (v: string, row: AgingRecord) => (
+   <span className="text-accent font-bold cursor-pointer hover:underline" onClick={() => onViewParty && onViewParty(row.name)}>{v}</span>
+ )},
  { 
  key: 'current_balance', 
  label: 'Outstanding (?)', 

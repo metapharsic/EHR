@@ -101,7 +101,10 @@ const AppContent: React.FC = () => {
     switch (activeTab) {
       case Tab.DASHBOARD: return <Dashboard />;
       case Tab.POS: return <StrategicPOS />;
-      case Tab.INVENTORY_HUB: return <InventoryHub />;
+      case Tab.INVENTORY_HUB:
+      case Tab.INVENTORY:           // legacy → redirect
+      case Tab.INVENTORY_ANALYTICS: // legacy → redirect
+        return <InventoryHub />;
       case Tab.PURCHASE: return <PurchaseEnhanced />;
       case Tab.ACCOUNTS: return <Accounts />;
       case Tab.PCD: return <StrategicPCD />;

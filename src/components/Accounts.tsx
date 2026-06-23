@@ -424,11 +424,11 @@ const Accounts: React.FC = () => {
  case 'INVENTORY_VOUCHERS': return <InventoryVouchers />;
  case 'GENERAL_LEDGER': return <GeneralLedger accountId={selectedPartyId} />;
  case 'STOCK_SUMMARY': return <StockSummary />;
- case 'TRIAL_BALANCE': return <FinancialStatements type="TRIAL_BALANCE" />;
+ case 'TRIAL_BALANCE': return <FinancialStatements type="TRIAL_BALANCE" onDrillDown={(id) => { setSelectedPartyId(id); openTab('GENERAL_LEDGER', 'General Ledger'); }} />;
  case 'PROFIT_LOSS': return <FinancialStatements type="PROFIT_LOSS" />;
  case 'BALANCE_SHEET': return <FinancialStatements type="BALANCE_SHEET" />;
  case 'CASH_FLOW': return <CashFlowStatement />;
- case 'AGING_ANALYSIS': return <AgingAnalysis />;
+ case 'AGING_ANALYSIS': return <AgingAnalysis onViewParty={(name) => { setPartySearch(name); openTab('PARTIES', 'Chart of Accounts'); }} />;
  case 'GST': return <GstReports />;
  case 'TDS': return <TDSManagement />;
  case 'AUDIT_TRAIL': return <AuditTrailView />;

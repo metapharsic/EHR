@@ -87,7 +87,11 @@ const CashFlowStatement: React.FC = () => {
  description="Direct method cash flow analysis"
  icon={<Activity className="text-accent" size={24} />}
  onRefresh={fetchCashFlow}
- onExport={() => {}}
+ onExport={() => {
+   const rows = [['Activity','Particulars','Amount'], ...data.items.map(d => [d.activity, d.category, d.amount])];
+   const csv = rows.map(r => r.join(',')).join('\n');
+   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download = 'cash-flow.csv'; a.click();
+ }}
  isLoading={loading}
  >
  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

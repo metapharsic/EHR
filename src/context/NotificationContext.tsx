@@ -39,7 +39,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 const moduleToTabMap: Record<string, Tab> = {
   DASHBOARD: Tab.DASHBOARD,
   SYSTEM: Tab.SETTINGS,
-  INVENTORY: Tab.INVENTORY,
+  INVENTORY: Tab.INVENTORY_HUB,
   POS: Tab.POS,
   REPORTS: Tab.REPORTS,
   ACCOUNTS: Tab.ACCOUNTS,
@@ -140,7 +140,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           read: false,
           priority: 'high',
           module: 'INVENTORY',
-          targetTab: Tab.INVENTORY,
+          targetTab: Tab.INVENTORY_HUB,
           sourceTable: 'products',
           sourceLabel: 'Products stock master'
         },

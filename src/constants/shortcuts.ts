@@ -24,12 +24,12 @@ export const ERP_SHORTCUTS: Partial<Record<Tab, ShortcutDefinition>> = {
     alt: false,
     description: 'Go to Point of Sale'
   },
-  [Tab.INVENTORY]: {
+  [Tab.INVENTORY_HUB]: {
     id: 'navigate-inventory',
     key: 'i',
     ctrl: true,
     alt: false,
-    description: 'Go to Inventory'
+    description: 'Go to Inventory Hub'
   },
   [Tab.PURCHASE]: {
     id: 'navigate-purchase',
@@ -198,13 +198,6 @@ export const ERP_SHORTCUTS: Partial<Record<Tab, ShortcutDefinition>> = {
     ctrl: true,
     alt: false,
     description: 'Go to Multi Branch'
-  },
-  [Tab.INVENTORY_ANALYTICS]: {
-    id: 'navigate-inventory-analytics',
-    key: 'y',
-    ctrl: true,
-    alt: false,
-    description: 'Go to Inventory Intelligence'
   },
   [Tab.INTELLIGENCE_DASHBOARD]: {
     id: 'navigate-intelligence-dashboard',

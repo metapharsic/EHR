@@ -240,4 +240,60 @@ router.post('/', async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/sales/:id
+ * Soft-cancel a wholesale invoice (status → Cancelled)
+ */
+router.delete('/:id', verifyRoleMiddleware(['ADMIN', 'SALES_MANAGER']), async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `UPDATE sales_invoices SET status='Cancelled', updated_at=NOW()
+       WHERE id=$1 AND status != 'Cancelled' RETURNING id, invoice_number`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Invoice not found or already cancelled' });
+    logger.info('Wholesale invoice cancelled', { id: req.params.id, invoiceNumber: rows[0].invoice_number });
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    logger.error('Failed to cancel invoice', { error: err.message });
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/sales/analytics
+ * Monthly revenue trend (last 6 months) + top products
+ */
+router.get('/analytics', async (req, res) => {
+  try {
+    const [trendRows, topRows] = await Promise.all([
+      db.query(`
+        SELECT to_char(date_trunc('month', date), 'Mon YY') AS month,
+               SUM(net_amount) AS revenue,
+               COUNT(*) AS invoices
+        FROM sales_invoices
+        WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '5 months'
+          AND status != 'Cancelled'
+          AND (invoice_number LIKE 'WHO-%' OR invoice_number LIKE 'PCD-%')
+        GROUP BY date_trunc('month', date)
+        ORDER BY date_trunc('month', date)
+      `),
+      db.query(`
+        SELECT p.category, COALESCE(SUM(sii.taxable_value),0) AS revenue
+        FROM sales_invoice_items sii
+        JOIN products p ON p.id = sii.product_id
+        JOIN sales_invoices si ON si.id = sii.invoice_id
+        WHERE si.status != 'Cancelled'
+          AND si.date >= CURRENT_DATE - INTERVAL '90 days'
+        GROUP BY p.category
+        ORDER BY revenue DESC
+        LIMIT 5
+      `)
+    ]);
+    res.json({ success: true, data: { trend: trendRows.rows, topCategories: topRows.rows } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

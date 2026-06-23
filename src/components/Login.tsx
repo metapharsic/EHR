@@ -78,7 +78,7 @@ const Login: React.FC = () => {
       items: [
         { id: Tab.DASHBOARD, name: 'Dashboard', icon: LayoutDashboard, desc: 'Executive overview with KPIs, analytics, and real-time business intelligence', color: 'blue' },
         { id: Tab.POS, name: 'POS / Billing', icon: ShoppingCart, desc: 'Point of Sale with GST compliance, multi-payment modes, and invoice generation', color: 'green' },
-        { id: Tab.INVENTORY, name: 'Inventory', icon: Package, desc: 'Stock management with expiry tracking, batch control, and reorder alerts', color: 'purple' },
+        { id: Tab.INVENTORY_HUB, name: 'Inventory', icon: Package, desc: 'Stock management with expiry tracking, batch control, and reorder alerts', color: 'purple' },
         { id: Tab.PURCHASE, name: 'Purchase', icon: Truck, desc: 'Purchase orders, supplier management, and GRN processing', color: 'orange' },
         { id: Tab.ACCOUNTS, name: 'Accounts', icon: CreditCard, desc: 'Financial accounting, ledgers, and payment tracking', color: 'cyan' },
       ]
