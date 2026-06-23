@@ -6,7 +6,8 @@ import {
   AlertCircle, Users, Building2, Phone, Mail, MapPin, CreditCard,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid,
   List, FileText, CheckCircle2, Loader2, XCircle, MoreHorizontal,
-  User, Banknote, BookOpen, Shield,
+  User, Banknote, BookOpen, Shield, ShieldCheck, ShieldAlert, ShieldOff,
+  ClipboardList, Bell,
 } from 'lucide-react';
 import { Party, PartyLedgerEntry, Tab } from '../types';
 import { getAllParties, saveParty, deleteParty } from '../services/databaseService';
@@ -27,6 +28,49 @@ const INDIAN_STATES = [
 ];
 
 const CATEGORIES = ['Regular','Premium','VIP','Corporate','Walkin'] as const;
+
+const ENTITY_TYPES = ['Retail Chemist','Wholesale Dealer','Hospital','Clinic','Doctor','Government','Other'] as const;
+
+// Required fields per entity type (mirrors server/routes/customers.js)
+const REQUIRED_BY_ENTITY: Record<string, string[]> = {
+  'Retail Chemist':   ['dl_20a','dl_20a_expiry','dl_20b','dl_20b_expiry','pharmacist_name','pharmacist_reg_no','gstin','mobile'],
+  'Wholesale Dealer': ['dl_20c','dl_20c_expiry','dl_20d','dl_20d_expiry','gstin','mobile'],
+  'Hospital':         ['hospital_reg_no','hospital_reg_expiry','gstin','mobile'],
+  'Clinic':           ['doctor_reg_no','doctor_degree','mobile'],
+  'Doctor':           ['doctor_reg_no','doctor_degree','mobile'],
+  'Government':       ['firm_reg_no','mobile'],
+  'Other':            ['mobile'],
+};
+
+type ComplianceStatus = 'COMPLETE'|'EXPIRING_SOON'|'CRITICAL'|'EXPIRED'|'INCOMPLETE';
+
+function computeComplianceFE(p: any): { status: ComplianceStatus; score: number } {
+  const required = REQUIRED_BY_ENTITY[p.entity_type] || ['mobile'];
+  const today = new Date();
+  const d30 = new Date(); d30.setDate(d30.getDate() + 30);
+  const d90 = new Date(); d90.setDate(d90.getDate() + 90);
+
+  const expiryDates = [
+    p.dl_20a_expiry, p.dl_20b_expiry, p.dl_20c_expiry, p.dl_20d_expiry,
+    p.dl_expiry_date, p.pharmacist_reg_expiry, p.hospital_reg_expiry,
+    p.fssai_expiry, p.firm_reg_expiry,
+  ].filter(Boolean).map((d: string) => new Date(d));
+
+  const missing = required.filter(f => !p[f] || p[f] === '');
+  if (missing.length > 0) return { status: 'INCOMPLETE', score: Math.round((1 - missing.length / required.length) * 100) };
+  if (expiryDates.some(d => d < today)) return { status: 'EXPIRED', score: 10 };
+  if (expiryDates.some(d => d <= d30)) return { status: 'CRITICAL', score: 50 };
+  if (expiryDates.some(d => d <= d90)) return { status: 'EXPIRING_SOON', score: 75 };
+  return { status: 'COMPLETE', score: 100 };
+}
+
+const COMPLIANCE_UI: Record<ComplianceStatus, { label: string; cls: string; icon: React.ReactNode }> = {
+  COMPLETE:      { label: 'Compliant',    cls: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: <ShieldCheck size={11}/> },
+  EXPIRING_SOON: { label: 'Expiring',     cls: 'bg-amber-100  text-amber-700  border-amber-200',  icon: <ShieldAlert size={11}/> },
+  CRITICAL:      { label: 'Critical',     cls: 'bg-orange-100 text-orange-700 border-orange-200', icon: <ShieldAlert size={11}/> },
+  EXPIRED:       { label: 'EXPIRED',      cls: 'bg-red-100    text-red-700    border-red-200',    icon: <ShieldOff size={11}/> },
+  INCOMPLETE:    { label: 'Incomplete',   cls: 'bg-slate-100  text-slate-600  border-slate-200',  icon: <Shield size={11}/> },
+};
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
@@ -483,10 +527,11 @@ const CustomerFormModal = ({
   };
 
   const TABS = [
-    { key:'basic',     label:'Basic Info',  icon:<User size={13}/> },
-    { key:'financial', label:'Financial',   icon:<CreditCard size={13}/> },
-    { key:'bank',      label:'Bank',        icon:<Banknote size={13}/> },
-    { key:'notes',     label:'Notes',       icon:<FileText size={13}/> },
+    { key:'basic',      label:'Basic Info',  icon:<User size={13}/> },
+    { key:'compliance', label:'Compliance',  icon:<Shield size={13}/> },
+    { key:'financial',  label:'Financial',   icon:<CreditCard size={13}/> },
+    { key:'bank',       label:'Bank',        icon:<Banknote size={13}/> },
+    { key:'notes',      label:'Notes',       icon:<FileText size={13}/> },
   ] as const;
 
   return (
@@ -617,6 +662,113 @@ const CustomerFormModal = ({
                     <Input value={form.territory ?? ''} onChange={e => set('territory', e.target.value)} placeholder="e.g. North Zone"/>
                   </Field>
                 </div>
+              </div>
+            )}
+
+            {tab === 'compliance' && (
+              <div className="space-y-5">
+                {/* Entity Type */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <Field label="Entity Type" required>
+                      <Select value={(form as any).entity_type ?? ''} onChange={e => set('entity_type' as any, e.target.value)}>
+                        <option value="">— Select Entity Type —</option>
+                        {ENTITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </Select>
+                    </Field>
+                  </div>
+                  <Field label="WhatsApp Number">
+                    <Input value={(form as any).whatsapp_number ?? ''} onChange={e => set('whatsapp_number' as any, e.target.value)}
+                      placeholder="10-digit (for alerts)" maxLength={10}/>
+                  </Field>
+                  <Field label="Primary DL Expiry">
+                    <Input type="date" value={(form as any).dl_expiry_date ?? ''} onChange={e => set('dl_expiry_date' as any, e.target.value)}/>
+                  </Field>
+                </div>
+
+                {/* Retail Chemist */}
+                {((form as any).entity_type === 'Retail Chemist') && (
+                  <div className="border border-blue-200 rounded-xl p-4 space-y-3 bg-blue-50/40">
+                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wide flex items-center gap-1"><Shield size={12}/> Retail Drug License (Form 20A / 20B)</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="License 20A (OTC)" required><Input value={(form as any).dl_20a ?? ''} onChange={e => set('dl_20a' as any, e.target.value)} placeholder="MH/20A/2024/XXXX"/></Field>
+                      <Field label="20A Expiry" required><Input type="date" value={(form as any).dl_20a_expiry ?? ''} onChange={e => set('dl_20a_expiry' as any, e.target.value)}/></Field>
+                      <Field label="License 20B (Rx)" required><Input value={(form as any).dl_20b ?? ''} onChange={e => set('dl_20b' as any, e.target.value)} placeholder="MH/20B/2024/XXXX"/></Field>
+                      <Field label="20B Expiry" required><Input type="date" value={(form as any).dl_20b_expiry ?? ''} onChange={e => set('dl_20b_expiry' as any, e.target.value)}/></Field>
+                      <Field label="Pharmacist Name" required><Input value={(form as any).pharmacist_name ?? ''} onChange={e => set('pharmacist_name' as any, e.target.value)} placeholder="Registered pharmacist name"/></Field>
+                      <Field label="Pharmacist Reg. No." required><Input value={(form as any).pharmacist_reg_no ?? ''} onChange={e => set('pharmacist_reg_no' as any, e.target.value)} placeholder="Pharmacy Council Reg. No."/></Field>
+                      <Field label="Pharmacist Cert. Expiry"><Input type="date" value={(form as any).pharmacist_reg_expiry ?? ''} onChange={e => set('pharmacist_reg_expiry' as any, e.target.value)}/></Field>
+                      <Field label="FSSAI No. (if applicable)"><Input value={(form as any).fssai_no ?? ''} onChange={e => set('fssai_no' as any, e.target.value)}/></Field>
+                    </div>
+                  </div>
+                )}
+
+                {/* Wholesale Dealer */}
+                {((form as any).entity_type === 'Wholesale Dealer') && (
+                  <div className="border border-purple-200 rounded-xl p-4 space-y-3 bg-purple-50/40">
+                    <p className="text-xs font-bold text-purple-700 uppercase tracking-wide flex items-center gap-1"><Shield size={12}/> Wholesale Drug License (Form 20C / 20D)</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="License 20C (OTC)" required><Input value={(form as any).dl_20c ?? ''} onChange={e => set('dl_20c' as any, e.target.value)} placeholder="MH/20C/2024/XXXX"/></Field>
+                      <Field label="20C Expiry" required><Input type="date" value={(form as any).dl_20c_expiry ?? ''} onChange={e => set('dl_20c_expiry' as any, e.target.value)}/></Field>
+                      <Field label="License 20D (H/Rx)" required><Input value={(form as any).dl_20d ?? ''} onChange={e => set('dl_20d' as any, e.target.value)} placeholder="MH/20D/2024/XXXX"/></Field>
+                      <Field label="20D Expiry" required><Input type="date" value={(form as any).dl_20d_expiry ?? ''} onChange={e => set('dl_20d_expiry' as any, e.target.value)}/></Field>
+                    </div>
+                  </div>
+                )}
+
+                {/* Hospital */}
+                {((form as any).entity_type === 'Hospital') && (
+                  <div className="border border-teal-200 rounded-xl p-4 space-y-3 bg-teal-50/40">
+                    <p className="text-xs font-bold text-teal-700 uppercase tracking-wide flex items-center gap-1"><Shield size={12}/> Hospital / Nursing Home Registration</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Hospital Reg. No." required><Input value={(form as any).hospital_reg_no ?? ''} onChange={e => set('hospital_reg_no' as any, e.target.value)} placeholder="Dist. CMO / State Reg. No."/></Field>
+                      <Field label="Registration Expiry" required><Input type="date" value={(form as any).hospital_reg_expiry ?? ''} onChange={e => set('hospital_reg_expiry' as any, e.target.value)}/></Field>
+                      <Field label="Firm Reg. / Trade License"><Input value={(form as any).firm_reg_no ?? ''} onChange={e => set('firm_reg_no' as any, e.target.value)}/></Field>
+                      <Field label="Trade License Expiry"><Input type="date" value={(form as any).firm_reg_expiry ?? ''} onChange={e => set('firm_reg_expiry' as any, e.target.value)}/></Field>
+                    </div>
+                  </div>
+                )}
+
+                {/* Clinic / Doctor */}
+                {(['Clinic','Doctor'].includes((form as any).entity_type)) && (
+                  <div className="border border-indigo-200 rounded-xl p-4 space-y-3 bg-indigo-50/40">
+                    <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide flex items-center gap-1"><Shield size={12}/> Medical Registration</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Doctor Reg. No. (MCI/SMC)" required><Input value={(form as any).doctor_reg_no ?? ''} onChange={e => set('doctor_reg_no' as any, e.target.value)} placeholder="State Medical Council Reg."/></Field>
+                      <Field label="Qualification" required><Input value={(form as any).doctor_degree ?? ''} onChange={e => set('doctor_degree' as any, e.target.value)} placeholder="MBBS, MD, BDS..."/></Field>
+                      <Field label="Firm Reg. No."><Input value={(form as any).firm_reg_no ?? ''} onChange={e => set('firm_reg_no' as any, e.target.value)} placeholder="Trade/Shop license"/></Field>
+                      <Field label="Firm Reg. Expiry"><Input type="date" value={(form as any).firm_reg_expiry ?? ''} onChange={e => set('firm_reg_expiry' as any, e.target.value)}/></Field>
+                    </div>
+                  </div>
+                )}
+
+                {/* Government */}
+                {((form as any).entity_type === 'Government') && (
+                  <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/40">
+                    <p className="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1"><Shield size={12}/> Govt. Institution</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Sanction / Order No." required><Input value={(form as any).firm_reg_no ?? ''} onChange={e => set('firm_reg_no' as any, e.target.value)} placeholder="Govt. sanction letter ref."/></Field>
+                      <Field label="Expiry / Validity"><Input type="date" value={(form as any).firm_reg_expiry ?? ''} onChange={e => set('firm_reg_expiry' as any, e.target.value)}/></Field>
+                    </div>
+                  </div>
+                )}
+
+                {/* Live compliance preview */}
+                {(form as any).entity_type && (() => {
+                  const { status, score } = computeComplianceFE(form);
+                  const ui = COMPLIANCE_UI[status];
+                  const required = REQUIRED_BY_ENTITY[(form as any).entity_type] || [];
+                  const missing = required.filter(f => !(form as any)[f]);
+                  return (
+                    <div className={`rounded-xl p-3 border text-sm flex items-start gap-3 ${ui.cls}`}>
+                      <div className="mt-0.5">{ui.icon}</div>
+                      <div className="flex-1">
+                        <p className="font-bold">{ui.label} — {score}% complete</p>
+                        {missing.length > 0 && <p className="text-xs mt-0.5 opacity-80">Missing: {missing.map(f => f.replace(/_/g,' ')).join(', ')}</p>}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -1263,6 +1415,15 @@ const CustomerDatabasePage: React.FC = () => {
                           <span>{[c.city, c.state].filter(Boolean).join(', ')}{c.pinCode ? ` ${c.pinCode}` : ''}</span>
                         </div>
                       )}
+                      {(() => {
+                        const { status } = computeComplianceFE(c);
+                        const ui = COMPLIANCE_UI[status];
+                        return (
+                          <div className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${ui.cls}`}>
+                            {ui.icon} {(c as any).entity_type || 'No Entity'} · {ui.label}
+                          </div>
+                        );
+                      })()}
                       {c.drugLicenseNo && (
                         <div className="flex items-center gap-1.5 text-xs text-slate-500">
                           <Shield size={11} className="text-slate-400 shrink-0"/>

@@ -40,7 +40,41 @@ import { CompanyProvider } from './context/CompanyContext';
 import { KeyboardShortcutProvider } from './context/KeyboardShortcutContext';
 import { NotificationProvider, NotificationBell } from './context/NotificationContext';
 import { useAppStore } from './store/useAppStore';
-import { Menu } from 'lucide-react';
+import { Menu, ShieldOff, ShieldAlert, X } from 'lucide-react';
+import { useDataFetch } from './hooks/useDataFetch';
+
+// ── Compliance Alert Banner ───────────────────────────────────────────────────
+const ComplianceAlertBanner: React.FC = () => {
+  const [dismissed, setDismissed] = React.useState(false);
+  const { data } = useDataFetch<any>('/api/customers/alerts', { cacheTime: 300000 });
+  const summary = data?.summary;
+  if (!summary || dismissed) return null;
+  const critical = (summary.expired || 0) + (summary.critical || 0);
+  const warn = summary.expiring || 0;
+  const incomplete = summary.incomplete || 0;
+  if (critical === 0 && warn === 0 && incomplete === 0) return null;
+  const isRed = critical > 0;
+  return (
+    <div className={`relative flex items-center gap-3 px-4 py-2.5 text-sm font-semibold
+      ${isRed
+        ? 'bg-red-600 text-white animate-pulse'
+        : 'bg-amber-500 text-white'
+      }`}>
+      {isRed ? <ShieldOff size={16} className="shrink-0"/> : <ShieldAlert size={16} className="shrink-0"/>}
+      <span className="flex-1">
+        {isRed
+          ? `🚨 COMPLIANCE ALERT — ${summary.expired} customer(s) EXPIRED drug license · ${summary.critical} CRITICAL (< 30 days). Sales to these customers may be ILLEGAL.`
+          : `⚠ Compliance Warning — ${warn} customer(s) expiring within 90 days · ${incomplete} profile(s) incomplete.`
+        }
+        <a href="#" onClick={(e) => { e.preventDefault(); (window as any).__erp_goto?.('CUSTOMER_DATABASE'); }}
+          className="underline ml-2 font-bold">View Customers →</a>
+      </span>
+      <button onClick={() => setDismissed(true)} className="p-1 hover:opacity-70 shrink-0" aria-label="Dismiss">
+        <X size={15}/>
+      </button>
+    </div>
+  );
+};
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
@@ -103,6 +137,7 @@ const AppContent: React.FC = () => {
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-auto transition-all duration-300">
+        <ComplianceAlertBanner />
         <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-white/80 px-4 backdrop-blur-md">
           <div className="flex items-center gap-4">
              <button onClick={toggleSidebar} className="p-2 hover:bg-slate-100 rounded-lg">

@@ -235,6 +235,8 @@ app.use('/api/oms', omsRoutes);
 const omsPortalRoutes = require('./routes/omsPortal');
 app.use('/api/portal', omsPortalRoutes);
 app.use('/api/compliance', complianceRoutes);
+const customerRoutes = require('./routes/customers');
+app.use('/api/customers', customerRoutes);
 app.use('/api', inventoryRoutesFull); // Support /api/godowns, /api/stock-ledger etc.
 app.use('/api', manufacturingRoutes); // Support /api/boms, /api/raw-materials etc.
 app.use('/api', posRoutes);       // Support /api/parties

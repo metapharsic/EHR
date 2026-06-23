@@ -42,10 +42,39 @@ async function checkAndAlert() {
   }
 }
 
+// Customer compliance alert — checks parties table for expiring/expired docs
+async function checkCustomerCompliance() {
+  try {
+    const { rows } = await db.query(`
+      SELECT p.name, p.drug_license_no as license_number, p.mobile,
+             p.whatsapp_number, p.email, p.entity_type,
+             LEAST(p.dl_20a_expiry, p.dl_20b_expiry, p.dl_20c_expiry, p.dl_20d_expiry,
+                   p.dl_expiry_date, p.pharmacist_reg_expiry, p.hospital_reg_expiry,
+                   p.fssai_expiry, p.firm_reg_expiry) as expiry_date
+      FROM parties p
+      WHERE p.type IN ('Debtor','Both')
+        AND p.status = 'Active'
+        AND LEAST(p.dl_20a_expiry, p.dl_20b_expiry, p.dl_20c_expiry, p.dl_20d_expiry,
+                  p.dl_expiry_date, p.pharmacist_reg_expiry, p.hospital_reg_expiry,
+                  p.fssai_expiry, p.firm_reg_expiry) <= CURRENT_DATE + 90
+      ORDER BY expiry_date ASC
+    `);
+    if (rows.length) {
+      await sendExpiryAlerts(rows);
+      console.log(`[CustomerComplianceCron] Alerted for ${rows.length} customer(s)`);
+    } else {
+      console.log('[CustomerComplianceCron] All customer docs OK.');
+    }
+  } catch (err) {
+    console.error('[CustomerComplianceCron] Error:', err.message);
+  }
+}
+
 // Schedule: every day at 9:00 AM
 function startComplianceCron() {
   cron.schedule("0 9 * * *", checkAndAlert, { timezone: "Asia/Kolkata" });
-  console.log("[ComplianceCron] Scheduled daily license expiry check at 9:00 AM IST");
+  cron.schedule("0 9 * * *", checkCustomerCompliance, { timezone: "Asia/Kolkata" });
+  console.log("[ComplianceCron] Scheduled daily license + customer compliance checks at 9:00 AM IST");
 }
 
-module.exports = { startComplianceCron, checkAndAlert };
+module.exports = { startComplianceCron, checkAndAlert, checkCustomerCompliance };
