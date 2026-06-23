@@ -18,9 +18,11 @@ router.get('/inventory/comprehensive', verifyTokenMiddleware, verify2FAMiddlewar
         p.id, p.name, p.code, p.min_stock_level as "minStockLevel", p.reorder_level as "reorderLevel",
         p.schedule_type as "scheduleType", p.category,
         COALESCE(SUM(b.stock), 0) as "totalStock",
-        COALESCE(SUM(b.stock * b.mrp), 0) as "stockValue"
+        COALESCE(SUM(b.stock * COALESCE(b.purchase_rate, b.landed_cost, 0)), 0)::float as "stockValue",
+        COALESCE(SUM(b.stock * b.mrp), 0)::float as "mrpValue"
       FROM products p
       LEFT JOIN batches b ON p.id = b.product_id
+      WHERE COALESCE(p.is_active, true) = true
       GROUP BY p.id
     `);
 
@@ -98,7 +100,7 @@ router.get('/inventory/comprehensive', verifyTokenMiddleware, verify2FAMiddlewar
 
     // ABC Calculation
     items.sort((a, b) => b.stockValue - a.stockValue);
-    const totalValue = items.reduce((acc, curr) => acc + curr.stockValue, 0);
+    const totalValue = items.reduce((acc, curr) => acc + (parseFloat(curr.stockValue) || 0), 0);
     let runningValue = 0;
 
     items.forEach(item => {
@@ -122,11 +124,11 @@ router.get('/inventory/comprehensive', verifyTokenMiddleware, verify2FAMiddlewar
           categoryC: items.filter(i => i.abc === 'C'),
           summary: {
             countA: items.filter(i => i.abc === 'A').length,
-            valueA: items.filter(i => i.abc === 'A').reduce((s, i) => s + i.stockValue, 0),
+            valueA: items.filter(i => i.abc === 'A').reduce((s, i) => s + (parseFloat(i.stockValue) || 0), 0),
             countB: items.filter(i => i.abc === 'B').length,
-            valueB: items.filter(i => i.abc === 'B').reduce((s, i) => s + i.stockValue, 0),
+            valueB: items.filter(i => i.abc === 'B').reduce((s, i) => s + (parseFloat(i.stockValue) || 0), 0),
             countC: items.filter(i => i.abc === 'C').length,
-            valueC: items.filter(i => i.abc === 'C').reduce((s, i) => s + i.stockValue, 0),
+            valueC: items.filter(i => i.abc === 'C').reduce((s, i) => s + (parseFloat(i.stockValue) || 0), 0),
           }
         },
         fsnAnalysis: {
