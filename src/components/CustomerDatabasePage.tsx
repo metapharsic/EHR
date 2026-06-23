@@ -45,6 +45,7 @@ const REQUIRED_BY_ENTITY: Record<string, string[]> = {
 type ComplianceStatus = 'COMPLETE'|'EXPIRING_SOON'|'CRITICAL'|'EXPIRED'|'INCOMPLETE';
 
 function computeComplianceFE(p: any): { status: ComplianceStatus; score: number } {
+  if (!p.entity_type) return { status: 'INCOMPLETE', score: 0 };
   const required = REQUIRED_BY_ENTITY[p.entity_type] || ['mobile'];
   const today = new Date();
   const d30 = new Date(); d30.setDate(d30.getDate() + 30);
@@ -231,6 +232,154 @@ function completenessScore(p: Party) {
 
 /* ──────────────────────── Full-Profile Drawer ───────────────────────────── */
 
+const DOC_TYPE_LABELS: Record<string, string> = {
+  DL_20A: 'License 20A (OTC)', DL_20B: 'License 20B (Rx)',
+  DL_20C: 'License 20C (Wholesale OTC)', DL_20D: 'License 20D (Wholesale H)',
+  PHARMACIST_CERT: 'Pharmacist Certificate', FSSAI: 'FSSAI License',
+  GST: 'GST Certificate', PAN: 'PAN Card', TRADE_LICENSE: 'Trade License',
+  HOSPITAL_REG: 'Hospital Registration', DOCTOR_REG: 'Doctor Registration',
+  FIRM_REG: 'Firm Registration', OTHER: 'Other Document',
+};
+
+const DOC_TYPES = Object.keys(DOC_TYPE_LABELS);
+
+const CustomerDocuments: React.FC<{ partyId: string }> = ({ partyId }) => {
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ doc_type: 'DL_20A', doc_number: '', expiry_date: '', notes: '' });
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const fetchDocs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiClient.get(`/api/customers/${partyId}/documents`);
+      setDocs(res.data || []);
+    } catch { /* ignore */ } finally { setLoading(false); }
+  }, [partyId]);
+
+  useEffect(() => { fetchDocs(); }, [fetchDocs]);
+
+  const handleUpload = async () => {
+    const file = fileRef.current?.files?.[0];
+    if (!file) { alert('Select a file first'); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('doc_type', form.doc_type);
+      if (form.doc_number) fd.append('doc_number', form.doc_number);
+      if (form.expiry_date) fd.append('expiry_date', form.expiry_date);
+      if (form.notes) fd.append('notes', form.notes);
+      const token = localStorage.getItem('erp_token') || localStorage.getItem('token') || '';
+      const resp = await fetch(`/api/customers/${partyId}/documents/upload`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+      });
+      const json = await resp.json();
+      if (json.success) { setShowForm(false); if (fileRef.current) fileRef.current.value = ''; fetchDocs(); }
+      else alert(json.error || 'Upload failed');
+    } catch (e: any) { alert(e.message || 'Upload failed'); }
+    finally { setUploading(false); }
+  };
+
+  const handleDelete = async (docId: string) => {
+    if (!window.confirm('Delete this document?')) return;
+    await apiClient.delete(`/api/customers/documents/${docId}`);
+    fetchDocs();
+  };
+
+  const handleVerify = async (docId: string) => {
+    await apiClient.put(`/api/customers/documents/${docId}/verify`, {});
+    fetchDocs();
+  };
+
+  const daysLeft = (expiry: string) => {
+    if (!expiry) return null;
+    return Math.ceil((new Date(expiry).getTime() - Date.now()) / 86400000);
+  };
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Documents</h4>
+        <button onClick={() => setShowForm(v => !v)}
+          className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">
+          <Upload size={11}/> {showForm ? 'Cancel' : 'Upload'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="border border-dashed border-primary/40 rounded-xl p-3 mb-3 bg-sky-50/40 space-y-2">
+          <select className="w-full text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white"
+            value={form.doc_type} onChange={e => setForm(f => ({ ...f, doc_type: e.target.value }))}>
+            {DOC_TYPES.map(t => <option key={t} value={t}>{DOC_TYPE_LABELS[t]}</option>)}
+          </select>
+          <div className="grid grid-cols-2 gap-2">
+            <input type="text" placeholder="License / Doc Number"
+              className="text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white"
+              value={form.doc_number} onChange={e => setForm(f => ({ ...f, doc_number: e.target.value }))}/>
+            <input type="date" className="text-xs border border-slate-300 rounded-lg px-2 py-1.5 bg-white"
+              value={form.expiry_date} onChange={e => setForm(f => ({ ...f, expiry_date: e.target.value }))}/>
+          </div>
+          <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
+            className="w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-primary file:text-white file:text-xs cursor-pointer"/>
+          <button onClick={handleUpload} disabled={uploading}
+            className="w-full py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-sky-600 disabled:opacity-50 flex items-center justify-center gap-1">
+            {uploading ? <><Loader2 size={12} className="animate-spin"/> Uploading...</> : <><Upload size={12}/> Upload Document</>}
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-slate-400 py-2"><Loader2 size={12} className="animate-spin"/> Loading...</div>
+      ) : docs.length === 0 ? (
+        <p className="text-xs text-slate-400 italic py-2">No documents uploaded yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {docs.map(doc => {
+            const dl = daysLeft(doc.expiry_date);
+            const expired = dl !== null && dl < 0;
+            const critical = dl !== null && dl <= 30 && dl >= 0;
+            return (
+              <div key={doc.id} className={`rounded-lg border p-2.5 text-xs ${expired ? 'border-red-200 bg-red-50' : critical ? 'border-orange-200 bg-orange-50' : 'border-slate-200 bg-white'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-800 truncate">{DOC_TYPE_LABELS[doc.doc_type] || doc.doc_type}</p>
+                    {doc.doc_number && <p className="font-mono text-slate-500 text-[10px]">{doc.doc_number}</p>}
+                    {doc.expiry_date && (
+                      <p className={`text-[10px] font-bold mt-0.5 ${expired ? 'text-red-600' : critical ? 'text-orange-600' : 'text-slate-500'}`}>
+                        {expired ? `⚠ EXPIRED ${Math.abs(dl!)} days ago` : `Expires: ${new Date(doc.expiry_date).toLocaleDateString('en-IN')} (${dl} days)`}
+                      </p>
+                    )}
+                    {doc.verified && <p className="text-[10px] text-emerald-600 font-bold mt-0.5">✓ Verified by {doc.verified_by}</p>}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {doc.file_path && (
+                      <a href={doc.file_path} target="_blank" rel="noopener noreferrer"
+                        className="p-1 text-primary hover:bg-primary/10 rounded" title="View">
+                        <Eye size={13}/>
+                      </a>
+                    )}
+                    {!doc.verified && (
+                      <button onClick={() => handleVerify(doc.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Mark verified">
+                        <CheckCircle2 size={13}/>
+                      </button>
+                    )}
+                    <button onClick={() => handleDelete(doc.id)} className="p-1 text-red-400 hover:bg-red-50 rounded" title="Delete">
+                      <Trash2 size={13}/>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+};
+
 const ProfileDrawer = ({
   party, onClose, onEdit, onNavigateLedger,
 }: {
@@ -325,8 +474,27 @@ const ProfileDrawer = ({
               <div><span className="text-slate-400 text-xs">GSTIN</span><p className="font-mono font-medium text-slate-800">{party.gstin || '—'}</p></div>
               <div><span className="text-slate-400 text-xs">PAN</span><p className="font-mono font-medium text-slate-800">{party.pan || '—'}</p></div>
               <div className="col-span-2"><span className="text-slate-400 text-xs">Drug License No.</span><p className="font-mono font-medium text-slate-800">{party.drugLicenseNo || '—'}</p></div>
+              {(party as any).entity_type && (
+                <div className="col-span-2">
+                  <span className="text-slate-400 text-xs">Entity Type</span>
+                  <p className="font-medium text-slate-800">{(party as any).entity_type}</p>
+                </div>
+              )}
             </div>
+            {/* Compliance status badge */}
+            {(() => {
+              const { status, score: cs } = computeComplianceFE(party);
+              const ui = COMPLIANCE_UI[status];
+              return (
+                <div className={`mt-2 flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-lg border ${ui.cls}`}>
+                  {ui.icon} {ui.label} — {cs}% complete
+                </div>
+              );
+            })()}
           </section>
+
+          {/* Documents */}
+          <CustomerDocuments partyId={(party as any).id || ''} />
 
           {/* Bank */}
           {(party.bankName || party.accountNumber) && (

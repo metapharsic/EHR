@@ -46,8 +46,8 @@ import { useDataFetch } from './hooks/useDataFetch';
 // ── Compliance Alert Banner ───────────────────────────────────────────────────
 const ComplianceAlertBanner: React.FC = () => {
   const [dismissed, setDismissed] = React.useState(false);
-  const { data } = useDataFetch<any>('/api/customers/alerts', { cacheTime: 300000 });
-  const summary = data?.summary;
+  const { fullResponse } = useDataFetch<any>('/api/customers/alerts', { cacheTime: 300000 });
+  const summary = fullResponse?.summary;
   if (!summary || dismissed) return null;
   const critical = (summary.expired || 0) + (summary.critical || 0);
   const warn = summary.expiring || 0;

@@ -4,10 +4,31 @@
  */
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const db = require('../db');
 const { verifyTokenMiddleware } = require('../utils/jwt');
 const { sendExpiryAlerts } = require('../services/complianceNotificationService');
 const logger = require('../utils/logger');
+
+const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads', 'customer-docs');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+    filename: (req, file, cb) => {
+      const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+      cb(null, `${Date.now()}_${safe}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ok = ['image/jpeg','image/png','image/webp','application/pdf'].includes(file.mimetype);
+    cb(null, ok);
+  },
+});
 
 router.use(verifyTokenMiddleware);
 
@@ -24,6 +45,7 @@ const REQUIRED_DOCS = {
 
 // Compute compliance status for a party row
 function computeCompliance(p) {
+  if (!p.entity_type) return { status: 'INCOMPLETE', score: 0 };
   const required = REQUIRED_DOCS[p.entity_type] || ['mobile'];
   const today = new Date();
   const d30 = new Date(today); d30.setDate(d30.getDate() + 30);
@@ -200,7 +222,7 @@ router.get('/:id/documents', async (req, res) => {
   }
 });
 
-// ── POST /api/customers/:id/documents — add doc ─────────────────────────────
+// ── POST /api/customers/:id/documents — add doc (JSON) ──────────────────────
 router.post('/:id/documents', async (req, res) => {
   try {
     const { doc_type, doc_number, expiry_date, file_path, file_name, notes } = req.body;
@@ -212,6 +234,25 @@ router.post('/:id/documents', async (req, res) => {
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── POST /api/customers/:id/documents/upload — multipart file upload ─────────
+router.post('/:id/documents/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+    const { doc_type = 'OTHER', doc_number, expiry_date, notes } = req.body;
+    const file_path = `/uploads/customer-docs/${req.file.filename}`;
+    const { rows } = await db.query(
+      `INSERT INTO customer_documents (party_id, doc_type, doc_number, expiry_date, file_path, file_name, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [req.params.id, doc_type, doc_number || null, expiry_date || null, file_path, req.file.originalname, notes || null]
+    );
+    logger.info('Customer doc uploaded', { party: req.params.id, doc_type, file: req.file.filename });
+    res.status(201).json({ success: true, data: rows[0] });
+  } catch (err) {
+    logger.error('Doc upload failed', { error: err.message });
     res.status(500).json({ success: false, error: err.message });
   }
 });
