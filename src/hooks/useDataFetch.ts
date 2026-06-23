@@ -33,6 +33,19 @@ interface UseFetchResult<T> {
 const dataCache = new Map<string, { data: any; fullResponse: any; timestamp: number }>();
 
 /**
+ * Invalidate all cache entries whose key starts with the given prefix.
+ * Call this after any mutation that affects shared product/inventory data.
+ * Affected components will fetch fresh data on their next mount or refetch.
+ */
+export const invalidateCache = (keyPrefix: string): void => {
+  for (const key of dataCache.keys()) {
+    if (key.startsWith(keyPrefix)) {
+      dataCache.delete(key);
+    }
+  }
+};
+
+/**
  * Universal Data Fetching Hook
  * Usage: const { data, loading, error, refetch } = useDataFetch('/api/endpoint');
  */

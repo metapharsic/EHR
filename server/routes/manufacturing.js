@@ -48,7 +48,7 @@ router.post(['/bom', '/boms'], verifyTokenMiddleware, verifyRoleMiddleware(['ADM
     if (!finalProductId) {
       // Auto-resolve product_id by querying the products table
       const pResult = await db.query(
-        `SELECT id FROM products WHERE name = $1 LIMIT 1`,
+        `SELECT id FROM products WHERE name = $1 AND deleted_at IS NULL AND (is_active IS NULL OR is_active = true) LIMIT 1`,
         [finalProductName]
       );
       if (pResult.rows.length > 0) {
@@ -110,7 +110,7 @@ router.put(['/bom/:id', '/boms/:id'], verifyTokenMiddleware, verifyRoleMiddlewar
 
     if (!finalProductId && finalProductName) {
       const pResult = await db.query(
-        `SELECT id FROM products WHERE name = $1 LIMIT 1`,
+        `SELECT id FROM products WHERE name = $1 AND deleted_at IS NULL AND (is_active IS NULL OR is_active = true) LIMIT 1`,
         [finalProductName]
       );
       if (pResult.rows.length > 0) {

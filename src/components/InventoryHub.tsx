@@ -17,8 +17,8 @@ import {
 import { 
   ERPLayout, StatCard, Tabs, Badge, Modal, DataTable, FilterBar 
 } from './UniversalLayout';
-import { 
-  useDataFetch, useDatabaseStatus, useSearch, usePagination 
+import {
+  useDataFetch, useDatabaseStatus, useSearch, usePagination, invalidateCache
 } from '../hooks/useDataFetch';
 import { useNotificationSystem } from '../hooks/useNotifications';
 import { useAppStore } from '../store/useAppStore';
@@ -270,6 +270,11 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
         await apiClient.post('/api/inventory', payload);
         notify.success('SKU Created Successfully');
       }
+      invalidateCache('/api/inventory');
+      invalidateCache('/api/products');
+      invalidateCache('/api/pos');
+      invalidateCache('/api/sales');
+      invalidateCache('/api/analytics/inventory');
       setShowSkuModal(false);
       refetchInventory();
     } catch (err: any) {
@@ -311,8 +316,11 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
     try {
       await apiClient.delete(`/api/inventory/${id}`);
       notify.success('SKU deleted');
-      // FIX: clear stale batch cache for the deleted product so it doesn't
-      // reappear if a new product with the same ID is created later
+      invalidateCache('/api/inventory');
+      invalidateCache('/api/products');
+      invalidateCache('/api/pos');
+      invalidateCache('/api/sales');
+      invalidateCache('/api/analytics/inventory');
       setBatchData(prev => { const next = { ...prev }; delete next[id]; return next; });
       setExpandedRows(prev => { const next = { ...prev }; delete next[id]; return next; });
       refetchInventory();
