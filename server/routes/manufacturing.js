@@ -3,7 +3,6 @@ const router = express.Router();
 const db = require('../db');
 const logger = require('../utils/logger');
 const { verifyTokenMiddleware, verifyRoleMiddleware } = require('../utils/jwt');
-const { triggerWorkflow } = require('../services/deerflowClient');
 
 /**
  * GET /bom and /boms
@@ -254,10 +253,6 @@ router.post('/production-orders', verifyTokenMiddleware, verifyRoleMiddleware(['
       [finalBatchNumber, finalProductId, finalProductName, finalBomId, finalQty, finalStart, orderStatus || 'Planned', req.user.userId]
     );
     
-    triggerWorkflow({
-      type: 'PRODUCTION_ORDER_CREATED',
-      data: result.rows[0]
-    }).catch(err => logger.error('Deerflow sync error:', err));
 
     res.status(201).json({ success: true, data: result.rows[0], id: result.rows[0].id });
   } catch (error) {

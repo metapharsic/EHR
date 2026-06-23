@@ -3,7 +3,6 @@ const router = express.Router();
 const db = require('../db');
 const logger = require('../utils/logger');
 const { verifyTokenMiddleware, verifyRoleMiddleware, verify2FAMiddleware } = require('../utils/jwt');
-const { triggerWorkflow } = require('../services/deerflowClient');
 
 // Helper to wrap async routes
 const asyncRoute = (fn) => (req, res, next) => {
@@ -422,14 +421,6 @@ router.post('/journal-vouchers', verifyTokenMiddleware, verifyRoleMiddleware(['A
 
         await client.query('COMMIT');
 
-        // Trigger Deerflow Workflow
-        setImmediate(() => {
-            triggerWorkflow({
-                workflowId: 'JOURNAL_VOUCHER_CREATED',
-                moduleId: 'ACCOUNTING',
-                payload: { voucherId, voucherNo, totalDebit, totalCredit }
-            }).catch(err => logger.error('Deerflow journal voucher trigger failed', { error: err.message }));
-        });
 
         // Return the new voucher; include any budget alerts as advisory warnings
         res.status(201).json({

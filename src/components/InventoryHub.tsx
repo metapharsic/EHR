@@ -27,7 +27,6 @@ import {
   ResponsiveContainer, Cell, PieChart as RePieChart, Pie, Legend
 } from 'recharts';
 import { apiClient } from '../services/apiClient';
-import { DeerflowWidget } from './DeerflowWidget';
 
 interface InventoryHubProps {
   isPosMode?: boolean;
@@ -600,9 +599,6 @@ const InventoryHub: React.FC<InventoryHubProps> = ({
 
     return (
       <div className="space-y-4">
-        <div className="mb-4">
-          <DeerflowWidget workflowId="inventory-sync" />
-        </div>
         <div className="flex justify-between items-center mb-[12px]">
           <div className="inline-flex bg-[#f1f5f9] rounded-[6px] p-[3px] gap-[2px]">
             <button 

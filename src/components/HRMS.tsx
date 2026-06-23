@@ -17,7 +17,6 @@ import {
 } from 'recharts';
 
 import { ERPLayout, EnterpriseLayout, Tabs, DataTable, StatCard, Badge, Modal, FilterBar } from './UniversalLayout';
-import { DeerflowWidget } from './DeerflowWidget';
 import { useDataFetch, useDatabaseStatus } from '../hooks/useDataFetch';
 import { useAppStore } from '../store/useAppStore';
 import hrmsService from '../services/hrmsService';
@@ -3781,9 +3780,6 @@ const HRMS: React.FC = () => {
         ]}
       >
         <div className="flex-1 overflow-y-auto">
-          <div className="p-4 pb-0">
-            <DeerflowWidget workflowId="EMPLOYEE_ONBOARDING_INITIATED" />
-          </div>
           {renderView()}
         </div>
       </EnterpriseLayout>

@@ -78,7 +78,6 @@ const MENU_STRUCTURE = [
     items: [
       { id: Tab.DASHBOARD, label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
       { id: Tab.INTELLIGENCE_DASHBOARD, label: 'Intelligence Center', icon: <Sparkles size={18} className="text-indigo-500" /> },
-      { id: Tab.DEERFLOW_DASHBOARD, label: 'Deerflow Control', icon: <Activity size={18} className="text-blue-500" /> },
       { id: Tab.REPORTS, label: 'Reports', icon: <FileBarChart size={18} /> },
       { id: Tab.AUDIT, label: 'Audit Logs', icon: <Layers size={18} /> },
       { id: Tab.MULTI_BRANCH, label: 'Enterprise Hub', icon: <Globe size={18} /> },

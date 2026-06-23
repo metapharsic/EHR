@@ -26,7 +26,6 @@ import { useAppStore } from '../store/useAppStore';
 import { useNotifications } from '../context/NotificationContext';
 import { crmService, Lead } from '../services/crmService';
 import { formatDate, formatCurrency } from '../utils/formatters';
-import { DeerflowWidget } from './DeerflowWidget';
 
 import { 
  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -488,9 +487,6 @@ const CRM: React.FC = () => {
         </button>
       ]}
     >
-      <div className="mb-6">
-        <DeerflowWidget workflowId="LEAD_CONVERTED" />
-      </div>
       {/* Stats Ribbon */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
         <StatCard label="Pipeline Leads" value={stats?.total_leads || 0} icon={<Users className="text-blue-500" />} color="blue" />

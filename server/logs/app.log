@@ -2233,3 +2233,8 @@ tus":"Processing","hoursOpen":"97.6","maxHours":24,"severity":"critical","escala
 {"timestamp":"2026-06-07T19:58:25.577Z","level":"WARN","message":"OMS SLA breach detected","orderNumber":"ORD-2026-00033","status":"Partially Shipped","hoursOpen":"169.8","maxHours":72,"severity":"warning","escalateTo":"SALES_MANAGER"}
 {"timestamp":"2026-06-07T19:58:25.577Z","level":"INFO","message":"OMS SLA check complete — 26 breach(es) logged"}
 {"timestamp":"2026-06-07T20:00:09.343Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"b23a6a8439c0dde5515893e7c90c1e3233b8616e634470f20dc4928bcf3609bc"}
+{"timestamp":"2026-06-21T18:37:21.530Z","level":"INFO","message":"Security middleware initialized"}
+{"timestamp":"2026-06-21T18:37:22.309Z","level":"INFO","message":"OMS SLA service started","intervalMs":7200000}
+{"timestamp":"2026-06-21T18:37:22.309Z","level":"INFO","message":"OMS SLA check started"}
+{"timestamp":"2026-06-21T18:37:22.314Z","level":"INFO","message":"🚀 Metapharsic ERP Server running","port":"5000","environment":"development","nodeVersion":"v25.6.1"}
+{"timestamp":"2026-06-21T18:37:22.423Z","level":"WARN","message":"OMS SLA breach detected","orderNumber":"ORD-2026-00006","status":"Pending Approval","hoursOpen":"504.5","maxHours":24,"severity":"warning","escalateTo":"SALES_MANAGER"}
