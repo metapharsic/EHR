@@ -49,7 +49,7 @@ router.get("/partners", async (req, res) => {
     const offset = (parseInt(page)-1)*parseInt(limit);
     const companyId = req.user?.companyId || 1;
 
-    let where = "WHERE (p.company_id = $1 OR p.company_id IS NULL) AND p.is_active = true";
+    let where = "WHERE (p.company_id = $1 OR p.company_id IS NULL) AND p.status != 'TERMINATED'";
     const params = [companyId];
 
     if (search.trim()) {
@@ -123,8 +123,8 @@ router.post("/partners", async (req, res) => {
           name, territory, state, district, contact_person, contact_number, email,
           drug_license_no, drug_license_expiry, gst_registration, gstin_expiry, credit_limit,
           discount_percentage, status, partner_grade, join_date, monopoly_territory, company_id,
-          address, assigned_mr_ids
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+          address, assigned_mr_ids, is_active
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING *`,
         [
           name, territory, state, district, contact_person, contact_number, email,
           drug_license_no || null, drug_license_expiry || null,
@@ -132,7 +132,7 @@ router.post("/partners", async (req, res) => {
           credit_limit || 100000, discount_percentage || 5,
           status || "APPLIED", partner_grade || "BRONZE",
           join_date || null, monopoly_territory || null, companyId,
-          address || null, assigned_mr_ids || []
+          address || null, assigned_mr_ids || [], true
         ]
       );
     } catch(dbErr) {
@@ -236,7 +236,7 @@ router.put("/partners/:id", async (req, res) => {
 
 router.delete("/partners/:id", async (req, res) => {
   try {
-    const r = await db.query("UPDATE pcd_partners SET is_active=false, updated_at=NOW() WHERE id=$1 RETURNING id,name", [req.params.id]);
+    const r = await db.query("UPDATE pcd_partners SET is_active=false, status='TERMINATED', updated_at=NOW() WHERE id=$1 RETURNING id,name", [req.params.id]);
     if (!r.rows.length) return res.status(404).json({ success: false, error: "Not found" });
     res.json({ success: true, data: r.rows[0] });
   } catch(e) {
