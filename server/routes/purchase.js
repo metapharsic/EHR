@@ -19,10 +19,11 @@ router.get('/', async (req, res) => {
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT po.id, po.company_id, po.supplier_id, po.po_number as invoice_no, po.date as order_date, po.total_amount, po.status, po.created_by, po.created_at, po.updated_at,
+      SELECT po.id, po.company_id, po.supplier_id, po.po_number as invoice_no, po.date as order_date,
+             COALESCE(NULLIF(SUM(poi.total_amount)::numeric, 0), po.total_amount, 0) as total_amount,
+             po.status, po.created_by, po.created_at, po.updated_at,
              s.name as supplier_name, NULL as supplier_code,
-             COUNT(poi.id)::int as item_count,
-             COALESCE(SUM(poi.total_amount), 0)::numeric as total_amount
+             COUNT(poi.id)::int as item_count
       FROM purchase_orders po
       LEFT JOIN parties s ON po.supplier_id = s.id
       LEFT JOIN purchase_order_items poi ON po.id = poi.po_id
@@ -48,22 +49,15 @@ router.get('/', async (req, res) => {
 
     const { rows } = await db.query(query, params);
 
-    // Calculate Trend: This Month vs Last Month
+    // Calculate Trend: This Month vs Last Month (use po.total_amount — items may be unlinked)
     const { rows: trendData } = await db.query(`
-      WITH monthly_spent AS (
-        SELECT 
-          date_trunc('month', po.created_at) as month,
-          SUM(poi.total_amount) as spent
-        FROM purchase_orders po
-        JOIN purchase_order_items poi ON po.id = poi.po_id
-        WHERE po.created_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
-        GROUP BY 1
-      )
-      SELECT 
-        spent, 
-        month 
-      FROM monthly_spent 
-      ORDER BY month DESC
+      SELECT
+        date_trunc('month', created_at) as month,
+        SUM(total_amount) as spent
+      FROM purchase_orders
+      WHERE created_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+      GROUP BY 1
+      ORDER BY 1 DESC
     `);
 
     let trend = 0;
@@ -325,18 +319,17 @@ router.put('/vendor-ratings/:id', async (req, res) => {
 router.get('/reorder-alerts', async (req, res) => {
   try {
     const { rows } = await db.query(`
-      SELECT 
-        p.id as "productId", 
+      SELECT
+        p.id as "productId",
         p.name as "productName",
-        COALESCE(p.min_stock_level, 0) as "reorderPoint",
-        COALESCE((SELECT SUM(stock) FROM batches WHERE product_id = p.id), 0) as "currentStock",
-        COALESCE(s.name, 'N/A') as "supplierName"
+        COALESCE(p.min_stock_level, 5) as "reorderPoint",
+        COALESCE((SELECT SUM(stock) FROM batches WHERE product_id = p.id AND status != 'Expired'), 0) as "currentStock",
+        COALESCE(p.manufacturer, 'N/A') as "supplierName"
       FROM products p
-      LEFT JOIN suppliers s ON p.manufacturer = s.name
       WHERE COALESCE(p.is_active, true) = true
-      GROUP BY p.id, s.name
-      HAVING COALESCE((SELECT SUM(stock) FROM batches WHERE product_id = p.id), 0) <= COALESCE(p.min_stock_level, 0)
-      ORDER BY (COALESCE(p.min_stock_level, 0) - COALESCE((SELECT SUM(stock) FROM batches WHERE product_id = p.id), 0)) DESC
+      AND COALESCE((SELECT SUM(stock) FROM batches WHERE product_id = p.id AND status != 'Expired'), 0)
+          <= COALESCE(p.min_stock_level, 5)
+      ORDER BY (COALESCE(p.min_stock_level, 5) - COALESCE((SELECT SUM(stock) FROM batches WHERE product_id = p.id AND status != 'Expired'), 0)) DESC
     `);
     res.json({ success: true, data: rows });
   } catch (error) {
