@@ -46,7 +46,8 @@ const Sales: React.FC = () => {
     payment_mode: 'Credit', items: [] as any[]
   });
   const [pendingItem, setPendingItem] = useState({
-    product_id: '', name: '', quantity: 1, rate: 0, mrp: 0, gst_percent: 12
+    product_id: '', name: '', quantity: 1, rate: 0, mrp: 0, gst_percent: 12,
+    scheme_type: 'none' as 'none' | '10+7', paid_strips: 10, free_strips: 7, total_strips: 17
   });
 
   const { query, setQuery, results: searchResults } = useSearch<any>(salesData || [], ['invoice_no', 'party_name']);
@@ -79,8 +80,21 @@ const Sales: React.FC = () => {
 
   const handleProductSelect = (product_id: string) => {
     const prod = (productsData || []).find((p: any) => p.id === product_id);
-    if (prod) setPendingItem(prev => ({ ...prev, product_id: prod.id, name: prod.name, rate: parseFloat(prod.ptr) || 0, mrp: parseFloat(prod.mrp) || 0, gst_percent: parseFloat(prod.gst) || 12 }));
-    else setPendingItem(prev => ({ ...prev, product_id: '', name: '' }));
+    if (prod) {
+      const mrp = parseFloat(prod.mrp) || 0;
+      setPendingItem(prev => {
+        const effRate = prev.scheme_type === '10+7' ? parseFloat((mrp * prev.paid_strips / prev.total_strips).toFixed(2)) : (parseFloat(prod.ptr) || 0);
+        return { ...prev, product_id: prod.id, name: prod.name, rate: effRate, mrp, gst_percent: parseFloat(prod.gst) || 12 };
+      });
+    } else setPendingItem(prev => ({ ...prev, product_id: '', name: '' }));
+  };
+
+  const handleSchemeToggle = (scheme: 'none' | '10+7') => {
+    setPendingItem(prev => {
+      const mrp = prev.mrp;
+      const rate = scheme === '10+7' && mrp > 0 ? parseFloat((mrp * 10 / 17).toFixed(2)) : prev.rate;
+      return { ...prev, scheme_type: scheme, paid_strips: 10, free_strips: 7, total_strips: 17, rate };
+    });
   };
 
   const handleAddItem = () => {
@@ -88,7 +102,7 @@ const Sales: React.FC = () => {
     if (!pendingItem.quantity || pendingItem.quantity <= 0) { alert('Enter valid quantity.'); return; }
     if (!pendingItem.rate || pendingItem.rate <= 0) { alert('Enter valid PTR rate.'); return; }
     setInvoiceForm(prev => ({ ...prev, items: [...prev.items, { ...pendingItem }] }));
-    setPendingItem({ product_id: '', name: '', quantity: 1, rate: 0, mrp: 0, gst_percent: 12 });
+    setPendingItem({ product_id: '', name: '', quantity: 1, rate: 0, mrp: 0, gst_percent: 12, scheme_type: 'none', paid_strips: 10, free_strips: 7, total_strips: 17 });
   };
 
   const handleCreateInvoice = async (e: React.FormEvent) => {
@@ -402,7 +416,25 @@ const Sales: React.FC = () => {
           </div>
 
           <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/60">
-            <p className="text-xs font-bold text-slate-500 uppercase mb-3">Add Product</p>
+            <div className="flex justify-between items-center mb-3">
+              <p className="text-xs font-bold text-slate-500 uppercase">Add Product</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Scheme:</span>
+                <button type="button" onClick={() => handleSchemeToggle('none')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${pendingItem.scheme_type === 'none' ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-slate-300 hover:border-slate-500'}`}>
+                  None
+                </button>
+                <button type="button" onClick={() => handleSchemeToggle('10+7')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${pendingItem.scheme_type === '10+7' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-300 hover:border-emerald-400'}`}>
+                  10+7 Free
+                </button>
+                {pendingItem.scheme_type === '10+7' && (
+                  <span className="text-[10px] text-emerald-600 font-bold">
+                    Eff. price = MRP×10÷17
+                  </span>
+                )}
+              </div>
+            </div>
             <div className="grid grid-cols-12 gap-2 items-end">
               <div className="col-span-5">
                 <label className="block text-[10px] text-slate-400 font-bold mb-1">Product</label>
@@ -438,8 +470,9 @@ const Sales: React.FC = () => {
               <thead className="bg-slate-50 border-b">
                 <tr>
                   <th className="px-4 py-2 text-left">Product</th>
-                  <th className="px-4 py-2 text-center w-20">Qty</th>
-                  <th className="px-4 py-2 text-right w-28">PTR</th>
+                  <th className="px-4 py-2 text-center w-20">Boxes</th>
+                  <th className="px-4 py-2 text-center w-32">Scheme</th>
+                  <th className="px-4 py-2 text-right w-28">Eff. PTR</th>
                   <th className="px-4 py-2 text-right w-20">GST%</th>
                   <th className="px-4 py-2 text-right w-32">Amount</th>
                   <th className="px-4 py-2 w-10"></th>
@@ -447,14 +480,24 @@ const Sales: React.FC = () => {
               </thead>
               <tbody className="divide-y">
                 {invoiceForm.items.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">No items yet. Use picker above.</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400 italic">No items yet. Use picker above.</td></tr>
                 ) : invoiceForm.items.map((item, idx) => (
                   <tr key={idx}>
-                    <td className="px-4 py-2 font-medium">{item.name}</td>
+                    <td className="px-4 py-2">
+                      <div className="font-medium">{item.name}</div>
+                      {item.scheme_type === '10+7' && item.mrp > 0 && (
+                        <div className="text-[10px] text-slate-400 mt-0.5">MRP ₹{parseFloat(item.mrp).toFixed(2)}/strip · Eff ₹{item.rate}/strip</div>
+                      )}
+                    </td>
                     <td className="px-4 py-2 text-center">{item.quantity}</td>
-                    <td className="px-4 py-2 text-right">₹{parseFloat(item.rate).toLocaleString()}</td>
+                    <td className="px-4 py-2 text-center">
+                      {item.scheme_type === '10+7'
+                        ? <span className="inline-block bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">10 paid + 7 free</span>
+                        : <span className="text-slate-300 text-xs">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-right">₹{parseFloat(item.rate).toFixed(2)}</td>
                     <td className="px-4 py-2 text-right">{item.gst_percent}%</td>
-                    <td className="px-4 py-2 text-right font-semibold">₹{(item.quantity * item.rate).toLocaleString()}</td>
+                    <td className="px-4 py-2 text-right font-semibold">₹{(item.quantity * item.rate).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
                     <td className="px-4 py-2 text-center">
                       <button type="button" onClick={() => { const ni = [...invoiceForm.items]; ni.splice(idx, 1); setInvoiceForm({ ...invoiceForm, items: ni }); }} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
                     </td>
@@ -463,9 +506,9 @@ const Sales: React.FC = () => {
               </tbody>
               {invoiceForm.items.length > 0 && (
                 <tfoot className="bg-slate-50 text-sm">
-                  <tr><td colSpan={4} className="px-4 py-2 text-right text-[10px] font-bold uppercase text-slate-500">Taxable Amount</td><td className="px-4 py-2 text-right font-bold">₹{invoiceSubTotal.toLocaleString()}</td><td /></tr>
-                  <tr><td colSpan={4} className="px-4 py-2 text-right text-[10px] font-bold uppercase text-orange-500">+ GST</td><td className="px-4 py-2 text-right font-bold text-orange-500">₹{invoiceTotalGst.toFixed(2)}</td><td /></tr>
-                  <tr className="text-primary"><td colSpan={4} className="px-4 py-3 text-right text-xs font-extrabold uppercase">Net Payable</td><td className="px-4 py-3 text-right text-base font-extrabold">₹{(invoiceSubTotal + invoiceTotalGst).toLocaleString()}</td><td /></tr>
+                  <tr><td colSpan={5} className="px-4 py-2 text-right text-[10px] font-bold uppercase text-slate-500">Taxable Amount</td><td className="px-4 py-2 text-right font-bold">₹{invoiceSubTotal.toLocaleString()}</td><td /></tr>
+                  <tr><td colSpan={5} className="px-4 py-2 text-right text-[10px] font-bold uppercase text-orange-500">+ GST</td><td className="px-4 py-2 text-right font-bold text-orange-500">₹{invoiceTotalGst.toFixed(2)}</td><td /></tr>
+                  <tr className="text-primary"><td colSpan={5} className="px-4 py-3 text-right text-xs font-extrabold uppercase">Net Payable</td><td className="px-4 py-3 text-right text-base font-extrabold">₹{(invoiceSubTotal + invoiceTotalGst).toLocaleString()}</td><td /></tr>
                 </tfoot>
               )}
             </table>

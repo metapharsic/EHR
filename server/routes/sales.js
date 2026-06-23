@@ -219,13 +219,14 @@ router.post('/', async (req, res) => {
       const taxable = parseFloat((qty * rate).toFixed(2));
       const total = parseFloat((taxable * (1 + gst_pct / 100)).toFixed(2));
 
+      const freeQty = item.scheme_type === '10+7' ? Math.round(qty * 7 / 10) : (parseInt(item.free_strips) || 0);
       await client.query(`
         INSERT INTO sales_invoice_items
-          (invoice_id, sales_invoice_id, product_id, quantity, rate, selling_rate,
-           mrp, gst_percent, taxable_value, total_amount)
-        VALUES ($1, $1, $2, $3, $4, $4, $5, $6, $7, $8)
-      `, [inv.id, item.product_id || null, qty, rate,
-          parseFloat(item.mrp) || 0, gst_pct, taxable, total]);
+          (invoice_id, sales_invoice_id, product_id, quantity, free_quantity, rate, selling_rate,
+           mrp, gst_percent, taxable_value, total_amount, scheme_type)
+        VALUES ($1, $1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10)
+      `, [inv.id, item.product_id || null, qty, freeQty, rate,
+          parseFloat(item.mrp) || 0, gst_pct, taxable, total, item.scheme_type || 'none']);
     }
 
     await client.query('COMMIT');
