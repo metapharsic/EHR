@@ -242,26 +242,6 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * DELETE /api/sales/:id
- * Soft-cancel a wholesale invoice (status → Cancelled)
- */
-router.delete('/:id', verifyRoleMiddleware(['ADMIN', 'SALES_MANAGER']), async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      `UPDATE sales_invoices SET status='Cancelled', updated_at=NOW()
-       WHERE id=$1 AND status != 'Cancelled' RETURNING id, invoice_number`,
-      [req.params.id]
-    );
-    if (!rows.length) return res.status(404).json({ success: false, error: 'Invoice not found or already cancelled' });
-    logger.info('Wholesale invoice cancelled', { id: req.params.id, invoiceNumber: rows[0].invoice_number });
-    res.json({ success: true, data: rows[0] });
-  } catch (err) {
-    logger.error('Failed to cancel invoice', { error: err.message });
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-/**
  * GET /api/sales/analytics
  * Monthly revenue trend (last 6 months) + top products
  */
@@ -293,6 +273,69 @@ router.get('/analytics', async (req, res) => {
     ]);
     res.json({ success: true, data: { trend: trendRows.rows, topCategories: topRows.rows } });
   } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/sales/:id
+ * Invoice header + line items for print/detail view
+ */
+router.get('/:id', async (req, res) => {
+  try {
+    const { rows: [inv] } = await db.query(
+      `SELECT si.id, si.invoice_number as invoice_no, si.date as invoice_date,
+              si.customer_name as party_name, si.payment_mode, si.status,
+              si.sub_total, si.total_gst, si.net_amount as net_payable,
+              p.gstin, p.address as party_address, p.mobile as party_phone
+       FROM sales_invoices si
+       LEFT JOIN parties p ON p.id = si.party_id
+       WHERE si.id = $1`,
+      [req.params.id]
+    );
+    if (!inv) return res.status(404).json({ success: false, error: 'Invoice not found' });
+
+    const { rows: items } = await db.query(
+      `SELECT sii.id, prod.name as product_name, sii.quantity, sii.free_quantity,
+              sii.rate as ptr, sii.mrp, sii.gst_percent, sii.scheme_type,
+              sii.taxable_value, sii.total_amount,
+              COALESCE(
+                (SELECT b.batch_no FROM batches b WHERE b.product_id = sii.product_id AND b.available_qty > 0 ORDER BY b.expiry_date LIMIT 1),
+                ''
+              ) as batch_no,
+              COALESCE(
+                (SELECT b.expiry_date::text FROM batches b WHERE b.product_id = sii.product_id AND b.available_qty > 0 ORDER BY b.expiry_date LIMIT 1),
+                ''
+              ) as expiry
+       FROM sales_invoice_items sii
+       LEFT JOIN products prod ON prod.id = sii.product_id
+       WHERE sii.invoice_id = $1
+       ORDER BY sii.id`,
+      [req.params.id]
+    );
+
+    res.json({ success: true, data: { ...inv, items } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/sales/:id
+ * Soft-cancel a wholesale invoice (status → Cancelled)
+ */
+router.delete('/:id', verifyRoleMiddleware(['ADMIN', 'SALES_MANAGER']), async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `UPDATE sales_invoices SET status='Cancelled', updated_at=NOW()
+       WHERE id=$1 AND status != 'Cancelled' RETURNING id, invoice_number`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Invoice not found or already cancelled' });
+    logger.info('Wholesale invoice cancelled', { id: req.params.id, invoiceNumber: rows[0].invoice_number });
+    res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    logger.error('Failed to cancel invoice', { error: err.message });
     res.status(500).json({ success: false, error: err.message });
   }
 });

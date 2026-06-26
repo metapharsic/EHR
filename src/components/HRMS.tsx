@@ -159,6 +159,10 @@ const ProfileDrawer: React.FC<{
   const [timeline, setTimeline] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [noteType, setNoteType] = useState('Note');
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -208,6 +212,39 @@ const ProfileDrawer: React.FC<{
     }
   };
 
+  const handleTerminate = async () => {
+    setLoading(true);
+    try {
+      await hrmsService.terminateEmployee(emp.id, { exit_date: new Date().toISOString().split('T')[0], exit_reason: 'Terminated via HR panel' });
+      addNotification({ type: 'success', message: `${emp.name} terminated` });
+      setProfile(p => ({ ...p, status: 'Terminated' }));
+      setShowDeleteConfirm(false);
+    } catch {
+      addNotification({ type: 'error', message: 'Terminate failed' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!noteText.trim()) return;
+    setLoading(true);
+    try {
+      const res = await hrmsService.addTimelineNote(emp.id, noteType, noteText.trim());
+      if (res.success) {
+        setTimeline(res.data);
+        setNoteText('');
+        setShowNoteModal(false);
+        setTab('timeline');
+        addNotification({ type: 'success', message: 'Note added' });
+      }
+    } catch {
+      addNotification({ type: 'error', message: 'Failed to add note' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const ptabs = [
     { id: 'personal', label: 'Personal Info' },
     { id: 'job', label: 'Job Details' },
@@ -235,12 +272,24 @@ const ProfileDrawer: React.FC<{
             <div className="text-[11px] text-indigo-200">{p.designation_name} · {p.department_name}</div>
             <div className="mt-1 flex items-center gap-2">
               <Badge value={p.status || 'Active'} variant={statusVariant[p.status || 'Active'] as any} />
-              <button 
+              <button
                 onClick={() => setIsEditing(!isEditing)}
                 className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${isEditing ? 'bg-white text-indigo-600 border-white' : 'bg-transparent text-white border-white/40 hover:bg-white/10'}`}
               >
                 {isEditing ? 'Cancel' : 'Edit'}
               </button>
+              <button
+                onClick={() => setShowNoteModal(true)}
+                className="text-[10px] uppercase font-bold px-2 py-0.5 rounded border bg-transparent text-white border-white/40 hover:bg-white/10"
+                title="Add note / append info"
+              >+ Note</button>
+              {p.status !== 'Terminated' && (
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded border bg-red-500/80 text-white border-red-400 hover:bg-red-600"
+                  title="Terminate employee"
+                >Terminate</button>
+              )}
             </div>
           </div>
         </div>
@@ -408,14 +457,14 @@ const ProfileDrawer: React.FC<{
 
         {isEditing && (
           <div className="p-4 border-t border-slate-100 bg-slate-50 shrink-0 flex gap-2">
-            <button 
+            <button
               type="submit"
               disabled={loading}
               className="flex-1 bg-indigo-600 text-white py-2 rounded font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
             >
               {loading ? <Spinner /> : <CheckCircle size={14} />} Save Changes
             </button>
-            <button 
+            <button
               type="button"
               onClick={() => setIsEditing(false)}
               className="px-4 py-2 border border-slate-200 rounded font-bold text-slate-600 hover:bg-slate-100 transition-colors"
@@ -425,6 +474,57 @@ const ProfileDrawer: React.FC<{
           </div>
         )}
       </form>
+
+      {/* Terminate confirm */}
+      {showDeleteConfirm && (
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+          <div className="bg-white rounded-xl p-5 shadow-2xl w-72 text-center">
+            <div className="text-red-500 font-bold text-sm mb-2">Terminate Employee?</div>
+            <div className="text-xs text-slate-500 mb-4">{p.name} will be marked Terminated and offboarding initiated.</div>
+            <div className="flex gap-2">
+              <button onClick={handleTerminate} disabled={loading} className="flex-1 bg-red-600 text-white py-2 rounded font-bold text-xs hover:bg-red-700">
+                {loading ? '...' : 'Yes, Terminate'}
+              </button>
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 border border-slate-200 py-2 rounded font-bold text-xs text-slate-600 hover:bg-slate-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Note modal */}
+      {showNoteModal && (
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+          <div className="bg-white rounded-xl p-5 shadow-2xl w-80">
+            <div className="font-bold text-sm text-slate-800 mb-3">Append Note / Info</div>
+            <select
+              value={noteType}
+              onChange={e => setNoteType(e.target.value)}
+              className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs mb-2"
+            >
+              {['Note', 'Warning', 'Promotion', 'Transfer', 'Training', 'Appraisal', 'Document', 'Other'].map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <textarea
+              value={noteText}
+              onChange={e => setNoteText(e.target.value)}
+              placeholder="Enter details..."
+              rows={3}
+              className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs mb-3 resize-none"
+            />
+            <div className="flex gap-2">
+              <button onClick={handleAddNote} disabled={loading || !noteText.trim()} className="flex-1 bg-indigo-600 text-white py-2 rounded font-bold text-xs hover:bg-indigo-700 disabled:opacity-50">
+                {loading ? '...' : 'Save Note'}
+              </button>
+              <button onClick={() => { setShowNoteModal(false); setNoteText(''); }} className="flex-1 border border-slate-200 py-2 rounded font-bold text-xs text-slate-600 hover:bg-slate-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -612,6 +712,9 @@ const HRMS: React.FC = () => {
   const [empSearch, setEmpSearch] = useState('');
   const [empDeptFilter, setEmpDeptFilter] = useState('');
   const [empStatusFilter, setEmpStatusFilter] = useState('');
+  const [showAddEmp, setShowAddEmp] = useState(false);
+  const [addEmpForm, setAddEmpForm] = useState({ name: '', email: '', contact: '', gender: '', dob: '', join_date: '', employment_type: 'Permanent', department_id: '', designation_id: '', grade: '' });
+  const [addEmpLoading, setAddEmpLoading] = useState(false);
   const [selectedEmp, setSelectedEmp] = useState<HrEmployee | null>(null);
   const [departments, setDepartments] = useState<HrDepartment[]>([]);
   const [deptTree, setDeptTree] = useState<HrDepartment[]>([]);
@@ -839,6 +942,23 @@ const HRMS: React.FC = () => {
       setLoadingView(false);
     }
   }, [empSearch, empDeptFilter, empStatusFilter]);
+
+  const handleAddEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addEmpForm.name.trim()) return;
+    setAddEmpLoading(true);
+    try {
+      await hrmsService.createEmployee({ ...addEmpForm, baseSalary: 0 } as any);
+      addNotification({ type: 'success', message: `Employee ${addEmpForm.name} added` });
+      setShowAddEmp(false);
+      setAddEmpForm({ name: '', email: '', contact: '', gender: '', dob: '', join_date: '', employment_type: 'Permanent', department_id: '', designation_id: '', grade: '' });
+      loadEmployees();
+    } catch {
+      addNotification({ type: 'error', message: 'Failed to add employee' });
+    } finally {
+      setAddEmpLoading(false);
+    }
+  };
 
   const loadOrgChart = useCallback(async () => {
     setLoadingView(true);
@@ -1378,16 +1498,24 @@ const HRMS: React.FC = () => {
 
   const renderEmployees = () => (
     <div className="p-4 space-y-4">
-      <FilterBar
-        filters={[
-          { type: 'search', key: 'search', placeholder: 'Search employees...', value: empSearch, onChange: setEmpSearch },
-          { type: 'select', key: 'status', label: 'Status', value: empStatusFilter, onChange: setEmpStatusFilter,
-            options: [{ value: '', label: 'All Status' }, { value: 'Active', label: 'Active' }, { value: 'On Leave', label: 'On Leave' }, { value: 'Inactive', label: 'Inactive' }] },
-          { type: 'select', key: 'dept', label: 'Department', value: empDeptFilter, onChange: setEmpDeptFilter,
-            options: [{ value: '', label: 'All Departments' }, ...departments.map(d => ({ value: d.id, label: d.name }))] },
-        ]}
-        onRefresh={loadEmployees}
-      />
+      <div className="flex justify-between items-center">
+        <FilterBar
+          filters={[
+            { type: 'search', key: 'search', placeholder: 'Search employees...', value: empSearch, onChange: setEmpSearch },
+            { type: 'select', key: 'status', label: 'Status', value: empStatusFilter, onChange: setEmpStatusFilter,
+              options: [{ value: '', label: 'All Status' }, { value: 'Active', label: 'Active' }, { value: 'On Leave', label: 'On Leave' }, { value: 'Inactive', label: 'Inactive' }] },
+            { type: 'select', key: 'dept', label: 'Department', value: empDeptFilter, onChange: setEmpDeptFilter,
+              options: [{ value: '', label: 'All Departments' }, ...departments.map(d => ({ value: d.id, label: d.name }))] },
+          ]}
+          onRefresh={loadEmployees}
+        />
+        <button
+          onClick={() => setShowAddEmp(true)}
+          className="ml-3 flex items-center gap-1.5 bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded hover:bg-indigo-700 shrink-0"
+        >
+          <Plus size={13} /> Add Employee
+        </button>
+      </div>
       <DataTable
         columns={[
           { key: 'employee_code', label: 'Code', width: 90 },
@@ -1399,19 +1527,81 @@ const HRMS: React.FC = () => {
             <Badge value={r.status || 'Active'} variant={r.status?.toLowerCase() === 'active' ? 'success' : r.status?.toLowerCase() === 'on leave' ? 'warning' : 'default'} />
           )},
           { key: 'join_date', label: 'Join Date', width: 100, render: (v) => v ? new Date(v).toLocaleDateString() : '—' },
-           { key: 'actions', label: 'Actions', render: (_, r: HrEmployee) => (
-             <div className="flex gap-1">
-               <button onClick={() => setSelectedEmp(r)} className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded"><Eye size={13} /></button>
-               <button onClick={() => { setSelectedEmp(r); /* optional: set default tab or edit mode */ }} className="p-1.5 hover:bg-slate-50 text-slate-500 rounded"><Edit2 size={13} /></button>
-             </div>
-           )},
+          { key: 'actions', label: 'Actions', render: (_, r: HrEmployee) => (
+            <div className="flex gap-1">
+              <button onClick={() => setSelectedEmp(r)} className="p-1.5 hover:bg-indigo-50 text-indigo-600 rounded" title="View / Edit"><Eye size={13} /></button>
+              <button onClick={() => setSelectedEmp(r)} className="p-1.5 hover:bg-slate-50 text-slate-500 rounded" title="Edit profile"><Edit2 size={13} /></button>
+            </div>
+          )},
         ]}
         data={filteredEmps}
         loading={loadingView}
         emptyMessage="No employees found"
       />
       {selectedEmp && (
-        <ProfileDrawer emp={selectedEmp} onClose={() => setSelectedEmp(null)} addNotification={addNotification} />
+        <ProfileDrawer emp={selectedEmp} onClose={() => { setSelectedEmp(null); loadEmployees(); }} addNotification={addNotification} />
+      )}
+
+      {/* Add Employee Modal */}
+      {showAddEmp && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-[480px] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-t-xl">
+              <div className="font-bold text-sm">Add New Employee</div>
+              <button onClick={() => setShowAddEmp(false)} className="p-1 hover:bg-white/20 rounded"><X size={16} /></button>
+            </div>
+            <form onSubmit={handleAddEmployee} className="p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Full Name *', key: 'name', type: 'text', required: true },
+                  { label: 'Email', key: 'email', type: 'email' },
+                  { label: 'Contact', key: 'contact', type: 'text' },
+                  { label: 'Gender', key: 'gender', type: 'select', options: ['', 'Male', 'Female', 'Other'] },
+                  { label: 'Date of Birth', key: 'dob', type: 'date' },
+                  { label: 'Join Date', key: 'join_date', type: 'date' },
+                  { label: 'Employment Type', key: 'employment_type', type: 'select', options: ['Permanent', 'Contract', 'Probation', 'Intern'] },
+                  { label: 'Grade', key: 'grade', type: 'text' },
+                ].map((f: any) => (
+                  <div key={f.key}>
+                    <label className="block text-[10px] text-slate-500 uppercase font-bold mb-0.5">{f.label}</label>
+                    {f.type === 'select' ? (
+                      <select
+                        value={(addEmpForm as any)[f.key]}
+                        onChange={e => setAddEmpForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs"
+                      >
+                        {f.options.map((o: string) => <option key={o} value={o}>{o || '— Select —'}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type={f.type}
+                        required={f.required}
+                        value={(addEmpForm as any)[f.key]}
+                        onChange={e => setAddEmpForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs"
+                      />
+                    )}
+                  </div>
+                ))}
+                <div>
+                  <label className="block text-[10px] text-slate-500 uppercase font-bold mb-0.5">Department</label>
+                  <select value={addEmpForm.department_id} onChange={e => setAddEmpForm(p => ({ ...p, department_id: e.target.value }))} className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs">
+                    <option value="">— None —</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="submit" disabled={addEmpLoading} className="flex-1 bg-indigo-600 text-white py-2 rounded font-bold text-xs hover:bg-indigo-700 disabled:opacity-50">
+                  {addEmpLoading ? 'Saving...' : 'Create Employee'}
+                </button>
+                <button type="button" onClick={() => setShowAddEmp(false)} className="px-4 py-2 border border-slate-200 rounded font-bold text-xs text-slate-600 hover:bg-slate-50">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

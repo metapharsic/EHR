@@ -63,7 +63,7 @@ router.get('/parties', async (req, res) => {
 router.post('/parties', async (req, res) => {
     try {
         const {
-            name, gstin = null, mobile = '', email = null, address = null,
+            name, type: rawType = 'Debtor', gstin = null, mobile = '', email = null, address = null,
             city = null, state = null, pinCode = null,
             creditLimit = 0, currentBalance = 0, creditDays = 0,
             category = 'Regular', contactPerson = null, pan = null,
@@ -71,6 +71,7 @@ router.post('/parties', async (req, res) => {
             bankName = null, accountNumber = null, ifscCode = null,
             drugLicenseNo = null, status = 'Active'
         } = req.body;
+        const partyType = ['Debtor','Creditor','Both'].includes(rawType) ? rawType : 'Debtor';
 
         if (!name || !mobile) {
             return res.status(400).json({ success: false, error: 'Customer name and mobile are required' });
@@ -82,7 +83,7 @@ router.post('/parties', async (req, res) => {
                 credit_limit, current_balance, credit_days, category, contact_person,
                 pan, route, territory, remarks, bank_name, account_number, ifsc_code, drug_license_no
              ) VALUES (
-                $1,'Debtor',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
              ) RETURNING
                 id, name, type, gstin, mobile, email, address, city, state, pin_code as "pinCode",
                 status, credit_limit as "creditLimit", current_balance as "currentBalance",
@@ -90,7 +91,7 @@ router.post('/parties', async (req, res) => {
                 pan, route, territory, remarks, bank_name as "bankName",
                 account_number as "accountNumber", ifsc_code as "ifscCode",
                 drug_license_no as "drugLicenseNo", created_at as "createdAt"`,
-            [name, gstin, mobile, email, address, city, state, pinCode, status,
+            [name, partyType, gstin, mobile, email, address, city, state, pinCode, status,
              creditLimit, currentBalance, creditDays, category, contactPerson,
              pan, route, territory, remarks, bankName, accountNumber, ifscCode, drugLicenseNo]
         );
@@ -109,7 +110,7 @@ router.post('/parties', async (req, res) => {
 router.put('/parties/:id', async (req, res) => {
     try {
         const {
-            name, gstin = null, mobile = '', email = null, address = null,
+            name, type: ptype = 'Debtor', gstin = null, mobile = '', email = null, address = null,
             city = null, state = null, pinCode = null,
             creditLimit = 0, currentBalance = 0, creditDays = 0,
             category = 'Regular', contactPerson = null, pan = null,
@@ -117,6 +118,7 @@ router.put('/parties/:id', async (req, res) => {
             bankName = null, accountNumber = null, ifscCode = null,
             drugLicenseNo = null, status = 'Active'
         } = req.body;
+        const updatedType = ['Debtor','Creditor','Both'].includes(ptype) ? ptype : 'Debtor';
 
         if (!name || !mobile) {
             return res.status(400).json({ success: false, error: 'Customer name and mobile are required' });
@@ -124,14 +126,14 @@ router.put('/parties/:id', async (req, res) => {
 
         const { rows } = await db.query(
             `UPDATE parties SET
-                name=$1, type='Debtor', gstin=$2, mobile=$3, email=$4,
-                address=$5, city=$6, state=$7, pin_code=$8, status=$9,
-                credit_limit=$10, current_balance=$11, credit_days=$12,
-                category=$13, contact_person=$14, pan=$15,
-                route=$16, territory=$17, remarks=$18,
-                bank_name=$19, account_number=$20, ifsc_code=$21,
-                drug_license_no=$22, updated_at=NOW()
-             WHERE id=$23
+                name=$1, type=$2, gstin=$3, mobile=$4, email=$5,
+                address=$6, city=$7, state=$8, pin_code=$9, status=$10,
+                credit_limit=$11, current_balance=$12, credit_days=$13,
+                category=$14, contact_person=$15, pan=$16,
+                route=$17, territory=$18, remarks=$19,
+                bank_name=$20, account_number=$21, ifsc_code=$22,
+                drug_license_no=$23, updated_at=NOW()
+             WHERE id=$24
              RETURNING
                 id, name, type, gstin, mobile, email, address, city, state, pin_code as "pinCode",
                 status, credit_limit as "creditLimit", current_balance as "currentBalance",
@@ -139,7 +141,7 @@ router.put('/parties/:id', async (req, res) => {
                 pan, route, territory, remarks, bank_name as "bankName",
                 account_number as "accountNumber", ifsc_code as "ifscCode",
                 drug_license_no as "drugLicenseNo", updated_at as "updatedAt"`,
-            [name, gstin, mobile, email, address, city, state, pinCode, status,
+            [name, updatedType, gstin, mobile, email, address, city, state, pinCode, status,
              creditLimit, currentBalance, creditDays, category, contactPerson, pan,
              route, territory, remarks, bankName, accountNumber, ifscCode, drugLicenseNo, req.params.id]
         );
@@ -872,6 +874,29 @@ router.get('/dashboard-summary', async (req, res) => {
         const draftsResult = await db.query(
             "SELECT COUNT(*) as count FROM sales_invoices WHERE status = 'Draft' AND invoice_number NOT LIKE 'PCD-%'"
         );
+        // Outstanding credit (sum of positive party balances)
+        const outstandingResult = await db.query(
+            "SELECT COALESCE(SUM(current_balance), 0) as outstanding FROM parties WHERE current_balance > 0"
+        );
+        // Today's payment mode breakdown
+        const paymentResult = await db.query(
+            "SELECT payment_mode, COALESCE(SUM(net_amount),0)::numeric as total FROM sales_invoices WHERE date::date = CURRENT_DATE AND invoice_number NOT LIKE 'PCD-%' GROUP BY payment_mode ORDER BY total DESC"
+        );
+        // Low stock count
+        const lowStockResult = await db.query(
+            "SELECT COUNT(*) as count FROM products WHERE is_active = true AND min_stock_level > 0 AND (SELECT COALESCE(SUM(available_qty),0) FROM batches WHERE product_id = products.id AND expiry_date > CURRENT_DATE) < min_stock_level"
+        );
+        // Near expiry count (within 60 days)
+        const nearExpiryResult = await db.query(
+            "SELECT COUNT(DISTINCT product_id) as count FROM batches WHERE expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '60 days' AND available_qty > 0"
+        );
+        // Monthly trend (last 6 months)
+        const monthlyTrendResult = await db.query(
+            `SELECT TO_CHAR(date::date,'Mon YY') as month, TO_CHAR(date::date,'YYYYMM') as sort_key,
+                    COALESCE(SUM(net_amount),0)::numeric as revenue, COUNT(*)::int as invoices
+             FROM sales_invoices WHERE date >= CURRENT_DATE - INTERVAL '6 months' AND invoice_number NOT LIKE 'PCD-%'
+             GROUP BY 1,2 ORDER BY 2`
+        );
         // Recent invoices with party name
         const recentResult = await db.query(`SELECT si.*,
                     COALESCE(p.name, 'Walk-in Customer') as party_name,
@@ -899,6 +924,11 @@ router.get('/dashboard-summary', async (req, res) => {
                 itemsSoldToday: parseInt(totalItemsResult.rows[0]?.items || 0),
                 pendingDrafts: parseInt(draftsResult.rows[0]?.count || 0),
                 monthlyRevenue: parseFloat(monthlyResult.rows[0]?.revenue || 0),
+                outstandingCredit: parseFloat(outstandingResult.rows[0]?.outstanding || 0),
+                paymentBreakdown: paymentResult.rows,
+                lowStockCount: parseInt(lowStockResult.rows[0]?.count || 0),
+                nearExpiryCount: parseInt(nearExpiryResult.rows[0]?.count || 0),
+                monthlyTrend: monthlyTrendResult.rows,
                 recentInvoices: recentResult.rows,
                 tables: ['sales_invoices', 'sales_invoice_items', 'parties']
             }

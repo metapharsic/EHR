@@ -49,6 +49,8 @@ export const hrmsService = {
     apiClient.put<any>(`/hr/employees/${id}/profile`, data),
   terminateEmployee: (id: string, data: { exit_date: string; exit_reason: string }) =>
     apiClient.delete<any>(`/hr/employees/${id}`),
+  addTimelineNote: (id: string, event_type: string, description: string) =>
+    apiClient.post<any>(`/hr/employees/${id}/timeline`, { event_type, description }),
   getOrgChart: () => apiClient.get<any>('/hr/org-chart').then(ok<HrDepartment[]>),
 
   // ======== DOCUMENTS ========

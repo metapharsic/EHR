@@ -472,6 +472,26 @@ router.delete(
 );
 
 router.post(
+  '/employees/:id/timeline',
+  verifyTokenMiddleware,
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  asyncRoute(async (req, res) => {
+    const { id } = req.params;
+    const { event_type = 'Note', description } = req.body;
+    if (!description) return res.status(400).json({ success: false, error: 'description required' });
+    await db.query(
+      `INSERT INTO hr_employee_timeline (id, employee_id, event_type, description, event_date, performed_by, created_at)
+       VALUES ($1,$2,$3,$4,NOW(),$5,NOW())`,
+      [uuidv4(), id, event_type, description, req.user.userId]
+    );
+    const { rows } = await db.query(
+      `SELECT * FROM hr_employee_timeline WHERE employee_id = $1 ORDER BY event_date DESC LIMIT 50`, [id]
+    );
+    res.json({ success: true, data: rows });
+  })
+);
+
+router.post(
   '/employees/:id/terminate',
   verifyTokenMiddleware,
   verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),

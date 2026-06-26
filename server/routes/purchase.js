@@ -111,7 +111,7 @@ router.get('/', async (req, res) => {
 router.get('/lists/dropdown', async (req, res) => {
   try {
     const { rows: suppliers } = await db.query(
-      "SELECT id, name, NULL as code FROM parties WHERE type = 'Creditor' AND status = 'Active' ORDER BY name"
+      "SELECT id, name, COALESCE(type,'Debtor') as type, NULL as code FROM parties WHERE status = 'Active' ORDER BY name"
     );
 
     const { rows: products } = await db.query(
@@ -194,11 +194,25 @@ router.post('/', async (req, res) => {
 
     // 4. Insert line items
     for (const item of items) {
+      const qty = Number(item.quantity) || 0;
+      const rate = Number(item.purchase_rate) || 0;
+      const discPct = Number(item.discount_percent) || 0;
+      const discAmt = rate * qty * discPct / 100;
+      const gstRate = Number(item.gst_rate) || 0;
+      const taxableAmt = rate * qty - discAmt;
+      const total = taxableAmt * (1 + gstRate / 100);
       await client.query(
-        `INSERT INTO purchase_order_items 
-         (po_id, product_id, quantity, unit_price, total_amount)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [poId, item.product_id, item.quantity, item.purchase_rate, (item.quantity * item.purchase_rate)]
+        `INSERT INTO purchase_order_items
+         (po_id, product_id, quantity, unit_price, total_amount, mrp, gst_rate, batch_no, expiry_date,
+          free_quantity, scheme_type, discount_percent, pack_type, units_per_pack, ptr)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+        [
+          poId, item.product_id, qty, rate, total,
+          item.mrp || 0, gstRate, item.batch_no || null, item.expiry_date || null,
+          Number(item.free_quantity) || 0, item.scheme_type || null,
+          discPct, item.pack_type || 'Strip',
+          Number(item.units_per_pack) || 10, Number(item.ptr) || rate
+        ]
       );
     }
 
@@ -464,8 +478,10 @@ router.get('/:id', async (req, res, next) => {
     }
 
     const { rows: items } = await db.query(
-      `SELECT poi.id, poi.po_id, poi.product_id, poi.quantity, poi.unit_price as purchase_rate, poi.total_amount, poi.created_at,
-              p.name as product_name, p.code as product_code
+      `SELECT poi.id, poi.po_id, poi.product_id, poi.quantity, poi.unit_price as purchase_rate, poi.total_amount,
+              poi.mrp, poi.gst_rate, poi.batch_no, poi.expiry_date,
+              poi.free_quantity, poi.scheme_type, poi.discount_percent, poi.pack_type, poi.units_per_pack, poi.ptr,
+              poi.created_at, p.name as product_name, p.code as product_code
        FROM purchase_order_items poi
        LEFT JOIN products p ON poi.product_id = p.id
        WHERE poi.po_id = $1
@@ -539,18 +555,24 @@ router.put('/:id', async (req, res) => {
       // For simplicity, we'll replace existing items. 
       // In a production app, you might want to reconcile (update/insert/delete)
       await client.query('DELETE FROM purchase_order_items WHERE po_id = $1', [id]);
-      
       for (const item of items) {
+        const qty = Number(item.quantity) || 0;
+        const rate = Number(item.purchase_rate) || 0;
+        const discPct = Number(item.discount_percent) || 0;
+        const gstRate = Number(item.gst_rate) || 0;
+        const taxableAmt = rate * qty * (1 - discPct / 100);
+        const total = taxableAmt * (1 + gstRate / 100);
         await client.query(
-          `INSERT INTO purchase_order_items 
-           (po_id, product_id, quantity, unit_price, total_amount)
-           VALUES ($1, $2, $3, $4, $5)`,
+          `INSERT INTO purchase_order_items
+           (po_id, product_id, quantity, unit_price, total_amount, mrp, gst_rate, batch_no, expiry_date,
+            free_quantity, scheme_type, discount_percent, pack_type, units_per_pack, ptr)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
           [
-            id, 
-            item.product_id, 
-            item.quantity, 
-            item.purchase_rate,
-            (item.quantity * item.purchase_rate)
+            id, item.product_id, qty, rate, total,
+            item.mrp || 0, gstRate, item.batch_no || null, item.expiry_date || null,
+            Number(item.free_quantity) || 0, item.scheme_type || null,
+            discPct, item.pack_type || 'Strip',
+            Number(item.units_per_pack) || 10, Number(item.ptr) || rate
           ]
         );
       }

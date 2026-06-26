@@ -837,7 +837,16 @@ const CustomerFormModal = ({
               <div className="space-y-5">
                 {/* Entity Type */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
+                  <div>
+                    <Field label="Party Role" required>
+                      <Select value={form.type ?? 'Debtor'} onChange={e => set('type' as any, e.target.value)}>
+                        <option value="Debtor">Customer (Debtor)</option>
+                        <option value="Creditor">Supplier / Distributor (Creditor)</option>
+                        <option value="Both">Both (Customer & Supplier)</option>
+                      </Select>
+                    </Field>
+                  </div>
+                  <div>
                     <Field label="Entity Type" required>
                       <Select value={(form as any).entity_type ?? ''} onChange={e => set('entity_type' as any, e.target.value)}>
                         <option value="">— Select Entity Type —</option>

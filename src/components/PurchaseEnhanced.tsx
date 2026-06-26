@@ -107,7 +107,7 @@ const PurchaseEnhanced: React.FC = () => {
  notes: ''
  });
  const [newOrderItems, setNewOrderItems] = useState<any[]>([
- { product_id: '', quantity: 1, purchase_rate: 0, mrp: 0, gst_rate: 18, batch_no: '', expiry_date: '' }
+ { product_id: '', pack_type: 'Box', units_per_pack: 10, quantity: 1, free_quantity: 0, scheme_type: '', batch_no: '', expiry_date: '', mrp: 0, ptr: 0, purchase_rate: 0, discount_percent: 0, gst_rate: 12 }
  ]);
 
  const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -118,7 +118,7 @@ const PurchaseEnhanced: React.FC = () => {
  const [isUpdating, setIsUpdating] = useState(false);
  const [isCreating, setIsCreating] = useState(false);
 
- const { data: lists, refetch: refetchLists } = useDataFetch<any>('/api/purchase/lists/dropdown');
+ const { data: lists, refetch: refetchLists } = useDataFetch<any>('/api/purchase/lists/dropdown', { cacheTime: 0 });
 
  const handleCreateOrder = async () => {
  if (!newOrderForm.supplier_id || newOrderItems.some(item => !item.product_id)) {
@@ -145,7 +145,7 @@ const PurchaseEnhanced: React.FC = () => {
  priority: 'Standard',
  notes: ''
  });
- setNewOrderItems([{ product_id: '', quantity: 1, purchase_rate: 0, mrp: 0, gst_rate: 18, batch_no: '', expiry_date: '' }]);
+ setNewOrderItems([{ product_id: '', pack_type: 'Box', units_per_pack: 10, quantity: 1, free_quantity: 0, scheme_type: '', batch_no: '', expiry_date: '', mrp: 0, ptr: 0, purchase_rate: 0, discount_percent: 0, gst_rate: 12 }]);
  handleRefreshAll();
  } else {
  notifyError(response.error || 'Failed to create purchase order');
@@ -247,7 +247,7 @@ const PurchaseEnhanced: React.FC = () => {
  };
 
  const handleAddItem = (isNew = false) => {
- const newItem = { product_id: '', quantity: 1, purchase_rate: 0, mrp: 0, gst_rate: 18, batch_no: '', expiry_date: '' };
+ const newItem = { product_id: '', pack_type: 'Box', units_per_pack: 10, quantity: 1, free_quantity: 0, scheme_type: '', batch_no: '', expiry_date: '', mrp: 0, ptr: 0, purchase_rate: 0, discount_percent: 0, gst_rate: 12 };
  if (isNew) {
  setNewOrderItems([...newOrderItems, newItem]);
  } else {
@@ -427,6 +427,7 @@ const PurchaseEnhanced: React.FC = () => {
  onClick: () => {
  setSelectedItem(null);
  setModalType('PURCHASE');
+ refetchLists();
  setIsNewPurchaseModalOpen(true);
  },
  icon: <Plus size={18} />,
@@ -950,91 +951,71 @@ const PurchaseEnhanced: React.FC = () => {
  </div>
  
  <div className="overflow-x-auto rounded-xl border border-slate-200">
- <table className="min-w-full text-left whitespace-nowrap">
+ <table className="min-w-full text-left" style={{fontSize:'10px', minWidth:'1100px'}}>
  <thead>
- <tr className="bg-slate-50 border-b border-slate-100">
- <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[200px]">Product</th>
- <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[80px] text-center">Qty</th>
- <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[100px] text-right">Rate</th>
- <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[80px] text-center">GST%</th>
- <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[120px]">Batch No</th>
- <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[130px]">Expiry</th>
- <th className="px-4 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest min-w-[120px] text-right">Total</th>
- <th className="px-6 py-4 w-10"></th>
+ <tr className="bg-slate-50 border-b-2 border-slate-200">
+ {['Product','Pack','Qty','Free','Scheme','Batch','Expiry','MRP','PTR','Rate/Box','Disc%','GST%','Amount',''].map(h => (
+ <th key={h} className="px-2 py-3 font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+ ))}
  </tr>
  </thead>
  <tbody className="divide-y divide-slate-50">
- {editItems.map((item, idx) => (
+ {editItems.map((item, idx) => {
+ const qty=Number(item.quantity)||0, rate=Number(item.purchase_rate)||0;
+ const disc=Number(item.discount_percent)||0, gst=Number(item.gst_rate)||0;
+ const total = rate*qty*(1-disc/100)*(1+gst/100);
+ const iCls = 'w-full bg-blue-50/70 rounded px-1 py-0.5 outline-none font-bold text-slate-800 text-center';
+ return (
  <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
- <td className="px-6 py-4">
- <select 
- value={item.product_id}
- onChange={(e) => handleItemChange(idx, 'product_id', e.target.value)}
- className="w-full bg-transparent font-bold text-slate-700 outline-none text-sm"
- >
- <option value="">Select Product...</option>
- {lists?.products?.map((p: any) => (
- <option key={p.id} value={p.id}>{p.name}</option>
- ))}
+ <td className="px-2 py-2" style={{minWidth:'150px'}}>
+ <select value={item.product_id} onChange={(e) => handleItemChange(idx,'product_id',e.target.value)}
+ className="w-full bg-transparent font-bold text-slate-700 outline-none text-xs">
+ <option value="">Select...</option>
+ {lists?.products?.map((p:any) => <option key={p.id} value={p.id}>{p.name}</option>)}
  </select>
  </td>
- <td className="px-4 py-4 text-center">
- <input 
- type="number"
- value={item.quantity}
- onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))}
- className="w-full text-center font-bold text-accent bg-blue-50/50 rounded-lg px-2 py-1 outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
- />
+ <td className="px-1 py-2" style={{minWidth:'80px'}}>
+ <select value={item.pack_type||'Box'} onChange={(e) => handleItemChange(idx,'pack_type',e.target.value)}
+ className="w-full bg-blue-50/70 rounded px-1 font-bold text-slate-700 outline-none">
+ {['Box','Strip','Bottle','Vial','Ampoule','Unit','Sachet','Tube'].map(pt => <option key={pt}>{pt}</option>)}
+ </select>
  </td>
- <td className="px-4 py-4 text-right">
- <input 
- type="number"
- value={item.purchase_rate}
- onChange={(e) => handleItemChange(idx, 'purchase_rate', Number(e.target.value))}
- className="w-full text-right font-bold text-accent bg-blue-50/50 rounded-lg px-2 py-1 outline-none focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
- />
+ <td className="px-1 py-2" style={{minWidth:'55px'}}><input type="number" min="0" value={item.quantity} onChange={(e) => handleItemChange(idx,'quantity',Number(e.target.value))} className={iCls}/></td>
+ <td className="px-1 py-2" style={{minWidth:'50px'}}><input type="number" min="0" value={item.free_quantity||0} onChange={(e) => handleItemChange(idx,'free_quantity',Number(e.target.value))} className={iCls}/></td>
+ <td className="px-1 py-2" style={{minWidth:'85px'}}>
+ <select value={item.scheme_type||''} onChange={(e) => handleItemChange(idx,'scheme_type',e.target.value)}
+ className="w-full bg-blue-50/70 rounded px-1 font-bold text-slate-700 outline-none">
+ <option value="">None</option>
+ {['5+1','10+1','10+2','12+1','14+1','20+2','100+10','1+1','2+1','3+1'].map(s => <option key={s}>{s}</option>)}
+ </select>
  </td>
- <td className="px-4 py-4 text-center">
- <input 
- type="number"
- value={item.gst_rate}
- onChange={(e) => handleItemChange(idx, 'gst_rate', Number(e.target.value))}
- className="w-full text-center font-bold text-slate-500 bg-slate-50 rounded-lg px-2 py-1 outline-none"
- />
+ <td className="px-1 py-2" style={{minWidth:'90px'}}><input type="text" placeholder="Batch#" value={item.batch_no||''} onChange={(e) => handleItemChange(idx,'batch_no',e.target.value)} className="w-full bg-blue-50/70 rounded px-1 py-0.5 outline-none font-bold text-slate-800"/></td>
+ <td className="px-1 py-2" style={{minWidth:'105px'}}><input type="date" value={item.expiry_date ? new Date(item.expiry_date).toISOString().split('T')[0]:''} onChange={(e) => handleItemChange(idx,'expiry_date',e.target.value)} className="w-full bg-blue-50/70 rounded px-1 py-0.5 outline-none font-bold text-slate-800 text-xs"/></td>
+ <td className="px-1 py-2" style={{minWidth:'65px'}}><input type="number" min="0" step="0.01" value={item.mrp||0} onChange={(e) => handleItemChange(idx,'mrp',Number(e.target.value))} className={iCls}/></td>
+ <td className="px-1 py-2" style={{minWidth:'65px'}}><input type="number" min="0" step="0.01" value={item.ptr||0} onChange={(e) => handleItemChange(idx,'ptr',Number(e.target.value))} className={iCls}/></td>
+ <td className="px-1 py-2" style={{minWidth:'75px'}}><input type="number" min="0" step="0.01" value={item.purchase_rate||0} onChange={(e) => handleItemChange(idx,'purchase_rate',Number(e.target.value))} className={iCls}/></td>
+ <td className="px-1 py-2" style={{minWidth:'50px'}}><input type="number" min="0" max="100" step="0.01" value={item.discount_percent||0} onChange={(e) => handleItemChange(idx,'discount_percent',Number(e.target.value))} className={iCls}/></td>
+ <td className="px-1 py-2" style={{minWidth:'55px'}}>
+ <select value={item.gst_rate||12} onChange={(e) => handleItemChange(idx,'gst_rate',Number(e.target.value))}
+ className="w-full bg-blue-50/70 rounded px-1 font-bold text-slate-700 outline-none">
+ {[0,5,12,18,28].map(g => <option key={g} value={g}>{g}%</option>)}
+ </select>
  </td>
- <td className="px-4 py-4">
- <input 
- type="text"
- value={item.batch_no || ''}
- placeholder="Batch"
- onChange={(e) => handleItemChange(idx, 'batch_no', e.target.value)}
- className="w-full text-xs font-bold text-slate-600 bg-slate-50 rounded-lg px-2 py-1 outline-none"
- />
- </td>
- <td className="px-4 py-4">
- <input 
- type="date"
- value={item.expiry_date ? new Date(item.expiry_date).toISOString().split('T')[0] : ''}
- onChange={(e) => handleItemChange(idx, 'expiry_date', e.target.value)}
- className="w-full text-xs font-bold text-slate-600 bg-slate-50 rounded-lg px-2 py-1 outline-none"
- />
- </td>
- <td className="px-4 py-4 text-right font-bold text-slate-900 text-sm">
- {formatCurrency(item.quantity * item.purchase_rate * (1 + (item.gst_rate || 0)/100))}
- </td>
- <td className="px-6 py-4 text-right">
- <button onClick={() => handleRemoveItem(idx)} className="text-rose-300 hover:text-rose-600 transition-colors">
- <Trash2 size={16} />
- </button>
- </td>
+ <td className="px-2 py-2 text-right font-bold text-slate-900 whitespace-nowrap" style={{minWidth:'80px'}}>{formatCurrency(total)}</td>
+ <td className="px-2 py-2"><button onClick={() => handleRemoveItem(idx)} className="text-rose-300 hover:text-rose-600 transition-colors"><Trash2 size={14}/></button></td>
  </tr>
- ))}
+ );
+ })}
  </tbody>
  <tfoot>
  <tr className="bg-slate-50/50">
- <td colSpan={6} className="px-6 py-6 text-right font-bold text-slate-400 uppercase tracking-widest">Strategic Total</td>
- <td className="px-4 py-6 text-right font-bold text-accent text-lg">
- {formatCurrency(editItems.reduce((sum, item) => sum + (item.quantity * item.purchase_rate * (1 + (item.gst_rate || 0)/100)), 0))}
+ <td colSpan={12} className="px-4 py-4 text-right font-bold text-slate-400 uppercase tracking-widest">Strategic Total</td>
+ <td className="px-2 py-4 text-right font-bold text-accent text-lg">
+ {formatCurrency(editItems.reduce((sum, item) => {
+ const qty=Number(item.quantity)||0, rate=Number(item.purchase_rate)||0;
+ const disc=Number(item.discount_percent)||0, gst=Number(item.gst_rate)||0;
+ return sum + rate*qty*(1-disc/100)*(1+gst/100);
+ }, 0))}
  </td>
  <td></td>
  </tr>
@@ -1165,62 +1146,117 @@ const PurchaseEnhanced: React.FC = () => {
  </div>
  </div>
  
- <div className="overflow-x-auto">
- <table className="w-full text-left text-xs">
+ <div className="overflow-x-auto -mx-2">
+ <table className="w-full text-left" style={{fontSize:'10px', minWidth:'1100px'}}>
  <thead>
- <tr className="border-b border-slate-100">
- <th className="pb-2 font-bold text-slate-400 uppercase tracking-widest">Product Intelligence</th>
- <th className="pb-2 font-bold text-slate-400 uppercase tracking-widest w-16 text-center">Qty</th>
- <th className="pb-2 font-bold text-slate-400 uppercase tracking-widest w-32 text-right">Rate (₹)</th>
- <th className="pb-2 font-bold text-slate-400 uppercase tracking-widest w-32 text-right">Subtotal</th>
- <th className="pb-2 w-10"></th>
+ <tr className="border-b-2 border-slate-200 bg-slate-50">
+ {['Product','Pack','Qty (Boxes)','Free','Scheme','Batch','Expiry','MRP','PTR/Box','Rate/Box','Disc%','GST%','Amount',''].map(h => (
+ <th key={h} className="px-1.5 py-2 font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap">{h}</th>
+ ))}
  </tr>
  </thead>
- <tbody className="divide-y divide-slate-50">
- {newOrderItems.map((item, idx) => (
- <tr key={idx}>
- <td className="py-2">
- <select 
- value={item.product_id}
- onChange={(e) => handleItemChange(idx, 'product_id', e.target.value, true)}
- className="w-full bg-transparent font-bold text-slate-700 outline-none"
- >
- <option value="">Select Product...</option>
- {lists?.products?.map((p: any) => (
- <option key={p.id} value={p.id}>{p.name}</option>
- ))}
+ <tbody className="divide-y divide-slate-100">
+ {newOrderItems.map((item, idx) => {
+ const qty = Number(item.quantity) || 0;
+ const rate = Number(item.purchase_rate) || 0;
+ const disc = Number(item.discount_percent) || 0;
+ const gst = Number(item.gst_rate) || 0;
+ const taxable = rate * qty * (1 - disc/100);
+ const total = taxable * (1 + gst/100);
+ const inputCls = 'w-full bg-blue-50 rounded px-1 py-0.5 outline-none font-bold text-slate-800 text-center';
+ return (
+ <tr key={idx} className="hover:bg-slate-50">
+ <td className="px-1.5 py-1.5" style={{minWidth:'160px'}}>
+ <select value={item.product_id} onChange={(e) => handleItemChange(idx,'product_id',e.target.value,true)}
+ className="w-full bg-transparent font-bold text-slate-700 outline-none text-xs">
+ <option value="">Select...</option>
+ {lists?.products?.map((p:any) => <option key={p.id} value={p.id}>{p.name}</option>)}
  </select>
  </td>
- <td className="py-2 text-center">
- <input 
- type="number"
- value={item.quantity}
- onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value), true)}
- className="w-16 text-center font-bold text-accent bg-blue-50 rounded px-1 outline-none"
- />
+ <td className="px-1 py-1.5" style={{minWidth:'80px'}}>
+ <select value={item.pack_type||'Box'} onChange={(e) => handleItemChange(idx,'pack_type',e.target.value,true)}
+ className="w-full bg-blue-50 rounded px-1 font-bold text-slate-700 outline-none">
+ {['Box','Strip','Bottle','Vial','Ampoule','Unit','Sachet','Tube'].map(pt => <option key={pt}>{pt}</option>)}
+ </select>
  </td>
- <td className="py-2 text-right">
- <input 
- type="number"
- value={item.purchase_rate}
- onChange={(e) => handleItemChange(idx, 'purchase_rate', Number(e.target.value), true)}
- className="w-24 text-right font-bold text-accent bg-blue-50 rounded px-1 outline-none"
- />
+ <td className="px-1 py-1.5" style={{minWidth:'70px'}}>
+ <input type="number" min="0" value={item.quantity}
+ onChange={(e) => handleItemChange(idx,'quantity',Number(e.target.value),true)}
+ className={inputCls} />
  </td>
- <td className="py-2 text-right font-bold text-slate-900">
- {formatCurrency(item.quantity * item.purchase_rate)}
+ <td className="px-1 py-1.5" style={{minWidth:'55px'}}>
+ <input type="number" min="0" value={item.free_quantity||0}
+ onChange={(e) => handleItemChange(idx,'free_quantity',Number(e.target.value),true)}
+ className={inputCls} />
  </td>
- <td className="py-2 text-right">
- <button 
- onClick={() => handleRemoveItem(idx, true)}
- className="text-rose-400 hover:text-rose-600"
- >
+ <td className="px-1 py-1.5" style={{minWidth:'90px'}}>
+ <select value={item.scheme_type||''} onChange={(e) => handleItemChange(idx,'scheme_type',e.target.value,true)}
+ className="w-full bg-blue-50 rounded px-1 font-bold text-slate-700 outline-none">
+ <option value="">None</option>
+ {['5+1','10+1','10+2','12+1','14+1','20+2','100+10','1+1','2+1','3+1'].map(s => <option key={s}>{s}</option>)}
+ </select>
+ </td>
+ <td className="px-1 py-1.5" style={{minWidth:'90px'}}>
+ <input type="text" placeholder="Batch#" value={item.batch_no||''}
+ onChange={(e) => handleItemChange(idx,'batch_no',e.target.value,true)}
+ className="w-full bg-blue-50 rounded px-1 py-0.5 outline-none font-bold text-slate-800" />
+ </td>
+ <td className="px-1 py-1.5" style={{minWidth:'105px'}}>
+ <input type="date" value={item.expiry_date ? new Date(item.expiry_date).toISOString().split('T')[0] : ''}
+ onChange={(e) => handleItemChange(idx,'expiry_date',e.target.value,true)}
+ className="w-full bg-blue-50 rounded px-1 py-0.5 outline-none font-bold text-slate-800 text-xs" />
+ </td>
+ <td className="px-1 py-1.5" style={{minWidth:'70px'}}>
+ <input type="number" min="0" step="0.01" value={item.mrp||0}
+ onChange={(e) => handleItemChange(idx,'mrp',Number(e.target.value),true)}
+ className={inputCls} />
+ </td>
+ <td className="px-1 py-1.5" style={{minWidth:'75px'}}>
+ <input type="number" min="0" step="0.01" value={item.ptr||0}
+ onChange={(e) => handleItemChange(idx,'ptr',Number(e.target.value),true)}
+ className={inputCls} />
+ </td>
+ <td className="px-1 py-1.5" style={{minWidth:'80px'}}>
+ <input type="number" min="0" step="0.01" value={item.purchase_rate||0}
+ onChange={(e) => handleItemChange(idx,'purchase_rate',Number(e.target.value),true)}
+ className={inputCls} />
+ </td>
+ <td className="px-1 py-1.5" style={{minWidth:'55px'}}>
+ <input type="number" min="0" max="100" step="0.01" value={item.discount_percent||0}
+ onChange={(e) => handleItemChange(idx,'discount_percent',Number(e.target.value),true)}
+ className={inputCls} />
+ </td>
+ <td className="px-1 py-1.5" style={{minWidth:'55px'}}>
+ <select value={item.gst_rate||12} onChange={(e) => handleItemChange(idx,'gst_rate',Number(e.target.value),true)}
+ className="w-full bg-blue-50 rounded px-1 font-bold text-slate-700 outline-none">
+ {[0,5,12,18,28].map(g => <option key={g} value={g}>{g}%</option>)}
+ </select>
+ </td>
+ <td className="px-1.5 py-1.5 text-right font-bold text-slate-900 whitespace-nowrap" style={{minWidth:'80px'}}>
+ {formatCurrency(total)}
+ </td>
+ <td className="px-1 py-1.5">
+ <button onClick={() => handleRemoveItem(idx,true)} className="text-rose-400 hover:text-rose-600">
  <Trash2 size={14} />
  </button>
  </td>
  </tr>
- ))}
+ );
+ })}
  </tbody>
+ <tfoot>
+ <tr className="border-t-2 border-slate-200 bg-slate-50">
+ <td colSpan={12} className="px-2 py-2 text-right font-bold text-slate-500 uppercase tracking-widest text-xs">Grand Total</td>
+ <td className="px-1.5 py-2 text-right font-bold text-slate-900 text-sm">
+ {formatCurrency(newOrderItems.reduce((s,i) => {
+ const qty=Number(i.quantity)||0, rate=Number(i.purchase_rate)||0;
+ const disc=Number(i.discount_percent)||0, gst=Number(i.gst_rate)||0;
+ return s + (rate*qty*(1-disc/100)*(1+gst/100));
+ },0))}
+ </td>
+ <td/>
+ </tr>
+ </tfoot>
  </table>
  </div>
  </div>

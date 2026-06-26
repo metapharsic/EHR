@@ -33,6 +33,9 @@ const Sales: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState('INVOICES');
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [invoiceItems, setInvoiceItems] = useState<any[]>([]);
+  const [invoiceFull, setInvoiceFull] = useState<any>(null);
+  const [loadingItems, setLoadingItems] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -89,11 +92,18 @@ const Sales: React.FC = () => {
     } else setPendingItem(prev => ({ ...prev, product_id: '', name: '' }));
   };
 
-  const handleSchemeToggle = (scheme: 'none' | '10+7') => {
+  const handleSchemeToggle = (scheme: string) => {
     setPendingItem(prev => {
       const mrp = prev.mrp;
-      const rate = scheme === '10+7' && mrp > 0 ? parseFloat((mrp * 10 / 17).toFixed(2)) : prev.rate;
-      return { ...prev, scheme_type: scheme, paid_strips: 10, free_strips: 7, total_strips: 17, rate };
+      // Parse paid+free from scheme string like "10+7", "5+1" etc
+      const parts = scheme !== 'none' && scheme !== 'custom' ? scheme.split('+').map(Number) : null;
+      const paid = parts ? parts[0] : 0;
+      const free = parts ? parts[1] : 0;
+      const total = paid + free;
+      const rate = parts && paid > 0 && mrp > 0
+        ? parseFloat((mrp * paid / total).toFixed(2))
+        : prev.rate;
+      return { ...prev, scheme_type: scheme, paid_strips: paid || prev.paid_strips, free_strips: scheme === 'custom' ? prev.free_strips : (free || 0), total_strips: total || prev.total_strips, rate: scheme === 'none' ? prev.rate : rate };
     });
   };
 
@@ -136,51 +146,243 @@ const Sales: React.FC = () => {
   };
 
   const handlePrint = () => {
-    const el = printRef.current;
-    if (!el) return;
-    const w = window.open('', '_blank', 'width=900,height=700');
+    const inv2 = invoiceFull || selectedInvoice;
+    if (!inv2) return;
+    const w = window.open('', '_blank', 'width=1100,height=800');
     if (!w) return;
-    w.document.write(`
-      <!DOCTYPE html><html><head>
-      <title>Invoice ${selectedInvoice?.invoice_no}</title>
+
+    const subTotal = Number(inv2.sub_total || inv2.total_taxable || 0);
+    const gstTotal = Number(inv2.total_gst || 0);
+    const cgst = +(gstTotal / 2).toFixed(2);
+    const sgst = +(gstTotal / 2).toFixed(2);
+    const netPayable = Number(inv2.net_payable || inv2.net_amount || 0);
+    const roundOff = +(Math.round(netPayable) - netPayable).toFixed(2);
+    const netFinal = Math.round(netPayable);
+
+    const fmtDate = (d: string) => { try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return d; } };
+    const fmtExp = (d: string) => { if (!d) return '—'; try { const dt = new Date(d); return `${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; } catch { return d; } };
+    const inr = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Group items by GST% for HSN tax summary table
+    const gstGroups: Record<string, { taxable: number; cgst: number; sgst: number }> = {};
+    invoiceItems.forEach(item => {
+      const pct = String(item.gst_percent || 12);
+      const taxable = Number(item.taxable_value || (item.quantity * item.ptr) || 0);
+      const tax = +(taxable * Number(pct) / 100).toFixed(2);
+      if (!gstGroups[pct]) gstGroups[pct] = { taxable: 0, cgst: 0, sgst: 0 };
+      gstGroups[pct].taxable += taxable;
+      gstGroups[pct].cgst += tax / 2;
+      gstGroups[pct].sgst += tax / 2;
+    });
+    const gstSummaryRows = Object.entries(gstGroups).map(([pct, g]) =>
+      `<tr><td style="padding:4px 8px;">${pct}%</td>
+        <td style="padding:4px 8px;text-align:right;">₹${inr(g.taxable)}</td>
+        <td style="padding:4px 8px;text-align:center;">${+pct/2}%</td>
+        <td style="padding:4px 8px;text-align:right;">₹${inr(g.cgst)}</td>
+        <td style="padding:4px 8px;text-align:center;">${+pct/2}%</td>
+        <td style="padding:4px 8px;text-align:right;">₹${inr(g.sgst)}</td>
+        <td style="padding:4px 8px;text-align:right;font-weight:700;">₹${inr(g.cgst+g.sgst)}</td>
+      </tr>`
+    ).join('');
+
+    const itemRows = invoiceItems.map((item, i) => {
+      const freeQty = item.free_quantity || 0;
+      const hasScheme = item.scheme_type === '10+7' || freeQty > 0;
+      const schemeLabel = item.scheme_type && item.scheme_type !== 'none' ? item.scheme_type : (freeQty > 0 ? `+${freeQty}` : '—');
+      const taxable = Number(item.taxable_value || (item.quantity * item.ptr) || 0);
+      const itemGst = +(taxable * (item.gst_percent || 12) / 100).toFixed(2);
+      const itemCgst = +(itemGst / 2).toFixed(2);
+      const itemSgst = +(itemGst / 2).toFixed(2);
+      const amt = Number(item.total_amount || (taxable + itemGst) || 0);
+      return `<tr style="background:${i%2===0?'#fff':'#f8fafc'}">
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:center;color:#64748b;">${i+1}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;font-weight:600;font-size:10.5px;">${item.product_name || '—'}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:9.5px;text-align:center;">${item.batch_no || '—'}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;font-size:9.5px;text-align:center;">${fmtExp(item.expiry)}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;">${item.quantity}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:${hasScheme?'#059669':'#94a3b8'};">${hasScheme?freeQty:'—'}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:9px;color:${hasScheme?'#065f46':'#94a3b8'};font-weight:${hasScheme?'700':'400'};">${schemeLabel}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:9.5px;">₹${Number(item.mrp||0).toFixed(2)}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:800;color:#0284c7;">₹${Number(item.ptr||0).toFixed(2)}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:9.5px;">₹${inr(taxable)}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:9px;">${item.gst_percent||12}%</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:9.5px;">₹${inr(itemCgst)}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:9.5px;">₹${inr(itemSgst)}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:800;">₹${inr(amt)}</td>
+      </tr>`;
+    }).join('');
+
+    w.document.write(`<!DOCTYPE html><html><head>
+      <title>Invoice ${inv2.invoice_no}</title>
       <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, sans-serif; font-size: 12px; color: #1e293b; background: white; }
-        .page { width: 210mm; min-height: 297mm; padding: 16mm; position: relative; }
-        .watermark {
-          position: fixed; top: 50%; left: 50%;
-          transform: translate(-50%,-50%) rotate(-35deg);
-          font-size: 80px; font-weight: 900; color: rgba(14,165,233,0.07);
-          white-space: nowrap; pointer-events: none; z-index: 0; letter-spacing: 10px;
-        }
-        .content { position: relative; z-index: 1; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0ea5e9; padding-bottom: 16px; margin-bottom: 20px; }
-        .company-name { font-size: 20px; font-weight: 900; color: #0ea5e9; }
-        .company-sub { font-size: 10px; color: #64748b; margin-top: 2px; }
-        .invoice-title { text-align: right; }
-        .invoice-title h1 { font-size: 26px; font-weight: 900; color: #0f172a; letter-spacing: 2px; }
-        .invoice-title .inv-no { font-size: 13px; font-weight: 700; color: #0ea5e9; margin-top: 4px; }
-        .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-        .meta-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
-        .meta-label { font-size: 9px; text-transform: uppercase; font-weight: 700; color: #94a3b8; margin-bottom: 4px; }
-        .meta-val { font-weight: 700; color: #0f172a; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        thead th { background: #0f172a; color: white; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; }
-        thead th:last-child { text-align: right; }
-        tbody tr:nth-child(even) { background: #f8fafc; }
-        tbody td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; }
-        tbody td:last-child { text-align: right; font-weight: 700; }
-        .totals { display: flex; justify-content: flex-end; }
-        .totals-box { width: 260px; }
-        .tot-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12px; border-bottom: 1px solid #e2e8f0; }
-        .tot-row.net { font-size: 15px; font-weight: 900; color: #0ea5e9; border-top: 2px solid #0ea5e9; border-bottom: none; padding-top: 8px; }
-        .footer { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #e2e8f0; padding-top: 16px; }
-        .sig-line { border-top: 1px solid #94a3b8; width: 160px; text-align: center; padding-top: 4px; font-size: 10px; color: #64748b; margin-top: 40px; }
-        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:Arial,sans-serif;font-size:10px;color:#1e293b;background:#fff;}
+        .page{width:297mm;min-height:210mm;padding:10mm 12mm;position:relative;margin:0 auto;}
+        .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);
+          font-size:100px;font-weight:900;color:rgba(14,165,233,0.035);white-space:nowrap;
+          pointer-events:none;z-index:0;letter-spacing:14px;}
+        .body{position:relative;z-index:1;}
+        /* ─ Header ─ */
+        .hdr{display:flex;justify-content:space-between;align-items:flex-start;
+          border-bottom:2.5px double #0284c7;padding-bottom:10px;margin-bottom:10px;}
+        .co-name{font-size:17px;font-weight:900;color:#0284c7;letter-spacing:-0.5px;}
+        .co-sub{font-size:9px;color:#64748b;margin-top:3px;line-height:1.6;}
+        .co-lic{font-family:monospace;font-size:8.5px;color:#0f172a;margin-top:4px;font-weight:700;line-height:1.5;}
+        .inv-r{text-align:right;}
+        .inv-r h1{font-size:22px;font-weight:900;color:#0f172a;letter-spacing:3px;text-transform:uppercase;}
+        .inv-r .ino{font-size:13px;font-weight:700;color:#0284c7;font-family:monospace;margin-top:3px;}
+        .inv-r .imeta{font-size:9px;color:#475569;margin-top:3px;line-height:1.7;}
+        /* ─ Bill / Ship ─ */
+        .bill-row{display:flex;gap:8px;margin-bottom:8px;}
+        .bbox{flex:1;border:1px solid #e2e8f0;border-radius:5px;padding:8px;}
+        .blbl{font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:4px;}
+        .bname{font-size:12px;font-weight:800;color:#0f172a;}
+        .bsub{font-size:8.5px;color:#64748b;margin-top:2px;line-height:1.5;}
+        /* ─ Items Table ─ */
+        table.items{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:9.5px;}
+        table.items thead th{background:#1e293b;color:#fff;padding:6px 6px;text-align:left;
+          font-size:8px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;white-space:nowrap;}
+        table.items thead th.c{text-align:center;}
+        table.items thead th.r{text-align:right;}
+        table.items tfoot td{background:#f1f5f9;padding:5px 6px;font-size:9.5px;border-top:1px solid #cbd5e1;}
+        /* ─ HSN Summary ─ */
+        table.hsn{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:10px;}
+        table.hsn thead th{background:#f1f5f9;padding:5px 8px;text-align:left;font-weight:700;
+          border:1px solid #e2e8f0;font-size:8px;text-transform:uppercase;}
+        table.hsn tbody td{border:1px solid #e2e8f0;}
+        /* ─ Totals ─ */
+        .tot-wrap{display:flex;justify-content:flex-end;margin-bottom:10px;}
+        .tot-box{width:220px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;}
+        .trow{display:flex;justify-content:space-between;padding:5px 10px;border-bottom:1px solid #f1f5f9;font-size:10px;}
+        .trow.net{background:#1e293b;color:#38bdf8;font-weight:900;font-size:13px;border:none;padding:8px 10px;}
+        /* ─ Footer ─ */
+        .foot{display:flex;justify-content:space-between;align-items:flex-end;
+          border-top:1px solid #e2e8f0;padding-top:10px;margin-top:4px;}
+        .terms{font-size:8px;color:#94a3b8;max-width:340px;line-height:1.6;}
+        .sig{text-align:center;}
+        .sig-line{border-top:1px solid #94a3b8;width:150px;padding-top:3px;font-size:8px;color:#64748b;margin-top:32px;}
+        @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
       </style></head><body>
       <div class="page">
-        <div class="watermark">METAPHARSIC</div>
-        <div class="content">${el.innerHTML}</div>
+        <div class="wm">${COMPANY.name.split(' ')[0].toUpperCase()}</div>
+        <div class="body">
+
+          <!-- HEADER -->
+          <div class="hdr">
+            <div style="display:flex;align-items:flex-start;gap:12px;">
+              <img src="${window.location.origin}${COMPANY.logo}" alt="logo"
+                style="height:56px;width:56px;object-fit:contain;border:1px solid #e2e8f0;border-radius:10px;padding:4px;"
+                onerror="this.style.display='none'" />
+              <div>
+                <div class="co-name">${COMPANY.name}</div>
+                <div class="co-sub">${COMPANY.address}<br>${COMPANY.phone} &nbsp;·&nbsp; ${COMPANY.email}</div>
+                <div class="co-lic">GSTIN: ${COMPANY.gstin}<br>D.L. No.: ${COMPANY.dl}</div>
+              </div>
+            </div>
+            <div class="inv-r">
+              <h1>Tax Invoice</h1>
+              <div class="ino">${inv2.invoice_no}</div>
+              <div class="imeta">
+                Date: <strong>${fmtDate(inv2.invoice_date)}</strong><br>
+                Payment: <strong>${inv2.payment_mode || 'Credit'}</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- BILL TO -->
+          <div class="bill-row">
+            <div class="bbox">
+              <div class="blbl">Bill To / Consignee</div>
+              <div class="bname">${inv2.party_name}</div>
+              <div class="bsub">${inv2.party_address || ''}${inv2.gstin ? '<br>GSTIN: ' + inv2.gstin : ''}${inv2.party_phone ? '<br>Ph: ' + inv2.party_phone : ''}</div>
+            </div>
+            <div class="bbox" style="max-width:200px;background:#f0f9ff;border-color:#bae6fd;">
+              <div class="blbl" style="color:#0369a1;">Invoice Summary</div>
+              <div style="font-size:9px;line-height:2;">
+                <span style="color:#64748b;">Items: </span><strong>${invoiceItems.length}</strong><br>
+                <span style="color:#64748b;">Taxable: </span><strong>₹${inr(subTotal)}</strong><br>
+                <span style="color:#d97706;">CGST+SGST: </span><strong style="color:#d97706;">₹${inr(gstTotal)}</strong><br>
+                <span style="color:#0284c7;font-weight:800;">Net Payable: </span><strong style="color:#0284c7;font-size:12px;">₹${inr(netPayable)}</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- ITEMS TABLE -->
+          <table class="items">
+            <thead><tr>
+              <th class="c" style="width:24px;">#</th>
+              <th style="min-width:130px;">Product Name</th>
+              <th class="c" style="width:62px;">Batch No</th>
+              <th class="c" style="width:46px;">Expiry</th>
+              <th class="c" style="width:34px;">Qty</th>
+              <th class="c" style="width:34px;">Free</th>
+              <th class="c" style="width:46px;">Scheme</th>
+              <th class="r" style="width:52px;">MRP</th>
+              <th class="r" style="width:52px;">PTR</th>
+              <th class="r" style="width:62px;">Taxable</th>
+              <th class="c" style="width:34px;">GST%</th>
+              <th class="r" style="width:52px;">CGST</th>
+              <th class="r" style="width:52px;">SGST</th>
+              <th class="r" style="width:64px;">Amount</th>
+            </tr></thead>
+            <tbody>${itemRows || '<tr><td colspan="14" style="text-align:center;padding:16px;color:#94a3b8;">No items</td></tr>'}</tbody>
+            <tfoot>
+              <tr>
+                <td colspan="9" style="text-align:right;font-weight:700;font-size:8px;text-transform:uppercase;color:#64748b;">Taxable Sub-Total</td>
+                <td style="text-align:right;font-weight:700;">₹${inr(subTotal)}</td>
+                <td></td>
+                <td style="text-align:right;font-weight:700;">₹${inr(cgst)}</td>
+                <td style="text-align:right;font-weight:700;">₹${inr(sgst)}</td>
+                <td style="text-align:right;font-weight:800;">₹${inr(netPayable)}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <!-- HSN-WISE TAX SUMMARY -->
+          <div style="margin-bottom:10px;">
+            <div style="font-size:8px;font-weight:800;text-transform:uppercase;color:#64748b;letter-spacing:1px;margin-bottom:4px;">GST / Tax Summary</div>
+            <table class="hsn">
+              <thead><tr>
+                <th>GST Rate</th>
+                <th style="text-align:right;">Taxable Value</th>
+                <th style="text-align:center;">CGST Rate</th>
+                <th style="text-align:right;">CGST Amt</th>
+                <th style="text-align:center;">SGST Rate</th>
+                <th style="text-align:right;">SGST Amt</th>
+                <th style="text-align:right;">Total Tax</th>
+              </tr></thead>
+              <tbody>${gstSummaryRows}</tbody>
+            </table>
+          </div>
+
+          <!-- NET TOTALS -->
+          <div class="tot-wrap">
+            <div class="tot-box">
+              <div class="trow"><span style="color:#64748b;">Sub-Total (Taxable)</span><span style="font-weight:700;">₹${inr(subTotal)}</span></div>
+              <div class="trow"><span style="color:#64748b;">CGST</span><span style="font-weight:700;">₹${inr(cgst)}</span></div>
+              <div class="trow"><span style="color:#64748b;">SGST</span><span style="font-weight:700;">₹${inr(sgst)}</span></div>
+              ${roundOff !== 0 ? `<div class="trow"><span style="color:#64748b;">Round Off</span><span>${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</span></div>` : ''}
+              <div class="trow net"><span>Net Payable</span><span>₹${netFinal.toLocaleString('en-IN')}</span></div>
+            </div>
+          </div>
+
+          <!-- FOOTER -->
+          <div class="foot">
+            <div class="terms">
+              <strong style="color:#0f172a;">Terms &amp; Conditions:</strong><br>
+              1. Goods once sold will not be taken back without prior written approval.<br>
+              2. Interest @ 18% p.a. on overdue amounts after due date.<br>
+              3. All disputes subject to local jurisdiction only.<br>
+              4. E. &amp; O.E. — This is a computer generated invoice.
+            </div>
+            <div class="sig">
+              <div style="font-size:8px;color:#64748b;">For</div>
+              <div style="font-weight:800;font-size:10px;color:#0f172a;margin-top:2px;">${COMPANY.name}</div>
+              <div class="sig-line">Authorised Signatory</div>
+            </div>
+          </div>
+
+        </div>
       </div>
       <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}</script>
       </body></html>`);
@@ -266,7 +468,15 @@ const Sales: React.FC = () => {
                 key: 'actions', label: 'Actions', width: '14%', align: 'center',
                 render: (_: any, row: any) => (
                   <div className="flex items-center justify-center gap-1">
-                    <button onClick={() => { setSelectedInvoice(row); setShowDetailsModal(true); }} title="View Invoice"
+                    <button onClick={async () => {
+                      setSelectedInvoice(row); setShowDetailsModal(true); setInvoiceItems([]); setInvoiceFull(null);
+                      setLoadingItems(true);
+                      try {
+                        const r = await apiClient.get(`/api/sales/${row.id}`);
+                        if (r.success) { setInvoiceItems(r.data.items || []); setInvoiceFull(r.data); }
+                        else console.error('Sales detail API error:', r);
+                      } catch (e) { console.error('Sales detail fetch failed:', e); } finally { setLoadingItems(false); }
+                    }} title="View Invoice"
                       className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors">
                       <ExternalLink size={15} />
                     </button>
@@ -416,93 +626,129 @@ const Sales: React.FC = () => {
           </div>
 
           <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/60">
-            <div className="flex justify-between items-center mb-3">
-              <p className="text-xs font-bold text-slate-500 uppercase">Add Product</p>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Scheme:</span>
-                <button type="button" onClick={() => handleSchemeToggle('none')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${pendingItem.scheme_type === 'none' ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-slate-300 hover:border-slate-500'}`}>
-                  None
-                </button>
-                <button type="button" onClick={() => handleSchemeToggle('10+7')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${pendingItem.scheme_type === '10+7' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-300 hover:border-emerald-400'}`}>
-                  10+7 Free
-                </button>
-                {pendingItem.scheme_type === '10+7' && (
-                  <span className="text-[10px] text-emerald-600 font-bold">
-                    Eff. price = MRP×10÷17
-                  </span>
-                )}
-              </div>
-            </div>
+            <p className="text-xs font-bold text-slate-500 uppercase mb-3">Add Product Line</p>
             <div className="grid grid-cols-12 gap-2 items-end">
-              <div className="col-span-5">
-                <label className="block text-[10px] text-slate-400 font-bold mb-1">Product</label>
+              {/* Product */}
+              <div className="col-span-4">
+                <label className="block text-[10px] text-slate-400 font-bold mb-1">Product *</label>
                 <select className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                   value={pendingItem.product_id} onChange={(e) => handleProductSelect(e.target.value)}>
-                  <option value="">Select product...</option>
+                  <option value="">Select product…</option>
                   {(productsData || []).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
-              <div className="col-span-2">
+              {/* Qty */}
+              <div className="col-span-1">
                 <label className="block text-[10px] text-slate-400 font-bold mb-1">Qty</label>
                 <input type="number" min="1" className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                   value={pendingItem.quantity} onChange={(e) => setPendingItem(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))} />
               </div>
+              {/* Scheme dropdown */}
               <div className="col-span-2">
-                <label className="block text-[10px] text-slate-400 font-bold mb-1">PTR (₹)</label>
+                <label className="block text-[10px] text-slate-400 font-bold mb-1">Scheme</label>
+                <select className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                  value={pendingItem.scheme_type}
+                  onChange={(e) => handleSchemeToggle(e.target.value)}>
+                  <option value="none">No Scheme</option>
+                  <option value="10+7">10+7 (7 Free)</option>
+                  <option value="10+1">10+1 (1 Free)</option>
+                  <option value="5+1">5+1 (1 Free)</option>
+                  <option value="2+1">2+1 (1 Free)</option>
+                  <option value="1+1">1+1 (1 Free)</option>
+                  <option value="custom">Custom Free Qty</option>
+                </select>
+              </div>
+              {/* Free Strips — shown only for custom or auto-calculated schemes */}
+              <div className="col-span-1">
+                <label className="block text-[10px] text-slate-400 font-bold mb-1">
+                  {pendingItem.scheme_type === 'custom' ? 'Free Qty' : 'Free (auto)'}
+                </label>
+                <input type="number" min="0"
+                  readOnly={pendingItem.scheme_type !== 'custom' && pendingItem.scheme_type !== 'none'}
+                  className={`w-full border rounded-lg px-2 py-1.5 text-sm ${pendingItem.scheme_type === 'custom' ? 'bg-white border-emerald-400 focus:ring-2 focus:ring-emerald-400' : 'bg-slate-100 border-slate-200 text-slate-500'}`}
+                  value={pendingItem.free_strips || 0}
+                  onChange={(e) => pendingItem.scheme_type === 'custom' && setPendingItem(prev => ({ ...prev, free_strips: parseInt(e.target.value) || 0 }))} />
+              </div>
+              {/* PTR */}
+              <div className="col-span-2">
+                <label className="block text-[10px] text-slate-400 font-bold mb-1">PTR ₹ {pendingItem.scheme_type !== 'none' ? <span className="text-emerald-600">(eff.)</span> : null}</label>
                 <input type="number" min="0" step="0.01" className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
                   value={pendingItem.rate} onChange={(e) => setPendingItem(prev => ({ ...prev, rate: parseFloat(e.target.value) || 0 }))} />
               </div>
-              <div className="col-span-2">
-                <label className="block text-[10px] text-slate-400 font-bold mb-1">GST %</label>
-                <input type="number" min="0" max="28" className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-                  value={pendingItem.gst_percent} onChange={(e) => setPendingItem(prev => ({ ...prev, gst_percent: parseFloat(e.target.value) || 0 }))} />
-              </div>
+              {/* GST */}
               <div className="col-span-1">
+                <label className="block text-[10px] text-slate-400 font-bold mb-1">GST %</label>
+                <select className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                  value={pendingItem.gst_percent} onChange={(e) => setPendingItem(prev => ({ ...prev, gst_percent: parseFloat(e.target.value) }))}>
+                  <option value="0">0%</option>
+                  <option value="5">5%</option>
+                  <option value="12">12%</option>
+                  <option value="18">18%</option>
+                  <option value="28">28%</option>
+                </select>
+              </div>
+              {/* Add button */}
+              <div className="col-span-1">
+                <label className="block text-[10px] text-slate-400 font-bold mb-1">&nbsp;</label>
                 <button type="button" onClick={handleAddItem} className="w-full py-1.5 bg-primary text-white rounded-lg text-xs font-bold hover:bg-sky-600">+ Add</button>
               </div>
             </div>
+            {/* Scheme info bar */}
+            {pendingItem.scheme_type !== 'none' && (
+              <div className="mt-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-[10px] text-emerald-700 font-bold">
+                <span className="bg-emerald-600 text-white px-1.5 py-0.5 rounded font-black">{pendingItem.scheme_type}</span>
+                {pendingItem.scheme_type === '10+7' && <span>Effective PTR = MRP × 10 ÷ 17 &nbsp;·&nbsp; {pendingItem.free_strips || 0} strips FREE per box</span>}
+                {pendingItem.scheme_type !== '10+7' && pendingItem.scheme_type !== 'custom' && <span>{pendingItem.free_strips || 0} strip(s) FREE with every purchase</span>}
+                {pendingItem.scheme_type === 'custom' && <span>Enter free qty manually above</span>}
+                &nbsp;·&nbsp; MRP ₹{Number(pendingItem.mrp || 0).toFixed(2)}
+              </div>
+            )}
           </div>
 
           <div className="border rounded-xl overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b">
+              <thead className="bg-slate-900 text-white">
                 <tr>
-                  <th className="px-4 py-2 text-left">Product</th>
-                  <th className="px-4 py-2 text-center w-20">Boxes</th>
-                  <th className="px-4 py-2 text-center w-32">Scheme</th>
-                  <th className="px-4 py-2 text-right w-28">Eff. PTR</th>
-                  <th className="px-4 py-2 text-right w-20">GST%</th>
-                  <th className="px-4 py-2 text-right w-32">Amount</th>
-                  <th className="px-4 py-2 w-10"></th>
+                  <th className="px-3 py-2 text-left text-xs font-bold">#</th>
+                  <th className="px-3 py-2 text-left text-xs font-bold">Product</th>
+                  <th className="px-3 py-2 text-center text-xs font-bold w-14">Qty</th>
+                  <th className="px-3 py-2 text-center text-xs font-bold w-16 text-emerald-400">Free Strips</th>
+                  <th className="px-3 py-2 text-center text-xs font-bold w-24">Scheme</th>
+                  <th className="px-3 py-2 text-right text-xs font-bold w-24">PTR (Eff.)</th>
+                  <th className="px-3 py-2 text-right text-xs font-bold w-16">GST%</th>
+                  <th className="px-3 py-2 text-right text-xs font-bold w-28">Amount</th>
+                  <th className="px-3 py-2 w-8"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {invoiceForm.items.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400 italic">No items yet. Use picker above.</td></tr>
-                ) : invoiceForm.items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td className="px-4 py-2">
-                      <div className="font-medium">{item.name}</div>
-                      {item.scheme_type === '10+7' && item.mrp > 0 && (
-                        <div className="text-[10px] text-slate-400 mt-0.5">MRP ₹{parseFloat(item.mrp).toFixed(2)}/strip · Eff ₹{item.rate}/strip</div>
-                      )}
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400 italic text-sm">No items yet — use picker above.</td></tr>
+                ) : invoiceForm.items.map((item, idx) => {
+                  const hasScheme = item.scheme_type && item.scheme_type !== 'none';
+                  const freeStrips = hasScheme ? (item.free_strips || 0) : 0;
+                  return (
+                  <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                    <td className="px-3 py-2 text-slate-400 text-xs">{idx+1}</td>
+                    <td className="px-3 py-2">
+                      <div className="font-semibold text-slate-800">{item.name}</div>
+                      {item.mrp > 0 && <div className="text-[10px] text-slate-400">MRP ₹{Number(item.mrp).toFixed(2)}</div>}
                     </td>
-                    <td className="px-4 py-2 text-center">{item.quantity}</td>
-                    <td className="px-4 py-2 text-center">
-                      {item.scheme_type === '10+7'
-                        ? <span className="inline-block bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">10 paid + 7 free</span>
+                    <td className="px-3 py-2 text-center font-bold">{item.quantity}</td>
+                    <td className="px-3 py-2 text-center font-bold text-emerald-600">{hasScheme && freeStrips > 0 ? freeStrips : <span className="text-slate-300">—</span>}</td>
+                    <td className="px-3 py-2 text-center">
+                      {hasScheme
+                        ? <span className="inline-block bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200">{item.scheme_type}</span>
                         : <span className="text-slate-300 text-xs">—</span>}
                     </td>
-                    <td className="px-4 py-2 text-right">₹{parseFloat(item.rate).toFixed(2)}</td>
-                    <td className="px-4 py-2 text-right">{item.gst_percent}%</td>
-                    <td className="px-4 py-2 text-right font-semibold">₹{(item.quantity * item.rate).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                    <td className="px-4 py-2 text-center">
+                    <td className="px-3 py-2 text-right font-bold text-sky-700">₹{Number(item.rate).toFixed(2)}</td>
+                    <td className="px-3 py-2 text-right text-slate-500">{item.gst_percent}%</td>
+                    <td className="px-3 py-2 text-right font-bold">₹{(item.quantity * item.rate).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                    <td className="px-3 py-2 text-center">
                       <button type="button" onClick={() => { const ni = [...invoiceForm.items]; ni.splice(idx, 1); setInvoiceForm({ ...invoiceForm, items: ni }); }} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
               {invoiceForm.items.length > 0 && (
                 <tfoot className="bg-slate-50 text-sm">
@@ -539,9 +785,9 @@ const Sales: React.FC = () => {
                 <Badge text={inv.status} variant={inv.status === 'Completed' ? 'success' : inv.status === 'Cancelled' ? 'danger' : 'warning'} />
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={handlePrint}
-                  className="flex items-center gap-2 px-4 py-1.5 bg-sky-500 text-white text-sm font-bold rounded-lg hover:bg-sky-400 transition-colors">
-                  <Printer size={15} /> Print Invoice
+                <button onClick={handlePrint} disabled={loadingItems}
+                  className="flex items-center gap-2 px-4 py-1.5 bg-sky-500 text-white text-sm font-bold rounded-lg hover:bg-sky-400 transition-colors disabled:opacity-50 disabled:cursor-wait">
+                  <Printer size={15} /> {loadingItems ? 'Loading…' : 'Print Invoice'}
                 </button>
                 <button onClick={() => setShowDetailsModal(false)} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"><X size={18} /></button>
               </div>
@@ -591,15 +837,60 @@ const Sales: React.FC = () => {
                 </div>
               </div>
 
-              {/* Totals */}
-              <div className="flex justify-end">
-                <div className="w-64 bg-slate-800 text-white rounded-xl p-4 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-slate-400">Sub Total</span><span className="font-bold">₹{invSubTotal.toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span className="text-orange-300">GST</span><span className="font-bold text-orange-300">₹{invGst.toLocaleString()}</span></div>
-                  <div className="border-t border-slate-600 pt-2 flex justify-between text-sky-400 font-black text-base">
-                    <span>Net Payable</span><span>₹{invNet.toLocaleString()}</span>
-                  </div>
-                </div>
+              {/* Line Items */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                {loadingItems ? (
+                  <div className="flex items-center justify-center py-8 gap-2 text-slate-400"><Loader2 size={16} className="animate-spin" /> Loading items…</div>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-slate-900 text-white">
+                        <th className="px-3 py-2 text-left w-6">#</th>
+                        <th className="px-3 py-2 text-left">Product</th>
+                        <th className="px-3 py-2 text-center w-16">Batch</th>
+                        <th className="px-3 py-2 text-center w-14">Expiry</th>
+                        <th className="px-3 py-2 text-center w-10">Qty</th>
+                        <th className="px-3 py-2 text-center w-12 text-emerald-400">Free</th>
+                        <th className="px-3 py-2 text-center w-16 text-emerald-300">Scheme</th>
+                        <th className="px-3 py-2 text-right w-16">MRP</th>
+                        <th className="px-3 py-2 text-right w-16">PTR</th>
+                        <th className="px-3 py-2 text-center w-12">GST%</th>
+                        <th className="px-3 py-2 text-right w-20">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {invoiceItems.length === 0 ? (
+                        <tr><td colSpan={11} className="px-3 py-6 text-center text-slate-400 italic">No items</td></tr>
+                      ) : invoiceItems.map((item, i) => {
+                        const freeQty = Number(item.free_quantity) || 0;
+                        const schemeType = item.scheme_type && item.scheme_type !== 'none' ? item.scheme_type : '';
+                        const hasScheme = freeQty > 0 || !!schemeType;
+                        const schemeLabel = schemeType || (freeQty > 0 ? `+${freeQty} Free` : '—');
+                        const expiry = item.expiry ? (() => { try { const d = new Date(item.expiry); return `${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; } catch { return item.expiry; } })() : '—';
+                        return (
+                          <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="px-3 py-2 text-slate-400">{i+1}</td>
+                            <td className="px-3 py-2 font-semibold text-slate-800">{item.product_name}</td>
+                            <td className="px-3 py-2 text-center font-mono text-slate-500">{item.batch_no || '—'}</td>
+                            <td className="px-3 py-2 text-center text-slate-500">{expiry}</td>
+                            <td className="px-3 py-2 text-center font-bold">{item.quantity}</td>
+                            <td className="px-3 py-2 text-center font-bold text-emerald-600">{hasScheme ? freeQty : <span className="text-slate-300">—</span>}</td>
+                            <td className="px-3 py-2 text-center text-xs font-bold text-emerald-700">{schemeLabel}</td>
+                            <td className="px-3 py-2 text-right text-slate-600">₹{Number(item.mrp||0).toFixed(2)}</td>
+                            <td className="px-3 py-2 text-right font-bold text-sky-700">₹{Number(item.ptr||0).toFixed(2)}</td>
+                            <td className="px-3 py-2 text-center text-slate-500">{item.gst_percent||12}%</td>
+                            <td className="px-3 py-2 text-right font-bold">₹{Number(item.total_amount||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-50"><td colSpan={10} className="px-3 py-2 text-right text-[10px] font-bold uppercase text-slate-500">Taxable</td><td className="px-3 py-2 text-right font-bold">₹{invSubTotal.toLocaleString()}</td></tr>
+                      <tr className="bg-slate-50"><td colSpan={10} className="px-3 py-2 text-right text-[10px] font-bold uppercase text-orange-500">GST</td><td className="px-3 py-2 text-right font-bold text-orange-500">₹{invGst.toLocaleString()}</td></tr>
+                      <tr className="bg-slate-900"><td colSpan={10} className="px-3 py-3 text-right font-black text-sky-400 text-sm uppercase tracking-wide">Net Payable</td><td className="px-3 py-3 text-right font-black text-sky-400 text-base">₹{invNet.toLocaleString()}</td></tr>
+                    </tfoot>
+                  </table>
+                )}
               </div>
 
               {/* Footer note */}
