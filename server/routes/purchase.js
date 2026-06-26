@@ -146,7 +146,16 @@ router.post('/', async (req, res) => {
       supplier_id,
       order_date,
       category_id = 'GENERAL',
-      items = []
+      items = [],
+      supplier_invoice_no,
+      invoice_date,
+      lr_no, lr_date,
+      order_no, cases,
+      order_date_supp, due_date,
+      ewaybill_no, transport, weight,
+      payment_mode = 'CREDIT',
+      igst_total = 0, cgst_total = 0, sgst_total = 0,
+      discount_total = 0, round_off = 0, grand_total = 0
     } = req.body;
 
     if (!invoice_no || !supplier_id || !order_date) {
@@ -156,7 +165,11 @@ router.post('/', async (req, res) => {
     await client.query('BEGIN');
 
     // 1. Calculate Total Amount
-    const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.purchase_rate), 0);
+    const totalAmount = Number(grand_total) || items.reduce((sum, item) => {
+      const qty=Number(item.quantity)||0, rate=Number(item.purchase_rate)||0;
+      const disc=Number(item.discount_percent)||0, gst=Number(item.gst_rate)||0;
+      return sum + rate*qty*(1-disc/100)*(1+gst/100);
+    }, 0);
 
     // 2. BUDGET CONTROL CHECK
     const { rows: budget } = await client.query(
@@ -183,11 +196,18 @@ router.post('/', async (req, res) => {
 
     // 3. Insert purchase order
     const { rows: poResult } = await client.query(
-      `INSERT INTO purchase_orders 
-       (po_number, supplier_id, date, status, created_by)
-       VALUES ($1, $2, $3, 'Draft', $4)
+      `INSERT INTO purchase_orders
+       (po_number, supplier_id, date, status, created_by, category_id,
+        supplier_invoice_no, invoice_date, lr_no, lr_date, order_no, cases,
+        order_date_supp, due_date, ewaybill_no, transport, weight, payment_mode,
+        igst_total, cgst_total, sgst_total, discount_total, round_off, grand_total, total_amount)
+       VALUES ($1,$2,$3,'Draft',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
        RETURNING id`,
-      [invoice_no, supplier_id, order_date, req.user.userId]
+      [invoice_no, supplier_id, order_date, req.user.userId, category_id,
+       supplier_invoice_no||null, invoice_date||null, lr_no||null, lr_date||null,
+       order_no||null, cases||0, order_date_supp||null, due_date||null,
+       ewaybill_no||null, transport||null, weight||null, payment_mode,
+       igst_total, cgst_total, sgst_total, discount_total, round_off, grand_total, totalAmount]
     );
 
     const poId = poResult[0].id;
@@ -201,17 +221,21 @@ router.post('/', async (req, res) => {
       const gstRate = Number(item.gst_rate) || 0;
       const taxableAmt = rate * qty - discAmt;
       const total = taxableAmt * (1 + gstRate / 100);
+      const igstAmt = taxableAmt * gstRate / 100;
       await client.query(
         `INSERT INTO purchase_order_items
          (po_id, product_id, quantity, unit_price, total_amount, mrp, gst_rate, batch_no, expiry_date,
-          free_quantity, scheme_type, discount_percent, pack_type, units_per_pack, ptr)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+          free_quantity, scheme_type, discount_percent, pack_type, units_per_pack, ptr,
+          hsn_code, manufacturer_code, old_mrp, igst_amount, taxable_value,
+          is_charge, charge_description)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
         [
-          poId, item.product_id, qty, rate, total,
-          item.mrp || 0, gstRate, item.batch_no || null, item.expiry_date || null,
-          Number(item.free_quantity) || 0, item.scheme_type || null,
-          discPct, item.pack_type || 'Strip',
-          Number(item.units_per_pack) || 10, Number(item.ptr) || rate
+          poId, item.product_id||null, qty, rate, total,
+          item.mrp||0, gstRate, item.batch_no||null, item.expiry_date||null,
+          Number(item.free_quantity)||0, item.scheme_type||null,
+          discPct, item.pack_type||'Strip', Number(item.units_per_pack)||10, Number(item.ptr)||rate,
+          item.hsn_code||null, item.manufacturer_code||null, item.old_mrp||0,
+          igstAmt, taxableAmt, item.is_charge||false, item.charge_description||null
         ]
       );
     }
@@ -465,8 +489,15 @@ router.get('/:id', async (req, res, next) => {
   }
   try {
     const { rows: purchase } = await db.query(
-      `SELECT po.id, po.company_id, po.supplier_id, po.po_number as invoice_no, po.date as order_date, po.total_amount, po.status, po.created_by, po.created_at, po.updated_at,
-              s.name as supplier_name, NULL as supplier_code, s.gstin, s.mobile, s.email, s.address, s.city
+      `SELECT po.id, po.company_id, po.supplier_id, po.po_number as invoice_no, po.date as order_date,
+              po.total_amount, po.status, po.created_by, po.created_at, po.updated_at,
+              po.supplier_invoice_no, po.invoice_date, po.lr_no, po.lr_date,
+              po.order_no, po.cases, po.order_date_supp, po.due_date,
+              po.ewaybill_no, po.transport, po.weight, po.payment_mode,
+              po.igst_total, po.cgst_total, po.sgst_total, po.discount_total, po.round_off, po.grand_total,
+              s.name as supplier_name, s.gstin as supplier_gstin, s.mobile as supplier_mobile,
+              s.email as supplier_email, s.address as supplier_address, s.city as supplier_city,
+              s.drug_license_no as supplier_dl
        FROM purchase_orders po
        LEFT JOIN parties s ON po.supplier_id = s.id
        WHERE po.id = $1`,
@@ -479,9 +510,11 @@ router.get('/:id', async (req, res, next) => {
 
     const { rows: items } = await db.query(
       `SELECT poi.id, poi.po_id, poi.product_id, poi.quantity, poi.unit_price as purchase_rate, poi.total_amount,
-              poi.mrp, poi.gst_rate, poi.batch_no, poi.expiry_date,
+              poi.mrp, poi.old_mrp, poi.gst_rate, poi.batch_no, poi.expiry_date,
               poi.free_quantity, poi.scheme_type, poi.discount_percent, poi.pack_type, poi.units_per_pack, poi.ptr,
-              poi.created_at, p.name as product_name, p.code as product_code
+              poi.hsn_code, poi.manufacturer_code, poi.igst_amount, poi.taxable_value,
+              poi.is_charge, poi.charge_description,
+              poi.created_at, p.name as product_name, p.code as product_code, p.hsn_code as p_hsn
        FROM purchase_order_items poi
        LEFT JOIN products p ON poi.product_id = p.id
        WHERE poi.po_id = $1

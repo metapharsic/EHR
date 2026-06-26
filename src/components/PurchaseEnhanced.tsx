@@ -128,8 +128,36 @@ const PurchaseEnhanced: React.FC = () => {
 
  setIsCreating(true);
  try {
+ // compute totals for submission
+ let igstTotal=0, discTotal=0, grandTotal=0;
+ newOrderItems.forEach(item => {
+ const qty=Number(item.quantity)||0, rate=Number(item.purchase_rate)||0;
+ const disc=Number(item.discount_percent)||0, gst=Number(item.gst_rate)||0;
+ const taxable=rate*qty*(1-disc/100);
+ igstTotal+=taxable*gst/100; discTotal+=rate*qty*disc/100; grandTotal+=taxable*(1+gst/100);
+ });
+ const roundOff = Math.round(grandTotal)-grandTotal;
  const response = await apiClient.post('/api/purchase', {
- ...newOrderForm,
+ invoice_no: (newOrderForm as any).supplier_invoice_no || newOrderForm.invoice_no,
+ supplier_invoice_no: (newOrderForm as any).supplier_invoice_no,
+ supplier_id: newOrderForm.supplier_id,
+ order_date: (newOrderForm as any).invoice_date || newOrderForm.order_date,
+ invoice_date: (newOrderForm as any).invoice_date,
+ lr_no: (newOrderForm as any).lr_no,
+ lr_date: (newOrderForm as any).lr_date,
+ order_no: (newOrderForm as any).order_no,
+ cases: (newOrderForm as any).cases,
+ order_date_supp: newOrderForm.order_date,
+ due_date: (newOrderForm as any).due_date,
+ ewaybill_no: (newOrderForm as any).ewaybill_no,
+ transport: (newOrderForm as any).transport,
+ weight: (newOrderForm as any).weight,
+ payment_mode: (newOrderForm as any).payment_mode || 'CREDIT',
+ category_id: newOrderForm.category_id,
+ igst_total: igstTotal,
+ discount_total: discTotal,
+ round_off: roundOff,
+ grand_total: grandTotal+roundOff,
  items: newOrderItems
  });
 
@@ -1048,220 +1076,309 @@ const PurchaseEnhanced: React.FC = () => {
  </Modal>
 
  {/* New Purchase Modal */}
- <Modal 
- isOpen={isNewPurchaseModalOpen} 
+ <Modal
+ isOpen={isNewPurchaseModalOpen}
  onClose={() => setIsNewPurchaseModalOpen(false)}
- title="Intelligence-Driven Procurement"
- size="lg"
+ title="GST Purchase Invoice Entry"
+ size="xl"
  >
- <div className="space-y-8">
- <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
- <div className="space-y-6">
+ <div className="space-y-4 text-xs">
+
+ {/* === HEADER GRID === */}
+ <div className="border border-slate-300 rounded-lg overflow-hidden">
+ <div className="bg-slate-700 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5">Supplier & Invoice Details</div>
+ <div className="grid grid-cols-2 divide-x divide-slate-200">
+ {/* LEFT: Supplier */}
+ <div className="p-3 space-y-2">
  <div>
- <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Strategic Supplier</label>
- <select 
- className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700 focus:ring-2 focus:ring-blue-500/20"
- value={newOrderForm.supplier_id}
+ <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Supplier / Manufacturer *</label>
+ <select value={newOrderForm.supplier_id}
  onChange={(e) => setNewOrderForm({...newOrderForm, supplier_id: e.target.value})}
- >
- <option value="">Select Partner...</option>
- {lists?.suppliers?.map((s: any) => (
- <option key={s.id} value={s.id}>{s.name}</option>
+ className="w-full border border-slate-300 rounded px-2 py-1 font-bold text-slate-800 outline-none mt-0.5">
+ <option value="">Select...</option>
+ {lists?.suppliers?.map((s:any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+ </select>
+ </div>
+ <div className="grid grid-cols-2 gap-2">
+ <div>
+ <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ewaybill No</label>
+ <input type="text" placeholder="EWB No" value={(newOrderForm as any).ewaybill_no||''}
+ onChange={(e) => setNewOrderForm({...newOrderForm, ewaybill_no: e.target.value} as any)}
+ className="w-full border border-slate-200 rounded px-2 py-1 outline-none mt-0.5"/>
+ </div>
+ <div>
+ <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Transport</label>
+ <input type="text" placeholder="Carrier" value={(newOrderForm as any).transport||''}
+ onChange={(e) => setNewOrderForm({...newOrderForm, transport: e.target.value} as any)}
+ className="w-full border border-slate-200 rounded px-2 py-1 outline-none mt-0.5"/>
+ </div>
+ </div>
+ <div className="grid grid-cols-2 gap-2">
+ <div>
+ <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Weight</label>
+ <input type="text" placeholder="kg" value={(newOrderForm as any).weight||''}
+ onChange={(e) => setNewOrderForm({...newOrderForm, weight: e.target.value} as any)}
+ className="w-full border border-slate-200 rounded px-2 py-1 outline-none mt-0.5"/>
+ </div>
+ <div>
+ <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Payment Mode</label>
+ <select value={(newOrderForm as any).payment_mode||'CREDIT'}
+ onChange={(e) => setNewOrderForm({...newOrderForm, payment_mode: e.target.value} as any)}
+ className="w-full border border-slate-200 rounded px-2 py-1 outline-none mt-0.5 font-bold">
+ <option>CREDIT</option><option>CASH</option><option>NEFT</option><option>CHEQUE</option>
+ </select>
+ </div>
+ </div>
+ </div>
+ {/* RIGHT: Invoice fields */}
+ <div className="p-3">
+ <table className="w-full text-xs border-collapse">
+ <tbody>
+ {[
+ ['Invoice No *', 'supplier_invoice_no', 'text', newOrderForm.invoice_no],
+ ['Invoice Date *', 'invoice_date', 'date', ''],
+ ['L.R. No', 'lr_no', 'text', ''],
+ ['L.R. Date', 'lr_date', 'date', ''],
+ ['Order No', 'order_no', 'text', ''],
+ ['Cases', 'cases', 'number', ''],
+ ['Order Date', 'order_date', 'date', new Date().toISOString().split('T')[0]],
+ ['Due Date', 'due_date', 'date', ''],
+ ].map(([lbl, key, type]) => (
+ <tr key={key as string} className="border-b border-slate-100">
+ <td className="py-1 pr-2 text-[9px] font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap w-28">{lbl as string}</td>
+ <td className="py-1">
+ <input type={type as string}
+ value={(newOrderForm as any)[key as string] || ''}
+ onChange={(e) => setNewOrderForm({...newOrderForm, [key as string]: e.target.value} as any)}
+ className="w-full border border-slate-200 rounded px-2 py-0.5 font-bold text-slate-800 outline-none focus:border-blue-400"/>
+ </td>
+ </tr>
  ))}
- </select>
- </div>
- <div className="grid grid-cols-2 gap-4">
- <div>
- <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Order Reference</label>
- <input 
- type="text" 
- value={newOrderForm.invoice_no}
- onChange={(e) => setNewOrderForm({...newOrderForm, invoice_no: e.target.value})}
- className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-mono text-sm" 
- />
- </div>
- <div>
- <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Priority</label>
- <select 
- className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-bold text-slate-700"
- value={newOrderForm.priority}
- onChange={(e) => setNewOrderForm({...newOrderForm, priority: e.target.value})}
- >
- <option>Standard</option>
- <option>Urgent</option>
- <option>Emergency</option>
- </select>
+ </tbody>
+ </table>
  </div>
  </div>
  </div>
 
- <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 space-y-4">
- <div className="flex items-center gap-3 text-blue-800 mb-2">
- <Target size={20} />
- <h4 className="font-bold uppercase tracking-tight">Budget Validation</h4>
- </div>
- <p className="text-xs text-accent leading-relaxed font-medium">
- System is automatically validating this order against the **{newOrderForm.category_id.replace('_', ' ')}** budget for **FY2024-Q1**. 
- </p>
- <div className="pt-4 border-t border-blue-100">
- <div className="flex justify-between text-[10px] font-bold text-blue-400 uppercase mb-2">
- <span>Remaining Budget</span>
- <span>{currentBudget ? formatCurrency(Number(currentBudget.budgeted_amount) - Number(currentBudget.spent_amount) - Number(currentBudget.committed_amount)) : 'N/A'}</span>
- </div>
- <div className="h-2 bg-white rounded-full overflow-hidden">
- <div 
- className="h-full bg-accent transition-all duration-1000" 
- style={{ width: currentBudget ? `${Math.min(100, (Number(currentBudget.spent_amount) + Number(currentBudget.committed_amount)) / Number(currentBudget.budgeted_amount) * 100)}%` : '0%' }}
- ></div>
- </div>
- </div>
- </div>
- </div>
-
- <div className="space-y-4">
- <div className="flex justify-between items-center">
- <h4 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Procurement Line Items</h4>
- <div className="flex gap-4 items-center">
- <select 
- className="bg-transparent border-none text-[10px] font-bold text-accent uppercase tracking-widest outline-none cursor-pointer"
- value={newOrderForm.category_id}
- onChange={(e) => setNewOrderForm({...newOrderForm, category_id: e.target.value})}
- >
- <option value="RAW_MATERIALS">Raw Materials</option>
- <option value="PACKAGING">Packaging</option>
- <option value="LAB_EQUIPMENT">Lab Equipment</option>
- </select>
- <button 
- onClick={() => setIsNewProductModalOpen(true)}
- className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 uppercase tracking-widest hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition-all"
- >
- <Plus size={14} /> New Product
+ {/* === ITEMS TABLE === */}
+ <div className="border border-slate-300 rounded-lg overflow-hidden">
+ <div className="bg-slate-700 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 flex justify-between items-center">
+ <span>Line Items</span>
+ <div className="flex gap-3">
+ <button onClick={() => setIsNewProductModalOpen(true)}
+ className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 px-2 py-0.5 rounded text-white text-[9px] font-bold uppercase">
+ <Plus size={10}/> Product
  </button>
- <button 
- onClick={() => handleAddItem(true)}
- className="flex items-center gap-1 text-[10px] font-bold text-accent uppercase tracking-widest hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-all"
- >
- <Plus size={14} /> Add Line Item
+ <button onClick={() => handleAddItem(true)}
+ className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 px-2 py-0.5 rounded text-white text-[9px] font-bold uppercase">
+ <Plus size={10}/> Add Row
+ </button>
+ <button onClick={() => {
+ const chargeItem = { product_id: '', is_charge: true, charge_description: '', pack_type: 'Unit', units_per_pack: 1, quantity: 1, free_quantity: 0, scheme_type: '', batch_no: '', expiry_date: '', mrp: 0, ptr: 0, purchase_rate: 0, discount_percent: 0, gst_rate: 18, hsn_code: '', manufacturer_code: '', old_mrp: 0 };
+ setNewOrderItems([...newOrderItems, chargeItem]);
+ }}
+ className="flex items-center gap-1 bg-amber-600 hover:bg-amber-700 px-2 py-0.5 rounded text-white text-[9px] font-bold uppercase">
+ <Plus size={10}/> Charge
  </button>
  </div>
  </div>
- 
- <div className="overflow-x-auto -mx-2">
- <table className="w-full text-left" style={{fontSize:'10px', minWidth:'1100px'}}>
+ <div className="overflow-x-auto">
+ <table className="w-full text-left border-collapse" style={{fontSize:'10px', minWidth:'1200px'}}>
  <thead>
- <tr className="border-b-2 border-slate-200 bg-slate-50">
- {['Product','Pack','Qty (Boxes)','Free','Scheme','Batch','Expiry','MRP','PTR/Box','Rate/Box','Disc%','GST%','Amount',''].map(h => (
- <th key={h} className="px-1.5 py-2 font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap">{h}</th>
+ <tr className="bg-slate-100 border-b-2 border-slate-300">
+ {['S.N','HSN','Product / Description','Pack','Qty','Free','Batch No','Mfr','Exp. Dt','Old MRP','New MRP','Rate','Dis%','IGST%','Value','Amount',''].map(h => (
+ <th key={h} className="px-1.5 py-2 font-bold text-slate-600 uppercase tracking-widest whitespace-nowrap border-r border-slate-200 last:border-0">{h}</th>
  ))}
  </tr>
  </thead>
  <tbody className="divide-y divide-slate-100">
  {newOrderItems.map((item, idx) => {
- const qty = Number(item.quantity) || 0;
- const rate = Number(item.purchase_rate) || 0;
- const disc = Number(item.discount_percent) || 0;
- const gst = Number(item.gst_rate) || 0;
- const taxable = rate * qty * (1 - disc/100);
- const total = taxable * (1 + gst/100);
- const inputCls = 'w-full bg-blue-50 rounded px-1 py-0.5 outline-none font-bold text-slate-800 text-center';
+ const qty=Number(item.quantity)||0, rate=Number(item.purchase_rate)||0;
+ const disc=Number(item.discount_percent)||0, gst=Number(item.gst_rate)||0;
+ const taxable=rate*qty*(1-disc/100);
+ const amount=taxable*(1+gst/100);
+ const iCls='w-full border-0 outline-none font-bold text-slate-800 bg-transparent text-center px-0.5';
+ const isCharge = item.is_charge;
  return (
- <tr key={idx} className="hover:bg-slate-50">
- <td className="px-1.5 py-1.5" style={{minWidth:'160px'}}>
+ <tr key={idx} className={isCharge ? 'bg-amber-50' : 'hover:bg-blue-50/30'}>
+ <td className="px-1.5 py-1 text-center text-slate-500 border-r border-slate-100" style={{minWidth:'30px'}}>{idx+1}</td>
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'75px'}}>
+ <input type="text" placeholder="HSN" value={item.hsn_code||''}
+ onChange={(e) => handleItemChange(idx,'hsn_code',e.target.value,true)}
+ className={iCls}/>
+ </td>
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'180px'}}>
+ {isCharge ? (
+ <input type="text" placeholder="Charge description..." value={item.charge_description||''}
+ onChange={(e) => handleItemChange(idx,'charge_description',e.target.value,true)}
+ className="w-full border-0 outline-none font-bold text-amber-800 bg-transparent px-0.5 italic"/>
+ ) : (
  <select value={item.product_id} onChange={(e) => handleItemChange(idx,'product_id',e.target.value,true)}
- className="w-full bg-transparent font-bold text-slate-700 outline-none text-xs">
- <option value="">Select...</option>
+ className="w-full border-0 outline-none font-bold text-slate-800 bg-transparent text-xs">
+ <option value="">Select product...</option>
  {lists?.products?.map((p:any) => <option key={p.id} value={p.id}>{p.name}</option>)}
  </select>
+ )}
  </td>
- <td className="px-1 py-1.5" style={{minWidth:'80px'}}>
- <select value={item.pack_type||'Box'} onChange={(e) => handleItemChange(idx,'pack_type',e.target.value,true)}
- className="w-full bg-blue-50 rounded px-1 font-bold text-slate-700 outline-none">
- {['Box','Strip','Bottle','Vial','Ampoule','Unit','Sachet','Tube'].map(pt => <option key={pt}>{pt}</option>)}
- </select>
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'70px'}}>
+ <input type="text" placeholder="10*10" value={item.pack_type||''}
+ onChange={(e) => handleItemChange(idx,'pack_type',e.target.value,true)}
+ className={iCls}/>
  </td>
- <td className="px-1 py-1.5" style={{minWidth:'70px'}}>
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'55px'}}>
  <input type="number" min="0" value={item.quantity}
  onChange={(e) => handleItemChange(idx,'quantity',Number(e.target.value),true)}
- className={inputCls} />
+ className={iCls}/>
  </td>
- <td className="px-1 py-1.5" style={{minWidth:'55px'}}>
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'45px'}}>
  <input type="number" min="0" value={item.free_quantity||0}
  onChange={(e) => handleItemChange(idx,'free_quantity',Number(e.target.value),true)}
- className={inputCls} />
+ className={iCls}/>
  </td>
- <td className="px-1 py-1.5" style={{minWidth:'90px'}}>
- <select value={item.scheme_type||''} onChange={(e) => handleItemChange(idx,'scheme_type',e.target.value,true)}
- className="w-full bg-blue-50 rounded px-1 font-bold text-slate-700 outline-none">
- <option value="">None</option>
- {['5+1','10+1','10+2','12+1','14+1','20+2','100+10','1+1','2+1','3+1'].map(s => <option key={s}>{s}</option>)}
- </select>
- </td>
- <td className="px-1 py-1.5" style={{minWidth:'90px'}}>
- <input type="text" placeholder="Batch#" value={item.batch_no||''}
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'85px'}}>
+ <input type="text" placeholder="TC26-0160B" value={item.batch_no||''}
  onChange={(e) => handleItemChange(idx,'batch_no',e.target.value,true)}
- className="w-full bg-blue-50 rounded px-1 py-0.5 outline-none font-bold text-slate-800" />
+ className={iCls}/>
  </td>
- <td className="px-1 py-1.5" style={{minWidth:'105px'}}>
- <input type="date" value={item.expiry_date ? new Date(item.expiry_date).toISOString().split('T')[0] : ''}
- onChange={(e) => handleItemChange(idx,'expiry_date',e.target.value,true)}
- className="w-full bg-blue-50 rounded px-1 py-0.5 outline-none font-bold text-slate-800 text-xs" />
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'55px'}}>
+ <input type="text" placeholder="ATHE" value={item.manufacturer_code||''}
+ onChange={(e) => handleItemChange(idx,'manufacturer_code',e.target.value,true)}
+ className={iCls}/>
  </td>
- <td className="px-1 py-1.5" style={{minWidth:'70px'}}>
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'70px'}}>
+ <input type="month" value={item.expiry_date ? item.expiry_date.substring(0,7) : ''}
+ onChange={(e) => handleItemChange(idx,'expiry_date', e.target.value ? e.target.value+'-01' : '',true)}
+ className="w-full border-0 outline-none font-bold text-slate-800 bg-transparent text-[10px] px-0.5"/>
+ </td>
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'65px'}}>
+ <input type="number" min="0" step="0.01" value={item.old_mrp||0}
+ onChange={(e) => handleItemChange(idx,'old_mrp',Number(e.target.value),true)}
+ className={iCls}/>
+ </td>
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'65px'}}>
  <input type="number" min="0" step="0.01" value={item.mrp||0}
  onChange={(e) => handleItemChange(idx,'mrp',Number(e.target.value),true)}
- className={inputCls} />
+ className={iCls}/>
  </td>
- <td className="px-1 py-1.5" style={{minWidth:'75px'}}>
- <input type="number" min="0" step="0.01" value={item.ptr||0}
- onChange={(e) => handleItemChange(idx,'ptr',Number(e.target.value),true)}
- className={inputCls} />
- </td>
- <td className="px-1 py-1.5" style={{minWidth:'80px'}}>
- <input type="number" min="0" step="0.01" value={item.purchase_rate||0}
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'65px'}}>
+ <input type="number" min="0" step="0.0001" value={item.purchase_rate||0}
  onChange={(e) => handleItemChange(idx,'purchase_rate',Number(e.target.value),true)}
- className={inputCls} />
+ className={iCls}/>
  </td>
- <td className="px-1 py-1.5" style={{minWidth:'55px'}}>
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'45px'}}>
  <input type="number" min="0" max="100" step="0.01" value={item.discount_percent||0}
  onChange={(e) => handleItemChange(idx,'discount_percent',Number(e.target.value),true)}
- className={inputCls} />
+ className={iCls}/>
  </td>
- <td className="px-1 py-1.5" style={{minWidth:'55px'}}>
- <select value={item.gst_rate||12} onChange={(e) => handleItemChange(idx,'gst_rate',Number(e.target.value),true)}
- className="w-full bg-blue-50 rounded px-1 font-bold text-slate-700 outline-none">
+ <td className="px-1 py-1 border-r border-slate-100" style={{minWidth:'50px'}}>
+ <select value={item.gst_rate||5}
+ onChange={(e) => handleItemChange(idx,'gst_rate',Number(e.target.value),true)}
+ className="w-full border-0 outline-none font-bold text-slate-700 bg-transparent text-center">
  {[0,5,12,18,28].map(g => <option key={g} value={g}>{g}%</option>)}
  </select>
  </td>
- <td className="px-1.5 py-1.5 text-right font-bold text-slate-900 whitespace-nowrap" style={{minWidth:'80px'}}>
- {formatCurrency(total)}
+ <td className="px-1.5 py-1 text-right font-bold text-slate-700 border-r border-slate-100 whitespace-nowrap" style={{minWidth:'75px'}}>
+ {taxable.toFixed(2)}
  </td>
- <td className="px-1 py-1.5">
- <button onClick={() => handleRemoveItem(idx,true)} className="text-rose-400 hover:text-rose-600">
- <Trash2 size={14} />
- </button>
+ <td className="px-1.5 py-1 text-right font-bold text-slate-900 border-r border-slate-100 whitespace-nowrap" style={{minWidth:'80px'}}>
+ {amount.toFixed(2)}
+ </td>
+ <td className="px-1 py-1" style={{minWidth:'25px'}}>
+ <button onClick={() => handleRemoveItem(idx,true)} className="text-rose-400 hover:text-rose-600"><Trash2 size={12}/></button>
  </td>
  </tr>
  );
  })}
  </tbody>
- <tfoot>
- <tr className="border-t-2 border-slate-200 bg-slate-50">
- <td colSpan={12} className="px-2 py-2 text-right font-bold text-slate-500 uppercase tracking-widest text-xs">Grand Total</td>
- <td className="px-1.5 py-2 text-right font-bold text-slate-900 text-sm">
- {formatCurrency(newOrderItems.reduce((s,i) => {
- const qty=Number(i.quantity)||0, rate=Number(i.purchase_rate)||0;
- const disc=Number(i.discount_percent)||0, gst=Number(i.gst_rate)||0;
- return s + (rate*qty*(1-disc/100)*(1+gst/100));
- },0))}
- </td>
- <td/>
- </tr>
- </tfoot>
  </table>
  </div>
  </div>
 
- <div className="pt-8 border-t border-slate-100 flex justify-end gap-4">
+ {/* === FOOTER: GST SUMMARY + TOTALS === */}
+ {(() => {
+ const lines = newOrderItems;
+ const gstGroups: Record<string,{total:number,scheme:number,disc:number,igst:number}> = {};
+ let totalValue=0, totalIgst=0, totalDisc=0, totalAmt=0, totalQty=0, totalFree=0;
+ lines.forEach(item => {
+ const qty=Number(item.quantity)||0, rate=Number(item.purchase_rate)||0;
+ const disc=Number(item.discount_percent)||0, gst=Number(item.gst_rate)||0;
+ const discAmt=rate*qty*disc/100;
+ const taxable=rate*qty-discAmt;
+ const igstAmt=taxable*gst/100;
+ const amount=taxable+igstAmt;
+ totalValue+=taxable; totalIgst+=igstAmt; totalDisc+=discAmt; totalAmt+=amount;
+ totalQty+=qty; totalFree+=Number(item.free_quantity)||0;
+ const gKey=`IGST ${gst}%`;
+ if(!gstGroups[gKey]) gstGroups[gKey]={total:0,scheme:0,disc:0,igst:0};
+ gstGroups[gKey].total+=taxable+igstAmt;
+ gstGroups[gKey].disc+=discAmt;
+ gstGroups[gKey].igst+=igstAmt;
+ });
+ const roundOff = Math.round(totalAmt) - totalAmt;
+ const grandTotal = totalAmt + roundOff;
+ return (
+ <div className="border border-slate-300 rounded-lg overflow-hidden">
+ <div className="grid grid-cols-2 divide-x divide-slate-200">
+ {/* GST Class Summary */}
+ <div>
+ <table className="w-full text-xs border-collapse">
+ <thead>
+ <tr className="bg-slate-100 border-b border-slate-200">
+ {['Class','Total','Scheme','Discount','IGST'].map(h => (
+ <th key={h} className="px-2 py-1.5 text-[9px] font-bold text-slate-500 uppercase tracking-widest text-right first:text-left">{h}</th>
+ ))}
+ </tr>
+ </thead>
+ <tbody className="divide-y divide-slate-100">
+ {Object.entries(gstGroups).map(([cls,v]) => (
+ <tr key={cls}>
+ <td className="px-2 py-1 font-bold text-slate-700">{cls}</td>
+ <td className="px-2 py-1 text-right">{v.total.toFixed(2)}</td>
+ <td className="px-2 py-1 text-right text-slate-400">0.00</td>
+ <td className="px-2 py-1 text-right text-rose-600">{v.disc.toFixed(2)}</td>
+ <td className="px-2 py-1 text-right text-blue-700 font-bold">{v.igst.toFixed(2)}</td>
+ </tr>
+ ))}
+ <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
+ <td className="px-2 py-1.5">TOTAL</td>
+ <td className="px-2 py-1.5 text-right">{totalAmt.toFixed(2)}</td>
+ <td className="px-2 py-1.5 text-right text-slate-400">0.00</td>
+ <td className="px-2 py-1.5 text-right text-rose-600">{totalDisc.toFixed(2)}</td>
+ <td className="px-2 py-1.5 text-right text-blue-700">{totalIgst.toFixed(2)}</td>
+ </tr>
+ </tbody>
+ </table>
+ <div className="px-3 py-2 text-[10px] text-slate-500 border-t border-slate-200">
+ Total Items: <strong>{lines.filter(i=>!i.is_charge).length}</strong> &nbsp;|&nbsp; Total Qty: <strong>{totalQty}</strong> &nbsp;|&nbsp; Free: <strong>{totalFree}</strong>
+ </div>
+ </div>
+ {/* Right: totals box */}
+ <div className="p-3 space-y-1.5">
+ {[
+ ['Dis Amt.', totalDisc.toFixed(2), 'text-rose-600'],
+ ['IGST Payable', totalIgst.toFixed(2), 'text-blue-700 font-bold'],
+ ['Round off', roundOff.toFixed(2), 'text-slate-500'],
+ ['CR/DR Note', '0.00', 'text-slate-500'],
+ ].map(([lbl,val,cls]) => (
+ <div key={lbl as string} className="flex justify-between text-xs">
+ <span className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">{lbl as string}</span>
+ <span className={cls as string}>{val as string}</span>
+ </div>
+ ))}
+ <div className="border-t-2 border-slate-800 pt-2 mt-2 flex justify-between items-center">
+ <span className="font-bold text-slate-800 uppercase tracking-widest text-[10px]">Grand Total</span>
+ <span className="text-xl font-bold text-slate-900">₹{grandTotal.toFixed(2)}</span>
+ </div>
+ <div className="text-[9px] text-slate-400 italic pt-1">
+ {numberToWords(grandTotal)}
+ </div>
+ </div>
+ </div>
+ </div>
+ );
+ })()}
+
+ <div className="pt-4 border-t border-slate-100 flex justify-end gap-4">
  <button 
  onClick={() => setIsNewPurchaseModalOpen(false)}
  className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-all"
@@ -1292,6 +1409,23 @@ const PurchaseEnhanced: React.FC = () => {
  </Modal>
  </ERPLayout>
  );
+};
+
+// --- HELPER FUNCTIONS ---
+const numberToWords = (n: number): string => {
+  const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  const convert = (num: number): string => {
+    if (num < 20) return a[num];
+    if (num < 100) return b[Math.floor(num/10)] + (num%10 ? ' '+a[num%10] : '');
+    if (num < 1000) return a[Math.floor(num/100)]+' Hundred'+(num%100?' '+convert(num%100):'');
+    if (num < 100000) return convert(Math.floor(num/1000))+' Thousand'+(num%1000?' '+convert(num%1000):'');
+    if (num < 10000000) return convert(Math.floor(num/100000))+' Lakh'+(num%100000?' '+convert(num%100000):'');
+    return convert(Math.floor(num/10000000))+' Crore'+(num%10000000?' '+convert(num%10000000):'');
+  };
+  const rupees = Math.floor(n);
+  const paise = Math.round((n - rupees)*100);
+  return 'Rs. '+convert(rupees)+' and '+convert(paise)+' Paise Only';
 };
 
 // --- HELPER COMPONENTS ---
