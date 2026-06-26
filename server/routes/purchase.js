@@ -194,7 +194,8 @@ router.post('/', async (req, res) => {
       );
     }
 
-    // 3. Insert purchase order
+    // 3. Insert purchase order — internal PO number auto-generated, supplier invoice stored separately
+    const internalPoNo = `PO-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
     const { rows: poResult } = await client.query(
       `INSERT INTO purchase_orders
        (po_number, supplier_id, date, status, created_by, category_id,
@@ -203,10 +204,11 @@ router.post('/', async (req, res) => {
         igst_total, cgst_total, sgst_total, discount_total, round_off, grand_total, total_amount)
        VALUES ($1,$2,$3,'Draft',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
        RETURNING id`,
-      [invoice_no, supplier_id, order_date, req.user.userId, category_id,
-       supplier_invoice_no||null, invoice_date||null, lr_no||null, lr_date||null,
-       order_no||null, cases||0, order_date_supp||null, due_date||null,
-       ewaybill_no||null, transport||null, weight||null, payment_mode,
+      [internalPoNo, supplier_id, order_date||new Date(), req.user.userId, category_id||'PHARMA',
+       supplier_invoice_no||invoice_no||null, invoice_date||order_date||null,
+       lr_no||null, lr_date||null, order_no||null, cases||0,
+       order_date_supp||null, due_date||null,
+       ewaybill_no||null, transport||null, weight||null, payment_mode||'CREDIT',
        igst_total, cgst_total, sgst_total, discount_total, round_off, grand_total, totalAmount]
     );
 
