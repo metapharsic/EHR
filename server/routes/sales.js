@@ -176,7 +176,10 @@ router.get('/products', async (req, res) => {
  * Create a new wholesale invoice (ACID transaction, WHO- prefix)
  */
 router.post('/', async (req, res) => {
-  const { party_id, party_name, invoice_date, payment_mode = 'Credit', items } = req.body;
+  const {
+    party_id, party_name, invoice_date, payment_mode = 'Credit', items,
+    lr_no, lr_date, order_no, due_date, ewaybill_no, transport, weight
+  } = req.body;
 
   if (!party_id) return res.status(400).json({ success: false, error: 'Distributor is required' });
   if (!items || items.length === 0) return res.status(400).json({ success: false, error: 'Add at least one item' });
@@ -185,7 +188,6 @@ router.post('/', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Deterministic invoice number: WHO-YYYYMMDD-SEQ
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const { rows: seqRows } = await client.query(
       "SELECT COUNT(*)+1 AS seq FROM sales_invoices WHERE invoice_number LIKE $1",
@@ -194,39 +196,57 @@ router.post('/', async (req, res) => {
     const seq = String(seqRows[0].seq).padStart(4, '0');
     const invoiceNumber = 'WHO-' + dateStr + '-' + seq;
 
-    const sub_total = items.reduce((s, i) => s + parseFloat(i.quantity) * parseFloat(i.rate), 0);
+    const sub_total = items.reduce((s, i) => {
+      const qty = parseFloat(i.quantity)||0; const rate = parseFloat(i.rate)||0; const disc = parseFloat(i.discount_percent)||0;
+      return s + qty * rate * (1 - disc/100);
+    }, 0);
     const total_gst = items.reduce((s, i) => {
-      const taxable = parseFloat(i.quantity) * parseFloat(i.rate);
+      const qty = parseFloat(i.quantity)||0; const rate = parseFloat(i.rate)||0; const disc = parseFloat(i.discount_percent)||0;
+      const taxable = qty * rate * (1 - disc/100);
       return s + taxable * (parseFloat(i.gst_percent) || 12) / 100;
     }, 0);
-    const net_amount = parseFloat((sub_total + total_gst).toFixed(2));
+    const net_before_round = sub_total + total_gst;
+    const round_off = parseFloat((Math.round(net_before_round) - net_before_round).toFixed(2));
+    const net_amount = Math.round(net_before_round);
 
     const { rows: [inv] } = await client.query(`
       INSERT INTO sales_invoices
         (invoice_number, party_id, customer_name, date, payment_mode,
-         sub_total, taxable_value, total_gst, net_amount, status, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, 'Completed', $9)
+         sub_total, taxable_value, total_gst, net_amount, round_off, status, created_by,
+         lr_no, lr_date, order_no, due_date, ewaybill_no, transport, weight)
+      VALUES ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, 'Completed', $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING id, invoice_number
     `, [invoiceNumber, party_id, party_name,
         invoice_date || new Date().toISOString().split('T')[0],
-        payment_mode, sub_total, total_gst, net_amount,
-        req.user ? req.user.id : null]);
+        payment_mode, sub_total, total_gst, net_amount, round_off,
+        req.user ? req.user.id : null,
+        lr_no||null, lr_date||null, order_no||null, due_date||null,
+        ewaybill_no||null, transport||null, weight||null]);
 
     for (const item of items) {
-      const qty = parseFloat(item.quantity);
-      const rate = parseFloat(item.rate);
-      const gst_pct = parseFloat(item.gst_percent) || 12;
-      const taxable = parseFloat((qty * rate).toFixed(2));
-      const total = parseFloat((taxable * (1 + gst_pct / 100)).toFixed(2));
+      const qty   = parseFloat(item.quantity)||0;
+      const rate  = parseFloat(item.rate)||0;
+      const disc  = parseFloat(item.discount_percent)||0;
+      const gst_pct = parseFloat(item.gst_percent)||12;
+      const taxable = parseFloat((qty * rate * (1 - disc/100)).toFixed(2));
+      const igst_amt = parseFloat((taxable * gst_pct / 100).toFixed(2));
+      const total   = parseFloat((taxable + igst_amt).toFixed(2));
+      const freeQty = parseInt(item.free_quantity)||0;
 
-      const freeQty = item.scheme_type === '10+7' ? Math.round(qty * 7 / 10) : (parseInt(item.free_strips) || 0);
       await client.query(`
         INSERT INTO sales_invoice_items
           (invoice_id, sales_invoice_id, product_id, quantity, free_quantity, rate, selling_rate,
-           mrp, gst_percent, taxable_value, total_amount, scheme_type)
-        VALUES ($1, $1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10)
-      `, [inv.id, item.product_id || null, qty, freeQty, rate,
-          parseFloat(item.mrp) || 0, gst_pct, taxable, total, item.scheme_type || 'none']);
+           mrp, old_mrp, gst_percent, discount_percent, taxable_value, igst_amount, total_amount,
+           scheme_type, batch_no, hsn_code, manufacturer_code, expiry_date, pack)
+        VALUES ($1,$1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+      `, [inv.id, item.product_id||null, qty, freeQty, rate,
+          parseFloat(item.mrp)||0, parseFloat(item.old_mrp)||0,
+          gst_pct, disc, taxable, igst_amt, total,
+          item.scheme_type||'none',
+          item.batch_no||null, item.hsn_code||null,
+          item.manufacturer_code||null,
+          item.expiry_date||null,
+          item.pack||null]);
     }
 
     await client.query('COMMIT');

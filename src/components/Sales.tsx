@@ -47,15 +47,26 @@ const Sales: React.FC = () => {
   const [filters, setFilters] = useState({ searchTerm: '', status: 'All' });
   const printRef = useRef<HTMLDivElement>(null);
 
-  const [invoiceForm, setInvoiceForm] = useState({
+  const blankForm = () => ({
     party_id: '', party_name: '',
     invoice_date: new Date().toISOString().split('T')[0],
-    payment_mode: 'Credit', items: [] as any[]
+    payment_mode: 'Credit',
+    lr_no: '', lr_date: '', order_no: '', due_date: '',
+    ewaybill_no: '', transport: '', weight: '',
+    items: [] as any[]
   });
-  const [pendingItem, setPendingItem] = useState({
-    product_id: '', name: '', quantity: 1, rate: 0, mrp: 0, gst_percent: 12,
-    scheme_type: 'none' as 'none' | '10+7', paid_strips: 10, free_strips: 7, total_strips: 17
+  const blankItem = () => ({
+    product_id: '', name: '',
+    hsn_code: '', pack: '',
+    quantity: 1, free_quantity: 0,
+    batch_no: '', manufacturer_code: '',
+    expiry_date: '',
+    old_mrp: 0, mrp: 0, rate: 0,
+    discount_percent: 0, gst_percent: 12,
+    scheme_type: 'none'
   });
+  const [invoiceForm, setInvoiceForm] = useState(blankForm());
+  const [pendingItem, setPendingItem] = useState(blankItem());
 
   const { query, setQuery, results: searchResults } = useSearch<any>(salesData || [], ['invoice_no', 'party_name']);
 
@@ -76,9 +87,16 @@ const Sales: React.FC = () => {
     return { trend: d.trend || [], topCategories: d.topCategories || [] };
   }, [analyticsResp]);
 
-  const invoiceSubTotal = invoiceForm.items.reduce((s, i) => s + parseFloat(i.quantity) * parseFloat(i.rate), 0);
-  const invoiceTotalGst = invoiceForm.items.reduce((s, i) =>
-    s + parseFloat(i.quantity) * parseFloat(i.rate) * (parseFloat(i.gst_percent) || 12) / 100, 0);
+  const invoiceSubTotal = invoiceForm.items.reduce((s, i) => {
+    const t = (parseFloat(i.quantity)||0) * (parseFloat(i.rate)||0) * (1 - (parseFloat(i.discount_percent)||0)/100);
+    return s + t;
+  }, 0);
+  const invoiceTotalGst = invoiceForm.items.reduce((s, i) => {
+    const t = (parseFloat(i.quantity)||0) * (parseFloat(i.rate)||0) * (1 - (parseFloat(i.discount_percent)||0)/100);
+    return s + t * (parseFloat(i.gst_percent)||12) / 100;
+  }, 0);
+  const invoiceRoundOff = +(Math.round(invoiceSubTotal + invoiceTotalGst) - (invoiceSubTotal + invoiceTotalGst)).toFixed(2);
+  const invoiceGrandTotal = Math.round(invoiceSubTotal + invoiceTotalGst);
 
   const handleRefresh = async () => {
     invalidateCache('/api/sales');
@@ -88,35 +106,25 @@ const Sales: React.FC = () => {
   const handleProductSelect = (product_id: string) => {
     const prod = (productsData || []).find((p: any) => p.id === product_id);
     if (prod) {
-      const mrp = parseFloat(prod.mrp) || 0;
-      setPendingItem(prev => {
-        const effRate = prev.scheme_type === '10+7' ? parseFloat((mrp * prev.paid_strips / prev.total_strips).toFixed(2)) : (parseFloat(prod.ptr) || 0);
-        return { ...prev, product_id: prod.id, name: prod.name, rate: effRate, mrp, gst_percent: parseFloat(prod.gst) || 12 };
-      });
+      setPendingItem(prev => ({
+        ...prev,
+        product_id: prod.id, name: prod.name,
+        hsn_code: prod.hsn_code || prod.hsn || '',
+        pack: prod.pack || prod.pack_size || '',
+        mrp: parseFloat(prod.mrp) || 0,
+        rate: parseFloat(prod.ptr) || parseFloat(prod.rate) || 0,
+        gst_percent: parseFloat(prod.gst) || parseFloat(prod.gst_rate) || 12,
+        manufacturer_code: prod.manufacturer || prod.manufacturer_code || '',
+      }));
     } else setPendingItem(prev => ({ ...prev, product_id: '', name: '' }));
-  };
-
-  const handleSchemeToggle = (scheme: string) => {
-    setPendingItem(prev => {
-      const mrp = prev.mrp;
-      // Parse paid+free from scheme string like "10+7", "5+1" etc
-      const parts = scheme !== 'none' && scheme !== 'custom' ? scheme.split('+').map(Number) : null;
-      const paid = parts ? parts[0] : 0;
-      const free = parts ? parts[1] : 0;
-      const total = paid + free;
-      const rate = parts && paid > 0 && mrp > 0
-        ? parseFloat((mrp * paid / total).toFixed(2))
-        : prev.rate;
-      return { ...prev, scheme_type: scheme, paid_strips: paid || prev.paid_strips, free_strips: scheme === 'custom' ? prev.free_strips : (free || 0), total_strips: total || prev.total_strips, rate: scheme === 'none' ? prev.rate : rate };
-    });
   };
 
   const handleAddItem = () => {
     if (!pendingItem.product_id) { alert('Select a product.'); return; }
-    if (!pendingItem.quantity || pendingItem.quantity <= 0) { alert('Enter valid quantity.'); return; }
-    if (!pendingItem.rate || pendingItem.rate <= 0) { alert('Enter valid PTR rate.'); return; }
+    if (!pendingItem.quantity || pendingItem.quantity <= 0) { alert('Enter valid qty.'); return; }
+    if (!pendingItem.rate || pendingItem.rate <= 0) { alert('Enter valid rate.'); return; }
     setInvoiceForm(prev => ({ ...prev, items: [...prev.items, { ...pendingItem }] }));
-    setPendingItem({ product_id: '', name: '', quantity: 1, rate: 0, mrp: 0, gst_percent: 12, scheme_type: 'none', paid_strips: 10, free_strips: 7, total_strips: 17 });
+    setPendingItem(blankItem());
   };
 
   const handleCreateInvoice = async (e: React.FormEvent) => {
@@ -129,8 +137,8 @@ const Sales: React.FC = () => {
         setShowInvoiceModal(false);
         invalidateCache('/api/sales');
         handleRefresh();
-        setInvoiceForm({ party_id: '', party_name: '', invoice_date: new Date().toISOString().split('T')[0], payment_mode: 'Credit', items: [] });
-        setPendingItem({ product_id: '', name: '', quantity: 1, rate: 0, mrp: 0, gst_percent: 12 });
+        setInvoiceForm(blankForm());
+        setPendingItem(blankItem());
       } else alert(res.error || 'Failed to create invoice');
     } catch (error: any) {
       alert(error.message || 'Failed to create invoice');
@@ -644,177 +652,207 @@ const Sales: React.FC = () => {
       )}
 
       {/* ── NEW INVOICE MODAL ── */}
-      <Modal isOpen={showInvoiceModal} title="Create Wholesale Invoice" onClose={() => setShowInvoiceModal(false)} size="xl">
-        <form onSubmit={handleCreateInvoice} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Distributor *</label>
-              <select required className="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
+      <Modal isOpen={showInvoiceModal} title="GST Invoice Entry — Wholesale" onClose={() => { setShowInvoiceModal(false); setInvoiceForm(blankForm()); setPendingItem(blankItem()); }} size="xl">
+        <form onSubmit={handleCreateInvoice} className="space-y-0">
+
+          {/* ── HEADER: 3-column Arelion layout ── */}
+          <div className="grid grid-cols-3 border border-slate-300 rounded-t-lg overflow-hidden text-xs mb-0">
+            {/* Seller */}
+            <div className="p-3 border-r border-slate-300 bg-slate-50">
+              <div className="font-black text-sm text-slate-900">{COMPANY.name}</div>
+              <div className="text-slate-500 mt-1 leading-relaxed">{COMPANY.address}</div>
+              <div className="mt-1">GSTIN: <strong>{COMPANY.gstin}</strong></div>
+              <div>Ph: {COMPANY.phone}</div>
+              <div>D.L.: <strong>{COMPANY.dl}</strong></div>
+            </div>
+            {/* GST INVOICE centre */}
+            <div className="p-3 border-r border-slate-300 text-center">
+              <div className="font-black text-base tracking-widest">GST INVOICE</div>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-2 text-left">
+                <div className="text-slate-500">Invoice No</div><div className="font-mono font-bold text-sky-700">AUTO (WHO-...)</div>
+                <div className="text-slate-500">Date *</div>
+                <div><input type="date" required className="w-full border border-slate-300 rounded px-1 py-0.5 text-xs" value={invoiceForm.invoice_date} onChange={e => setInvoiceForm(f => ({...f, invoice_date: e.target.value}))} /></div>
+                <div className="text-slate-500">L.R. No.</div>
+                <div><input type="text" className="w-full border border-slate-300 rounded px-1 py-0.5 text-xs" placeholder="LR No." value={invoiceForm.lr_no} onChange={e => setInvoiceForm(f => ({...f, lr_no: e.target.value}))} /></div>
+                <div className="text-slate-500">L.R. Date</div>
+                <div><input type="date" className="w-full border border-slate-300 rounded px-1 py-0.5 text-xs" value={invoiceForm.lr_date} onChange={e => setInvoiceForm(f => ({...f, lr_date: e.target.value}))} /></div>
+                <div className="text-slate-500">Order No.</div>
+                <div><input type="text" className="w-full border border-slate-300 rounded px-1 py-0.5 text-xs" placeholder="Order No." value={invoiceForm.order_no} onChange={e => setInvoiceForm(f => ({...f, order_no: e.target.value}))} /></div>
+                <div className="text-slate-500">Due Date</div>
+                <div><input type="date" className="w-full border border-slate-300 rounded px-1 py-0.5 text-xs" value={invoiceForm.due_date} onChange={e => setInvoiceForm(f => ({...f, due_date: e.target.value}))} /></div>
+                <div className="text-slate-500">Payment</div>
+                <div><select className="w-full border border-slate-300 rounded px-1 py-0.5 text-xs bg-white" value={invoiceForm.payment_mode} onChange={e => setInvoiceForm(f => ({...f, payment_mode: e.target.value}))}>
+                  <option>Credit</option><option>Cash</option><option>Bank Transfer</option><option>Cheque</option>
+                </select></div>
+              </div>
+              <div className="grid grid-cols-3 gap-1 mt-1">
+                <input type="text" className="border border-slate-300 rounded px-1 py-0.5 text-xs" placeholder="Ewaybill No." value={invoiceForm.ewaybill_no} onChange={e => setInvoiceForm(f => ({...f, ewaybill_no: e.target.value}))} />
+                <input type="text" className="border border-slate-300 rounded px-1 py-0.5 text-xs" placeholder="Transport" value={invoiceForm.transport} onChange={e => setInvoiceForm(f => ({...f, transport: e.target.value}))} />
+                <input type="text" className="border border-slate-300 rounded px-1 py-0.5 text-xs" placeholder="Weight" value={invoiceForm.weight} onChange={e => setInvoiceForm(f => ({...f, weight: e.target.value}))} />
+              </div>
+            </div>
+            {/* Billing details */}
+            <div className="p-3">
+              <div className="font-black text-[10px] uppercase text-slate-400 underline mb-1">Billing Details</div>
+              <select required className="w-full border border-slate-300 rounded px-2 py-1.5 text-xs bg-white font-bold"
                 value={invoiceForm.party_id}
-                onChange={(e) => { const p = (partiesData || []).find((x: any) => x.id === e.target.value); setInvoiceForm({ ...invoiceForm, party_id: e.target.value, party_name: p?.name || '' }); }}>
-                <option value="">Select Distributor</option>
+                onChange={(e) => { const p = (partiesData || []).find((x: any) => x.id === e.target.value); setInvoiceForm(f => ({ ...f, party_id: e.target.value, party_name: p?.name || '' })); }}>
+                <option value="">Select Distributor *</option>
                 {(partiesData || []).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date *</label>
-              <input required type="date" className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                value={invoiceForm.invoice_date} onChange={(e) => setInvoiceForm({ ...invoiceForm, invoice_date: e.target.value })} />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Payment Mode</label>
-              <select className="w-full border border-slate-300 rounded-lg px-3 py-2"
-                value={invoiceForm.payment_mode} onChange={(e) => setInvoiceForm({ ...invoiceForm, payment_mode: e.target.value })}>
-                <option value="Credit">Credit (Post to Ledger)</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Cheque">Cheque</option>
-                <option value="Cash">Cash</option>
-              </select>
+              {invoiceForm.party_id && (() => { const p = (partiesData||[]).find((x:any)=>x.id===invoiceForm.party_id); return p ? (<div className="mt-1 text-[10px] text-slate-500 leading-relaxed">{p.address||''}{p.gstin?<><br/>GSTIN: <strong>{p.gstin}</strong></>:''}{p.phone?<><br/>Ph: {p.phone}</>:''}</div>) : null; })()}
             </div>
           </div>
 
-          <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/60">
-            <p className="text-xs font-bold text-slate-500 uppercase mb-3">Add Product Line</p>
-            <div className="grid grid-cols-12 gap-2 items-end">
-              {/* Product */}
-              <div className="col-span-4">
-                <label className="block text-[10px] text-slate-400 font-bold mb-1">Product *</label>
-                <select className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-                  value={pendingItem.product_id} onChange={(e) => handleProductSelect(e.target.value)}>
-                  <option value="">Select product…</option>
-                  {(productsData || []).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {/* ── ITEM ENTRY ROW ── */}
+          <div className="border border-slate-200 rounded-b-lg bg-slate-50 p-3 mt-0 border-t-0">
+            <div className="text-[10px] font-black uppercase text-slate-400 mb-2">Add Product Line</div>
+            <div className="grid grid-cols-12 gap-1 items-end text-[10px]">
+              <div className="col-span-3">
+                <div className="font-bold text-slate-500 mb-0.5">Product *</div>
+                <select className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.product_id} onChange={e => handleProductSelect(e.target.value)}>
+                  <option value="">Select…</option>
+                  {(productsData||[]).map((p:any)=><option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
-              {/* Qty */}
               <div className="col-span-1">
-                <label className="block text-[10px] text-slate-400 font-bold mb-1">Qty</label>
-                <input type="number" min="1" className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-                  value={pendingItem.quantity} onChange={(e) => setPendingItem(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))} />
+                <div className="font-bold text-slate-500 mb-0.5">HSN</div>
+                <input className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.hsn_code} onChange={e=>setPendingItem(p=>({...p,hsn_code:e.target.value}))} />
               </div>
-              {/* Scheme dropdown */}
-              <div className="col-span-2">
-                <label className="block text-[10px] text-slate-400 font-bold mb-1">Scheme</label>
-                <select className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-                  value={pendingItem.scheme_type}
-                  onChange={(e) => handleSchemeToggle(e.target.value)}>
-                  <option value="none">No Scheme</option>
-                  <option value="10+7">10+7 (7 Free)</option>
-                  <option value="10+1">10+1 (1 Free)</option>
-                  <option value="5+1">5+1 (1 Free)</option>
-                  <option value="2+1">2+1 (1 Free)</option>
-                  <option value="1+1">1+1 (1 Free)</option>
-                  <option value="custom">Custom Free Qty</option>
+              <div className="col-span-1">
+                <div className="font-bold text-slate-500 mb-0.5">Pack</div>
+                <input className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.pack} onChange={e=>setPendingItem(p=>({...p,pack:e.target.value}))} />
+              </div>
+              <div className="col-span-1">
+                <div className="font-bold text-slate-500 mb-0.5">Qty</div>
+                <input type="number" min="1" className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.quantity} onChange={e=>setPendingItem(p=>({...p,quantity:parseInt(e.target.value)||1}))} />
+              </div>
+              <div className="col-span-1">
+                <div className="font-bold text-slate-500 mb-0.5">Free</div>
+                <input type="number" min="0" className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.free_quantity} onChange={e=>setPendingItem(p=>({...p,free_quantity:parseInt(e.target.value)||0}))} />
+              </div>
+              <div className="col-span-1">
+                <div className="font-bold text-slate-500 mb-0.5">Batch</div>
+                <input className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.batch_no} onChange={e=>setPendingItem(p=>({...p,batch_no:e.target.value}))} />
+              </div>
+              <div className="col-span-1">
+                <div className="font-bold text-slate-500 mb-0.5">Exp</div>
+                <input type="month" className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.expiry_date?pendingItem.expiry_date.slice(0,7):''} onChange={e=>setPendingItem(p=>({...p,expiry_date:e.target.value?e.target.value+'-01':''}))} />
+              </div>
+              <div className="col-span-1">
+                <div className="font-bold text-slate-500 mb-0.5">MRP</div>
+                <input type="number" min="0" step="0.01" className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.mrp} onChange={e=>setPendingItem(p=>({...p,mrp:parseFloat(e.target.value)||0}))} />
+              </div>
+              <div className="col-span-1">
+                <div className="font-bold text-slate-500 mb-0.5">Rate</div>
+                <input type="number" min="0" step="0.01" className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.rate} onChange={e=>setPendingItem(p=>({...p,rate:parseFloat(e.target.value)||0}))} />
+              </div>
+              <div className="col-span-1">
+                <div className="font-bold text-slate-500 mb-0.5">Dis%</div>
+                <input type="number" min="0" step="0.01" className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.discount_percent} onChange={e=>setPendingItem(p=>({...p,discount_percent:parseFloat(e.target.value)||0}))} />
+              </div>
+              <div className="col-span-1">
+                <div className="font-bold text-slate-500 mb-0.5">GST%</div>
+                <select className="w-full border border-slate-300 rounded px-1.5 py-1 text-xs bg-white" value={pendingItem.gst_percent} onChange={e=>setPendingItem(p=>({...p,gst_percent:parseFloat(e.target.value)}))}>
+                  <option value="0">0</option><option value="5">5</option><option value="12">12</option><option value="18">18</option><option value="28">28</option>
                 </select>
               </div>
-              {/* Free Strips — shown only for custom or auto-calculated schemes */}
               <div className="col-span-1">
-                <label className="block text-[10px] text-slate-400 font-bold mb-1">
-                  {pendingItem.scheme_type === 'custom' ? 'Free Qty' : 'Free (auto)'}
-                </label>
-                <input type="number" min="0"
-                  readOnly={pendingItem.scheme_type !== 'custom' && pendingItem.scheme_type !== 'none'}
-                  className={`w-full border rounded-lg px-2 py-1.5 text-sm ${pendingItem.scheme_type === 'custom' ? 'bg-white border-emerald-400 focus:ring-2 focus:ring-emerald-400' : 'bg-slate-100 border-slate-200 text-slate-500'}`}
-                  value={pendingItem.free_strips || 0}
-                  onChange={(e) => pendingItem.scheme_type === 'custom' && setPendingItem(prev => ({ ...prev, free_strips: parseInt(e.target.value) || 0 }))} />
-              </div>
-              {/* PTR */}
-              <div className="col-span-2">
-                <label className="block text-[10px] text-slate-400 font-bold mb-1">PTR ₹ {pendingItem.scheme_type !== 'none' ? <span className="text-emerald-600">(eff.)</span> : null}</label>
-                <input type="number" min="0" step="0.01" className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-                  value={pendingItem.rate} onChange={(e) => setPendingItem(prev => ({ ...prev, rate: parseFloat(e.target.value) || 0 }))} />
-              </div>
-              {/* GST */}
-              <div className="col-span-1">
-                <label className="block text-[10px] text-slate-400 font-bold mb-1">GST %</label>
-                <select className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-                  value={pendingItem.gst_percent} onChange={(e) => setPendingItem(prev => ({ ...prev, gst_percent: parseFloat(e.target.value) }))}>
-                  <option value="0">0%</option>
-                  <option value="5">5%</option>
-                  <option value="12">12%</option>
-                  <option value="18">18%</option>
-                  <option value="28">28%</option>
-                </select>
-              </div>
-              {/* Add button */}
-              <div className="col-span-1">
-                <label className="block text-[10px] text-slate-400 font-bold mb-1">&nbsp;</label>
-                <button type="button" onClick={handleAddItem} className="w-full py-1.5 bg-primary text-white rounded-lg text-xs font-bold hover:bg-sky-600">+ Add</button>
+                <div className="font-bold text-slate-500 mb-0.5">&nbsp;</div>
+                <button type="button" onClick={handleAddItem} className="w-full py-1 bg-sky-600 text-white rounded text-xs font-bold hover:bg-sky-700">+ Add</button>
               </div>
             </div>
-            {/* Scheme info bar */}
-            {pendingItem.scheme_type !== 'none' && (
-              <div className="mt-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-[10px] text-emerald-700 font-bold">
-                <span className="bg-emerald-600 text-white px-1.5 py-0.5 rounded font-black">{pendingItem.scheme_type}</span>
-                {pendingItem.scheme_type === '10+7' && <span>Effective PTR = MRP × 10 ÷ 17 &nbsp;·&nbsp; {pendingItem.free_strips || 0} strips FREE per box</span>}
-                {pendingItem.scheme_type !== '10+7' && pendingItem.scheme_type !== 'custom' && <span>{pendingItem.free_strips || 0} strip(s) FREE with every purchase</span>}
-                {pendingItem.scheme_type === 'custom' && <span>Enter free qty manually above</span>}
-                &nbsp;·&nbsp; MRP ₹{Number(pendingItem.mrp || 0).toFixed(2)}
-              </div>
-            )}
           </div>
 
-          <div className="border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
+          {/* ── LINE ITEMS TABLE (Arelion style) ── */}
+          <div className="mt-3 border border-slate-300 rounded-lg overflow-auto">
+            <table className="w-full text-xs" style={{minWidth:'900px'}}>
               <thead className="bg-slate-900 text-white">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-bold">#</th>
-                  <th className="px-3 py-2 text-left text-xs font-bold">Product</th>
-                  <th className="px-3 py-2 text-center text-xs font-bold w-14">Qty</th>
-                  <th className="px-3 py-2 text-center text-xs font-bold w-16 text-emerald-400">Free Strips</th>
-                  <th className="px-3 py-2 text-center text-xs font-bold w-24">Scheme</th>
-                  <th className="px-3 py-2 text-right text-xs font-bold w-24">PTR (Eff.)</th>
-                  <th className="px-3 py-2 text-right text-xs font-bold w-16">GST%</th>
-                  <th className="px-3 py-2 text-right text-xs font-bold w-28">Amount</th>
-                  <th className="px-3 py-2 w-8"></th>
+                  {['S.N','HSN','Product Name','Pack','Qty','Free','Batch No.','Exp. DT','MRP','Rate','Dis%','IGST%','VALUE','AMOUNT',''].map((h,i)=>(
+                    <th key={i} className={`px-2 py-1.5 font-bold text-[9px] uppercase whitespace-nowrap ${['Qty','Free','Dis%','IGST%','VALUE','AMOUNT','MRP','Rate'].includes(h)?'text-right':h==='S.N'?'text-center':'text-left'}`}>{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y">
-                {invoiceForm.items.length === 0 ? (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400 italic text-sm">No items yet — use picker above.</td></tr>
-                ) : invoiceForm.items.map((item, idx) => {
-                  const hasScheme = item.scheme_type && item.scheme_type !== 'none';
-                  const freeStrips = hasScheme ? (item.free_strips || 0) : 0;
-                  return (
-                  <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                    <td className="px-3 py-2 text-slate-400 text-xs">{idx+1}</td>
-                    <td className="px-3 py-2">
-                      <div className="font-semibold text-slate-800">{item.name}</div>
-                      {item.mrp > 0 && <div className="text-[10px] text-slate-400">MRP ₹{Number(item.mrp).toFixed(2)}</div>}
-                    </td>
-                    <td className="px-3 py-2 text-center font-bold">{item.quantity}</td>
-                    <td className="px-3 py-2 text-center font-bold text-emerald-600">{hasScheme && freeStrips > 0 ? freeStrips : <span className="text-slate-300">—</span>}</td>
-                    <td className="px-3 py-2 text-center">
-                      {hasScheme
-                        ? <span className="inline-block bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200">{item.scheme_type}</span>
-                        : <span className="text-slate-300 text-xs">—</span>}
-                    </td>
-                    <td className="px-3 py-2 text-right font-bold text-sky-700">₹{Number(item.rate).toFixed(2)}</td>
-                    <td className="px-3 py-2 text-right text-slate-500">{item.gst_percent}%</td>
-                    <td className="px-3 py-2 text-right font-bold">₹{(item.quantity * item.rate).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                    <td className="px-3 py-2 text-center">
-                      <button type="button" onClick={() => { const ni = [...invoiceForm.items]; ni.splice(idx, 1); setInvoiceForm({ ...invoiceForm, items: ni }); }} className="text-red-400 hover:text-red-600"><Trash2 size={14} /></button>
-                    </td>
-                  </tr>
-                  );
-                })}
+              <tbody>
+                {invoiceForm.items.length === 0
+                  ? <tr><td colSpan={15} className="py-8 text-center text-slate-400 italic">No items — add product above.</td></tr>
+                  : invoiceForm.items.map((item,idx)=>{
+                    const qty=Number(item.quantity)||0; const rate=Number(item.rate)||0; const disc=Number(item.discount_percent)||0; const gst=Number(item.gst_percent)||12;
+                    const taxable=+(qty*rate*(1-disc/100)).toFixed(2);
+                    const igstAmt=+(taxable*gst/100).toFixed(2);
+                    return <tr key={idx} className={idx%2===0?'bg-white':'bg-slate-50'}>
+                      <td className="px-2 py-1 text-center text-slate-400">{idx+1}</td>
+                      <td className="px-2 py-1">{item.hsn_code||''}</td>
+                      <td className="px-2 py-1 font-semibold">{item.name}</td>
+                      <td className="px-2 py-1 text-center">{item.pack||''}</td>
+                      <td className="px-2 py-1 text-right font-bold">{qty}</td>
+                      <td className="px-2 py-1 text-right text-emerald-600">{item.free_quantity||0}</td>
+                      <td className="px-2 py-1 font-mono text-[9px]">{item.batch_no||''}</td>
+                      <td className="px-2 py-1 text-center">{item.expiry_date?item.expiry_date.slice(0,7).replace('-','/')?.split('/').reverse().join('/')?.slice(0,5):''}</td>
+                      <td className="px-2 py-1 text-right">{rate.toFixed(2)}</td>
+                      <td className="px-2 py-1 text-right font-bold text-sky-700">{rate.toFixed(2)}</td>
+                      <td className="px-2 py-1 text-right">{disc.toFixed(2)}</td>
+                      <td className="px-2 py-1 text-right">{gst}</td>
+                      <td className="px-2 py-1 text-right text-blue-700 font-bold">{igstAmt.toFixed(2)}</td>
+                      <td className="px-2 py-1 text-right font-bold">{taxable.toFixed(2)}</td>
+                      <td className="px-2 py-1 text-center"><button type="button" onClick={()=>{const ni=[...invoiceForm.items];ni.splice(idx,1);setInvoiceForm(f=>({...f,items:ni}));}} className="text-red-400 hover:text-red-600"><Trash2 size={12}/></button></td>
+                    </tr>;
+                  })
+                }
               </tbody>
-              {invoiceForm.items.length > 0 && (
-                <tfoot className="bg-slate-50 text-sm">
-                  <tr><td colSpan={5} className="px-4 py-2 text-right text-[10px] font-bold uppercase text-slate-500">Taxable Amount</td><td className="px-4 py-2 text-right font-bold">₹{invoiceSubTotal.toLocaleString()}</td><td /></tr>
-                  <tr><td colSpan={5} className="px-4 py-2 text-right text-[10px] font-bold uppercase text-orange-500">+ GST</td><td className="px-4 py-2 text-right font-bold text-orange-500">₹{invoiceTotalGst.toFixed(2)}</td><td /></tr>
-                  <tr className="text-primary"><td colSpan={5} className="px-4 py-3 text-right text-xs font-extrabold uppercase">Net Payable</td><td className="px-4 py-3 text-right text-base font-extrabold">₹{(invoiceSubTotal + invoiceTotalGst).toLocaleString()}</td><td /></tr>
-                </tfoot>
-              )}
             </table>
           </div>
 
-          <div className="pt-4 border-t flex justify-between items-center">
+          {/* ── FOOTER: CLASS table + totals ── */}
+          {invoiceForm.items.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
+                <table className="w-full">
+                  <thead className="bg-slate-100"><tr>
+                    <th className="px-2 py-1 text-left text-[9px] uppercase">CLASS</th>
+                    <th className="px-2 py-1 text-right text-[9px] uppercase">Total</th>
+                    <th className="px-2 py-1 text-right text-[9px] uppercase">IGST</th>
+                  </tr></thead>
+                  <tbody>
+                    {[5,12,18,28].map(slab=>{
+                      const slabItems=invoiceForm.items.filter(i=>Number(i.gst_percent)===slab);
+                      if(!slabItems.length) return null;
+                      const slabTaxable=slabItems.reduce((s,i)=>s+(Number(i.quantity)||0)*(Number(i.rate)||0)*(1-(Number(i.discount_percent)||0)/100),0);
+                      const slabTax=slabItems.reduce((s,i)=>{const t=(Number(i.quantity)||0)*(Number(i.rate)||0)*(1-(Number(i.discount_percent)||0)/100);return s+t*slab/100;},0);
+                      return <tr key={slab} className="border-t border-slate-100">
+                        <td className="px-2 py-0.5">GST {slab}%</td>
+                        <td className="px-2 py-0.5 text-right">{slabTaxable.toFixed(2)}</td>
+                        <td className="px-2 py-0.5 text-right font-bold">{slabTax.toFixed(2)}</td>
+                      </tr>;
+                    })}
+                    <tr className="bg-slate-50 font-bold border-t border-slate-300">
+                      <td className="px-2 py-1">TOTAL</td>
+                      <td className="px-2 py-1 text-right">{invoiceSubTotal.toFixed(2)}</td>
+                      <td className="px-2 py-1 text-right">{invoiceTotalGst.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="border border-slate-200 rounded-lg p-3 text-xs space-y-1">
+                <div className="flex justify-between"><span className="text-slate-500">Taxable (AMOUNT)</span><span className="font-bold">₹{invoiceSubTotal.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">IGST (VALUE)</span><span className="font-bold text-blue-700">₹{invoiceTotalGst.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Round off</span><span>{invoiceRoundOff.toFixed(2)}</span></div>
+                <div className="flex justify-between border-t border-slate-200 pt-1 mt-1">
+                  <span className="font-black text-sm">Grand Total</span>
+                  <span className="font-black text-sm text-sky-700">₹{invoiceGrandTotal.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="pt-3 border-t flex justify-between items-center">
             <p className="text-slate-400 text-xs">Invoice posted under <span className="font-mono font-bold text-slate-600">WHO-</span> prefix.</p>
             <div className="flex gap-3">
-              <button type="button" onClick={() => setShowInvoiceModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button type="button" onClick={() => { setShowInvoiceModal(false); setInvoiceForm(blankForm()); setPendingItem(blankItem()); }} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
               <button type="submit" disabled={isSaving || invoiceForm.items.length === 0}
-                className="px-8 py-2 bg-primary text-white font-bold rounded-lg hover:bg-sky-600 flex items-center gap-2 disabled:opacity-50">
-                {isSaving ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />} Finalize & Post
+                className="px-8 py-2 bg-primary text-white font-bold rounded-lg hover:bg-sky-600 flex items-center gap-2 disabled:opacity-50 text-sm">
+                {isSaving ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle size={16} />} Finalize & Post
               </button>
             </div>
           </div>
