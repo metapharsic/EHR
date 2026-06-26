@@ -12,12 +12,16 @@ import { apiClient } from '../services/apiClient';
 
 // ── Company info for invoice header (edit here or pull from settings API) ──
 const COMPANY = {
-  name: 'Metapharsic Lifesciences Pvt. Ltd.',
-  address: 'Plot No. 42, MIDC Industrial Area, Pune – 411 028',
-  phone: '+91 98765 43210',
-  email: 'sales@metapharsic.com',
-  gstin: '27AABCM1234A1ZK',
-  dl: 'MH-PUN-20B-12345',
+  name: 'METAPHARSIC LIFESCIENCES',
+  address: 'GROUND FLOOR, HMT NAGAR, STREET NO 5, HNO4-9-147, NACHARAM, UPPAL, Medchal Malkajgiri, Hyderabad, Telangana - 500076',
+  phone: '9533388894, 9985589599, 99855895',
+  email: 'metapharsic@gmail.com',
+  gstin: '36ACHFM0773D1ZC',
+  dl: 'TG/MDL/2026-147387, TG/MDL/2026-147387',
+  bank_name: 'HDFC BANK',
+  bank_branch: 'NACHARAM, HYDERABAD',
+  bank_account: '50200111658794',
+  bank_ifsc: 'HDFC0000108',
   logo: '/logo.svg'
 };
 
@@ -148,241 +152,285 @@ const Sales: React.FC = () => {
   const handlePrint = () => {
     const inv2 = invoiceFull || selectedInvoice;
     if (!inv2) return;
-    const w = window.open('', '_blank', 'width=1100,height=800');
+    const w = window.open('', '_blank', 'width=1200,height=900');
     if (!w) return;
 
-    const subTotal = Number(inv2.sub_total || inv2.total_taxable || 0);
-    const gstTotal = Number(inv2.total_gst || 0);
-    const cgst = +(gstTotal / 2).toFixed(2);
-    const sgst = +(gstTotal / 2).toFixed(2);
-    const netPayable = Number(inv2.net_payable || inv2.net_amount || 0);
-    const roundOff = +(Math.round(netPayable) - netPayable).toFixed(2);
-    const netFinal = Math.round(netPayable);
+    const fmtDate = (d: string) => { try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g,'-'); } catch { return d||''; } };
+    const fmtExp  = (d: string) => { if (!d) return ''; try { const dt=new Date(d); return `${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getFullYear()).slice(-2)}`; } catch { return d; } };
+    const n2 = (n: number) => n.toFixed(2);
+    const inr = (n: number) => n.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 
-    const fmtDate = (d: string) => { try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return d; } };
-    const fmtExp = (d: string) => { if (!d) return '—'; try { const dt = new Date(d); return `${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; } catch { return d; } };
-    const inr = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Detect IGST (interstate) vs CGST+SGST (intrastate Telangana=36)
+    const partyGstin = inv2.gstin || inv2.party_gstin || '';
+    const isIGST = partyGstin && !partyGstin.startsWith('36');
 
-    // Group items by GST% for HSN tax summary table
-    const gstGroups: Record<string, { taxable: number; cgst: number; sgst: number }> = {};
-    invoiceItems.forEach(item => {
-      const pct = String(item.gst_percent || 12);
-      const taxable = Number(item.taxable_value || (item.quantity * item.ptr) || 0);
-      const tax = +(taxable * Number(pct) / 100).toFixed(2);
-      if (!gstGroups[pct]) gstGroups[pct] = { taxable: 0, cgst: 0, sgst: 0 };
-      gstGroups[pct].taxable += taxable;
-      gstGroups[pct].cgst += tax / 2;
-      gstGroups[pct].sgst += tax / 2;
+    // Build per-item calcs
+    type ItemCalc = { taxable:number; igst:number; cgst:number; sgst:number; amount:number; gst:number };
+    const calcItems: ItemCalc[] = invoiceItems.map(item => {
+      const qty   = Number(item.quantity)||0;
+      const rate  = Number(item.ptr||item.rate||item.selling_price||0);
+      const disc  = Number(item.discount_percent||0);
+      const gst   = Number(item.gst_percent||item.gst_rate||12);
+      const taxable = +(rate*qty*(1-disc/100)).toFixed(2);
+      const tax   = +(taxable*gst/100).toFixed(2);
+      return { taxable, gst, igst: isIGST?tax:0, cgst: isIGST?0:+(tax/2).toFixed(2), sgst: isIGST?0:+(tax/2).toFixed(2), amount: taxable };
     });
-    const gstSummaryRows = Object.entries(gstGroups).map(([pct, g]) =>
-      `<tr><td style="padding:4px 8px;">${pct}%</td>
-        <td style="padding:4px 8px;text-align:right;">₹${inr(g.taxable)}</td>
-        <td style="padding:4px 8px;text-align:center;">${+pct/2}%</td>
-        <td style="padding:4px 8px;text-align:right;">₹${inr(g.cgst)}</td>
-        <td style="padding:4px 8px;text-align:center;">${+pct/2}%</td>
-        <td style="padding:4px 8px;text-align:right;">₹${inr(g.sgst)}</td>
-        <td style="padding:4px 8px;text-align:right;font-weight:700;">₹${inr(g.cgst+g.sgst)}</td>
-      </tr>`
-    ).join('');
 
-    const itemRows = invoiceItems.map((item, i) => {
-      const freeQty = item.free_quantity || 0;
-      const hasScheme = item.scheme_type === '10+7' || freeQty > 0;
-      const schemeLabel = item.scheme_type && item.scheme_type !== 'none' ? item.scheme_type : (freeQty > 0 ? `+${freeQty}` : '—');
-      const taxable = Number(item.taxable_value || (item.quantity * item.ptr) || 0);
-      const itemGst = +(taxable * (item.gst_percent || 12) / 100).toFixed(2);
-      const itemCgst = +(itemGst / 2).toFixed(2);
-      const itemSgst = +(itemGst / 2).toFixed(2);
-      const amt = Number(item.total_amount || (taxable + itemGst) || 0);
-      return `<tr style="background:${i%2===0?'#fff':'#f8fafc'}">
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:center;color:#64748b;">${i+1}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;font-weight:600;font-size:10.5px;">${item.product_name || '—'}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:9.5px;text-align:center;">${item.batch_no || '—'}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;font-size:9.5px;text-align:center;">${fmtExp(item.expiry)}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;">${item.quantity}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:center;font-weight:700;color:${hasScheme?'#059669':'#94a3b8'};">${hasScheme?freeQty:'—'}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:9px;color:${hasScheme?'#065f46':'#94a3b8'};font-weight:${hasScheme?'700':'400'};">${schemeLabel}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:9.5px;">₹${Number(item.mrp||0).toFixed(2)}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:800;color:#0284c7;">₹${Number(item.ptr||0).toFixed(2)}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:9.5px;">₹${inr(taxable)}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:9px;">${item.gst_percent||12}%</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:9.5px;">₹${inr(itemCgst)}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-size:9.5px;">₹${inr(itemSgst)}</td>
-        <td style="padding:5px 6px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:800;">₹${inr(amt)}</td>
+    // GST slab groups
+    const slabs: Record<string,{total:number;scheme:number;disc:number;tax:number}> = {};
+    [0,5,12,18,28].forEach(s => { slabs[s] = {total:0,scheme:0,disc:0,tax:0}; });
+    invoiceItems.forEach((item,i) => {
+      const g = Number(item.gst_percent||item.gst_rate||12);
+      const k = [0,5,12,18,28].includes(g)?g:12;
+      slabs[k].total  += calcItems[i].taxable;
+      slabs[k].tax    += isIGST ? calcItems[i].igst : calcItems[i].cgst+calcItems[i].sgst;
+    });
+
+    const totalTaxable = calcItems.reduce((s,c)=>s+c.taxable,0);
+    const totalIgst    = calcItems.reduce((s,c)=>s+c.igst,0);
+    const totalCgst    = calcItems.reduce((s,c)=>s+c.cgst,0);
+    const totalSgst    = calcItems.reduce((s,c)=>s+c.sgst,0);
+    const totalTax     = isIGST ? totalIgst : totalCgst+totalSgst;
+    const netBeforeRound = totalTaxable + totalTax;
+    const roundOff     = +(Math.round(netBeforeRound) - netBeforeRound).toFixed(2);
+    const grandTotal   = Math.round(netBeforeRound);
+    const totalQty     = invoiceItems.reduce((s,i)=>s+(Number(i.quantity)||0),0);
+
+    // Amount in words
+    const numWords = (n: number): string => {
+      const a=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+      const b=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+      const c=(x:number):string=>{
+        if(x<20)return a[x];if(x<100)return b[Math.floor(x/10)]+(x%10?' '+a[x%10]:'');
+        if(x<1000)return a[Math.floor(x/100)]+' Hundred'+(x%100?' '+c(x%100):'');
+        if(x<100000)return c(Math.floor(x/1000))+' Thousand'+(x%1000?' '+c(x%1000):'');
+        if(x<10000000)return c(Math.floor(x/100000))+' Lakh'+(x%100000?' '+c(x%100000):'');
+        return c(Math.floor(x/10000000))+' Crore'+(x%10000000?' '+c(x%10000000):'');
+      };
+      const rs=Math.floor(n); const ps=Math.round((n-rs)*100);
+      return 'Rs. '+c(rs)+' and '+c(ps)+' Paise only';
+    };
+
+    // Item rows
+    const td = (val:string,align='left',bold=false,extra='')=>
+      `<td style="border:1px solid #999;padding:3px 4px;font-size:9px;text-align:${align};${bold?'font-weight:700;':''}${extra}">${val}</td>`;
+
+    const itemRows = invoiceItems.map((item,i)=>{
+      const c = calcItems[i];
+      const freeQty = Number(item.free_quantity||0);
+      const schemeLabel = item.scheme_type&&item.scheme_type!=='none' ? item.scheme_type : (freeQty>0?`+${freeQty}`:' ');
+      return `<tr>
+        ${td(String(i+1),'center')}
+        ${td(item.hsn_code||item.hsn||'','center')}
+        ${td(item.product_name||'','left',true)}
+        ${td(item.pack||item.pack_size||'','center')}
+        ${td(n2(Number(item.quantity||0)),'center',true)}
+        ${td(n2(freeQty),'center')}
+        ${td(item.batch_no||'','center')}
+        ${td(item.manufacturer||item.mfr_code||'','center')}
+        ${td(fmtExp(item.expiry||item.expiry_date||''),'center')}
+        ${td(n2(Number(item.old_mrp||0)),'right')}
+        ${td(n2(Number(item.mrp||0)),'right')}
+        ${td(n2(Number(item.ptr||item.rate||0)),'right',true)}
+        ${td(n2(Number(item.discount_percent||0)),'right')}
+        ${td(n2(c.gst),'right')}
+        ${td(n2(isIGST?c.igst:c.cgst+c.sgst),'right','color:#00008B')}
+        ${td(n2(c.taxable),'right',true)}
       </tr>`;
     }).join('');
 
+    // GST class rows
+    const classRows = [5,12,18,28].map(s=>{
+      const sl = slabs[s];
+      const label = isIGST ? `IGST ${n2(s)}%` : `GST ${n2(s)}%`;
+      return `<tr>
+        <td style="border:1px solid #999;padding:2px 4px;font-size:8.5px;">${label}</td>
+        <td style="border:1px solid #999;padding:2px 4px;font-size:8.5px;text-align:right;">${n2(sl.total)}</td>
+        <td style="border:1px solid #999;padding:2px 4px;font-size:8.5px;text-align:right;">0.00</td>
+        <td style="border:1px solid #999;padding:2px 4px;font-size:8.5px;text-align:right;">0.00</td>
+        <td style="border:1px solid #999;padding:2px 4px;font-size:8.5px;text-align:right;font-weight:700;">${n2(sl.tax)}</td>
+      </tr>`;
+    }).join('');
+
+    const taxLabel = isIGST ? 'IGST PAYABLE' : 'CGST+SGST PAYABLE';
+
     w.document.write(`<!DOCTYPE html><html><head>
-      <title>Invoice ${inv2.invoice_no}</title>
+      <title>GST Invoice ${inv2.invoice_no}</title>
       <style>
         *{box-sizing:border-box;margin:0;padding:0;}
-        body{font-family:Arial,sans-serif;font-size:10px;color:#1e293b;background:#fff;}
-        .page{width:297mm;min-height:210mm;padding:10mm 12mm;position:relative;margin:0 auto;}
-        .wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);
-          font-size:100px;font-weight:900;color:rgba(14,165,233,0.035);white-space:nowrap;
-          pointer-events:none;z-index:0;letter-spacing:14px;}
-        .body{position:relative;z-index:1;}
-        /* ─ Header ─ */
-        .hdr{display:flex;justify-content:space-between;align-items:flex-start;
-          border-bottom:2.5px double #0284c7;padding-bottom:10px;margin-bottom:10px;}
-        .co-name{font-size:17px;font-weight:900;color:#0284c7;letter-spacing:-0.5px;}
-        .co-sub{font-size:9px;color:#64748b;margin-top:3px;line-height:1.6;}
-        .co-lic{font-family:monospace;font-size:8.5px;color:#0f172a;margin-top:4px;font-weight:700;line-height:1.5;}
-        .inv-r{text-align:right;}
-        .inv-r h1{font-size:22px;font-weight:900;color:#0f172a;letter-spacing:3px;text-transform:uppercase;}
-        .inv-r .ino{font-size:13px;font-weight:700;color:#0284c7;font-family:monospace;margin-top:3px;}
-        .inv-r .imeta{font-size:9px;color:#475569;margin-top:3px;line-height:1.7;}
-        /* ─ Bill / Ship ─ */
-        .bill-row{display:flex;gap:8px;margin-bottom:8px;}
-        .bbox{flex:1;border:1px solid #e2e8f0;border-radius:5px;padding:8px;}
-        .blbl{font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:4px;}
-        .bname{font-size:12px;font-weight:800;color:#0f172a;}
-        .bsub{font-size:8.5px;color:#64748b;margin-top:2px;line-height:1.5;}
-        /* ─ Items Table ─ */
-        table.items{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:9.5px;}
-        table.items thead th{background:#1e293b;color:#fff;padding:6px 6px;text-align:left;
-          font-size:8px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;white-space:nowrap;}
-        table.items thead th.c{text-align:center;}
-        table.items thead th.r{text-align:right;}
-        table.items tfoot td{background:#f1f5f9;padding:5px 6px;font-size:9.5px;border-top:1px solid #cbd5e1;}
-        /* ─ HSN Summary ─ */
-        table.hsn{width:100%;border-collapse:collapse;font-size:9px;margin-bottom:10px;}
-        table.hsn thead th{background:#f1f5f9;padding:5px 8px;text-align:left;font-weight:700;
-          border:1px solid #e2e8f0;font-size:8px;text-transform:uppercase;}
-        table.hsn tbody td{border:1px solid #e2e8f0;}
-        /* ─ Totals ─ */
-        .tot-wrap{display:flex;justify-content:flex-end;margin-bottom:10px;}
-        .tot-box{width:220px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;}
-        .trow{display:flex;justify-content:space-between;padding:5px 10px;border-bottom:1px solid #f1f5f9;font-size:10px;}
-        .trow.net{background:#1e293b;color:#38bdf8;font-weight:900;font-size:13px;border:none;padding:8px 10px;}
-        /* ─ Footer ─ */
-        .foot{display:flex;justify-content:space-between;align-items:flex-end;
-          border-top:1px solid #e2e8f0;padding-top:10px;margin-top:4px;}
-        .terms{font-size:8px;color:#94a3b8;max-width:340px;line-height:1.6;}
-        .sig{text-align:center;}
-        .sig-line{border-top:1px solid #94a3b8;width:150px;padding-top:3px;font-size:8px;color:#64748b;margin-top:32px;}
-        @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+        body{font-family:Arial,sans-serif;font-size:9.5px;color:#000;background:#fff;}
+        .page{width:210mm;padding:6mm 8mm;margin:0 auto;}
+        table{border-collapse:collapse;}
+        @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+          @page{size:A4 portrait;margin:6mm;}}
       </style></head><body>
       <div class="page">
-        <div class="wm">${COMPANY.name.split(' ')[0].toUpperCase()}</div>
-        <div class="body">
 
-          <!-- HEADER -->
-          <div class="hdr">
-            <div style="display:flex;align-items:flex-start;gap:12px;">
-              <img src="${window.location.origin}${COMPANY.logo}" alt="logo"
-                style="height:56px;width:56px;object-fit:contain;border:1px solid #e2e8f0;border-radius:10px;padding:4px;"
-                onerror="this.style.display='none'" />
-              <div>
-                <div class="co-name">${COMPANY.name}</div>
-                <div class="co-sub">${COMPANY.address}<br>${COMPANY.phone} &nbsp;·&nbsp; ${COMPANY.email}</div>
-                <div class="co-lic">GSTIN: ${COMPANY.gstin}<br>D.L. No.: ${COMPANY.dl}</div>
+        <!-- TOP BORDER -->
+        <div style="border:2px solid #000;padding:0;">
+
+          <!-- ROW 1: Seller | Invoice | Buyer -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1.5px solid #000;">
+
+            <!-- SELLER -->
+            <div style="padding:6px 8px;border-right:1px solid #000;">
+              <div style="font-size:13px;font-weight:900;color:#000;letter-spacing:0.5px;">${COMPANY.name}</div>
+              <div style="font-size:8px;margin-top:2px;line-height:1.6;">${COMPANY.address}</div>
+              <div style="font-size:8px;margin-top:2px;">GSTIN : <strong>${COMPANY.gstin}</strong></div>
+              <div style="font-size:8px;">Phone : ${COMPANY.phone}</div>
+              <div style="font-size:8px;">D.L. NO.: <strong>${COMPANY.dl}</strong></div>
+            </div>
+
+            <!-- GST INVOICE CENTRE -->
+            <div style="padding:4px 6px;border-right:1px solid #000;text-align:center;">
+              <div style="font-size:16px;font-weight:900;color:#000;letter-spacing:2px;">GST INVOICE</div>
+              <div style="font-size:10px;font-weight:700;margin-bottom:4px;">${inv2.payment_mode||'CREDIT'}</div>
+              <table style="width:100%;border-collapse:collapse;font-size:8.5px;">
+                <tr><td style="padding:1.5px 3px;font-weight:700;">Invoice No</td><td style="padding:1.5px 3px;font-weight:900;font-family:monospace;">${inv2.invoice_no}</td><td style="padding:1.5px 3px;">L.R. No.</td><td style="padding:1.5px 3px;"></td></tr>
+                <tr style="background:#f5f5f5;"><td style="padding:1.5px 3px;font-weight:700;">Invoice Date</td><td style="padding:1.5px 3px;font-weight:700;">${fmtDate(inv2.invoice_date)}</td><td style="padding:1.5px 3px;">L.R. Date</td><td style="padding:1.5px 3px;">${fmtDate(inv2.invoice_date)}</td></tr>
+                <tr><td style="padding:1.5px 3px;font-weight:700;">Order No.</td><td style="padding:1.5px 3px;"></td><td style="padding:1.5px 3px;">Cases</td><td style="padding:1.5px 3px;font-weight:700;">${invoiceItems.length}</td></tr>
+                <tr style="background:#f5f5f5;"><td style="padding:1.5px 3px;font-weight:700;">Order Date</td><td style="padding:1.5px 3px;"></td><td style="padding:1.5px 3px;">Due Date</td><td style="padding:1.5px 3px;font-weight:700;">${fmtDate(inv2.invoice_date)}</td></tr>
+              </table>
+              <div style="margin-top:4px;text-align:left;font-size:8px;">
+                <span style="font-weight:700;">Ewaybill No:</span>&nbsp;
+                <span style="font-weight:700;">Transport :-</span>&nbsp;
+                <span style="font-weight:700;">Weight :-</span>
               </div>
             </div>
-            <div class="inv-r">
-              <h1>Tax Invoice</h1>
-              <div class="ino">${inv2.invoice_no}</div>
-              <div class="imeta">
-                Date: <strong>${fmtDate(inv2.invoice_date)}</strong><br>
-                Payment: <strong>${inv2.payment_mode || 'Credit'}</strong>
-              </div>
+
+            <!-- BILLING DETAILS -->
+            <div style="padding:6px 8px;">
+              <div style="font-size:8px;font-weight:900;text-decoration:underline;margin-bottom:3px;">BILLING DETAILS</div>
+              <div style="font-size:11px;font-weight:900;">${inv2.party_name||''}</div>
+              <div style="font-size:8px;line-height:1.6;margin-top:2px;">${(inv2.party_address||'').replace(/,/g,',<br>')}</div>
+              <div style="font-size:8px;">PHONE. : ${inv2.party_phone||''}</div>
+              <div style="font-size:8px;">GSTIN : <strong>${partyGstin||''}</strong></div>
+              <div style="font-size:8px;">DL No.: <strong>${inv2.party_dl||inv2.drug_license||''}</strong></div>
+              <div style="font-size:8px;font-weight:900;text-decoration:underline;margin-top:4px;">SHIPPING DETAILS</div>
             </div>
           </div>
 
-          <!-- BILL TO -->
-          <div class="bill-row">
-            <div class="bbox">
-              <div class="blbl">Bill To / Consignee</div>
-              <div class="bname">${inv2.party_name}</div>
-              <div class="bsub">${inv2.party_address || ''}${inv2.gstin ? '<br>GSTIN: ' + inv2.gstin : ''}${inv2.party_phone ? '<br>Ph: ' + inv2.party_phone : ''}</div>
-            </div>
-            <div class="bbox" style="max-width:200px;background:#f0f9ff;border-color:#bae6fd;">
-              <div class="blbl" style="color:#0369a1;">Invoice Summary</div>
-              <div style="font-size:9px;line-height:2;">
-                <span style="color:#64748b;">Items: </span><strong>${invoiceItems.length}</strong><br>
-                <span style="color:#64748b;">Taxable: </span><strong>₹${inr(subTotal)}</strong><br>
-                <span style="color:#d97706;">CGST+SGST: </span><strong style="color:#d97706;">₹${inr(gstTotal)}</strong><br>
-                <span style="color:#0284c7;font-weight:800;">Net Payable: </span><strong style="color:#0284c7;font-size:12px;">₹${inr(netPayable)}</strong>
-              </div>
-            </div>
-          </div>
-
-          <!-- ITEMS TABLE -->
-          <table class="items">
-            <thead><tr>
-              <th class="c" style="width:24px;">#</th>
-              <th style="min-width:130px;">Product Name</th>
-              <th class="c" style="width:62px;">Batch No</th>
-              <th class="c" style="width:46px;">Expiry</th>
-              <th class="c" style="width:34px;">Qty</th>
-              <th class="c" style="width:34px;">Free</th>
-              <th class="c" style="width:46px;">Scheme</th>
-              <th class="r" style="width:52px;">MRP</th>
-              <th class="r" style="width:52px;">PTR</th>
-              <th class="r" style="width:62px;">Taxable</th>
-              <th class="c" style="width:34px;">GST%</th>
-              <th class="r" style="width:52px;">CGST</th>
-              <th class="r" style="width:52px;">SGST</th>
-              <th class="r" style="width:64px;">Amount</th>
-            </tr></thead>
-            <tbody>${itemRows || '<tr><td colspan="14" style="text-align:center;padding:16px;color:#94a3b8;">No items</td></tr>'}</tbody>
-            <tfoot>
-              <tr>
-                <td colspan="9" style="text-align:right;font-weight:700;font-size:8px;text-transform:uppercase;color:#64748b;">Taxable Sub-Total</td>
-                <td style="text-align:right;font-weight:700;">₹${inr(subTotal)}</td>
-                <td></td>
-                <td style="text-align:right;font-weight:700;">₹${inr(cgst)}</td>
-                <td style="text-align:right;font-weight:700;">₹${inr(sgst)}</td>
-                <td style="text-align:right;font-weight:800;">₹${inr(netPayable)}</td>
+          <!-- LINE ITEMS TABLE -->
+          <table style="width:100%;border-collapse:collapse;border-bottom:1px solid #000;">
+            <thead>
+              <tr style="background:#e8e8e8;">
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:center;width:20px;">S.N</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:center;width:55px;">HSN</th>
+                <th style="border:1px solid #999;padding:3px 4px;font-size:8px;text-align:left;">Product Name</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:center;width:40px;">Pack</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:center;width:36px;">Qty</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:center;width:32px;">Free</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:center;width:60px;">Batch No.</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:center;width:28px;">Mfr</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:center;width:32px;">Exp. DT</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:right;width:46px;">OLD MRP</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:right;width:46px;">NEW MRP</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:right;width:44px;">Rate</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:right;width:30px;">DIS%</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:right;width:34px;">IGST<br>%</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:right;width:52px;">VALUE</th>
+                <th style="border:1px solid #999;padding:3px 2px;font-size:8px;text-align:right;width:58px;">AMOUNT</th>
               </tr>
-            </tfoot>
+            </thead>
+            <tbody>
+              ${itemRows||'<tr><td colspan="16" style="text-align:center;padding:20px;color:#888;">No items found</td></tr>'}
+              <!-- empty rows to fill page -->
+              ${Array(Math.max(0,10-invoiceItems.length)).fill('<tr>'+Array(16).fill('<td style="border:1px solid #eee;padding:8px;"></td>').join('')+'</tr>').join('')}
+            </tbody>
           </table>
 
-          <!-- HSN-WISE TAX SUMMARY -->
-          <div style="margin-bottom:10px;">
-            <div style="font-size:8px;font-weight:800;text-transform:uppercase;color:#64748b;letter-spacing:1px;margin-bottom:4px;">GST / Tax Summary</div>
-            <table class="hsn">
-              <thead><tr>
-                <th>GST Rate</th>
-                <th style="text-align:right;">Taxable Value</th>
-                <th style="text-align:center;">CGST Rate</th>
-                <th style="text-align:right;">CGST Amt</th>
-                <th style="text-align:center;">SGST Rate</th>
-                <th style="text-align:right;">SGST Amt</th>
-                <th style="text-align:right;">Total Tax</th>
-              </tr></thead>
-              <tbody>${gstSummaryRows}</tbody>
-            </table>
-          </div>
+          <!-- FOOTER SECTION -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #000;">
 
-          <!-- NET TOTALS -->
-          <div class="tot-wrap">
-            <div class="tot-box">
-              <div class="trow"><span style="color:#64748b;">Sub-Total (Taxable)</span><span style="font-weight:700;">₹${inr(subTotal)}</span></div>
-              <div class="trow"><span style="color:#64748b;">CGST</span><span style="font-weight:700;">₹${inr(cgst)}</span></div>
-              <div class="trow"><span style="color:#64748b;">SGST</span><span style="font-weight:700;">₹${inr(sgst)}</span></div>
-              ${roundOff !== 0 ? `<div class="trow"><span style="color:#64748b;">Round Off</span><span>${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</span></div>` : ''}
-              <div class="trow net"><span>Net Payable</span><span>₹${netFinal.toLocaleString('en-IN')}</span></div>
+            <!-- LEFT: GST CLASS TABLE -->
+            <div style="border-right:1px solid #000;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#e8e8e8;">
+                    <th style="border:1px solid #999;padding:3px 4px;font-size:8px;text-align:left;width:80px;">CLASS</th>
+                    <th style="border:1px solid #999;padding:3px 4px;font-size:8px;text-align:right;">TOTAL</th>
+                    <th style="border:1px solid #999;padding:3px 4px;font-size:8px;text-align:right;">SCHEME</th>
+                    <th style="border:1px solid #999;padding:3px 4px;font-size:8px;text-align:right;">DISCOUNT</th>
+                    <th style="border:1px solid #999;padding:3px 4px;font-size:8px;text-align:right;">${isIGST?'IGST':'GST'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${classRows}
+                  <tr style="background:#e8e8e8;font-weight:900;">
+                    <td style="border:1px solid #999;padding:2px 4px;font-size:8.5px;">TOTAL</td>
+                    <td style="border:1px solid #999;padding:2px 4px;font-size:8.5px;text-align:right;">${n2(totalTaxable)}</td>
+                    <td style="border:1px solid #999;padding:2px 4px;font-size:8.5px;text-align:right;">0.00</td>
+                    <td style="border:1px solid #999;padding:2px 4px;font-size:8.5px;text-align:right;">0.00</td>
+                    <td style="border:1px solid #999;padding:2px 4px;font-size:8.5px;text-align:right;">${n2(totalTax)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style="padding:4px 6px;font-size:8.5px;font-style:italic;border-top:1px solid #ddd;">
+                ${numWords(grandTotal)}
+              </div>
+              <div style="padding:4px 6px;font-size:8px;border-top:1px dotted #ccc;"><strong>MSG:</strong></div>
+            </div>
+
+            <!-- RIGHT: TOTALS BOX -->
+            <div>
+              <table style="width:100%;border-collapse:collapse;">
+                <tr>
+                  <td colspan="2" style="border:1px solid #999;padding:2px 6px;font-size:9px;text-align:right;">
+                    Total Items :- <strong>${invoiceItems.length}</strong>
+                    &nbsp;&nbsp;&nbsp; DIS AMT. &nbsp;&nbsp;
+                    <strong style="font-size:10px;">0.00</strong>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="border:1px solid #999;padding:2px 6px;font-size:9px;">Total Qty :- <strong>${totalQty}</strong></td>
+                  <td style="border:1px solid #999;padding:2px 6px;font-size:9px;text-align:right;">${taxLabel} &nbsp; <strong>${n2(totalTax)}</strong></td>
+                </tr>
+                <tr>
+                  <td style="border:1px solid #999;padding:2px 6px;font-size:9px;"></td>
+                  <td style="border:1px solid #999;padding:2px 6px;font-size:9px;text-align:right;">Round off &nbsp; <strong>${n2(roundOff)}</strong></td>
+                </tr>
+                <tr>
+                  <td style="border:1px solid #999;padding:2px 6px;font-size:9px;"></td>
+                  <td style="border:1px solid #999;padding:2px 6px;font-size:9px;text-align:right;">CR/DR NOTE &nbsp; <strong>0.00</strong></td>
+                </tr>
+                <tr style="background:#e8e8e8;">
+                  <td colspan="2" style="border:1px solid #999;padding:2px 6px;font-size:9px;font-weight:900;text-align:right;">
+                    TOTAL &nbsp;&nbsp; ${n2(totalTaxable)}
+                  </td>
+                </tr>
+              </table>
+
+              <!-- BANK + SIGNATORY + GRAND TOTAL -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #000;">
+                <div style="padding:5px 6px;border-right:1px solid #000;font-size:8px;">
+                  <div style="font-weight:900;text-decoration:underline;margin-bottom:3px;">OUR BANK DETAILS AS :-</div>
+                  <div>Bank Name : <strong>${COMPANY.bank_name}</strong></div>
+                  <div>Branch Name : <strong>${COMPANY.bank_branch}</strong></div>
+                  <div>Account No. : <strong>${COMPANY.bank_account}</strong></div>
+                  <div>IFSC Code : <strong>${COMPANY.bank_ifsc}</strong></div>
+                  <div style="margin-top:4px;font-weight:900;text-decoration:underline;">Terms &amp; Conditions</div>
+                  <div style="line-height:1.5;margin-top:2px;">
+                    1. Goods once sold will not be taken back or exchanged.<br>
+                    2. Bills not paid due date will attract 24% interest.<br>
+                    3. All disputes subject to Jurisdication only.<br>
+                    4. MRP revised as per reduced GST slab.
+                  </div>
+                </div>
+                <div style="padding:5px 6px;display:flex;flex-direction:column;justify-content:space-between;">
+                  <div style="font-size:8.5px;text-align:center;font-weight:700;">FOR &nbsp; ${COMPANY.name}</div>
+                  <div style="text-align:center;margin-top:8px;">
+                    <div style="font-size:8px;color:#555;">Authorised Signatory</div>
+                  </div>
+                  <div style="border:2px solid #000;padding:6px;text-align:center;margin-top:8px;background:#f9f9f9;">
+                    <div style="font-size:9px;font-weight:700;">Grand Total</div>
+                    <div style="font-size:18px;font-weight:900;">${grandTotal.toLocaleString('en-IN')}.00</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- FOOTER -->
-          <div class="foot">
-            <div class="terms">
-              <strong style="color:#0f172a;">Terms &amp; Conditions:</strong><br>
-              1. Goods once sold will not be taken back without prior written approval.<br>
-              2. Interest @ 18% p.a. on overdue amounts after due date.<br>
-              3. All disputes subject to local jurisdiction only.<br>
-              4. E. &amp; O.E. — This is a computer generated invoice.
-            </div>
-            <div class="sig">
-              <div style="font-size:8px;color:#64748b;">For</div>
-              <div style="font-weight:800;font-size:10px;color:#0f172a;margin-top:2px;">${COMPANY.name}</div>
-              <div class="sig-line">Authorised Signatory</div>
-            </div>
-          </div>
-
-        </div>
+        </div><!-- end border -->
       </div>
       <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}</script>
       </body></html>`);
