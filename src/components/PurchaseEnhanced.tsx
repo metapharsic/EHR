@@ -129,14 +129,16 @@ const PurchaseEnhanced: React.FC = () => {
  setIsCreating(true);
  try {
  // compute totals for submission
- let igstTotal=0, discTotal=0, grandTotal=0;
+ let igstTotal=0, discTotal=0, taxableTotal=0;
  newOrderItems.forEach(item => {
  const qty=Number(item.quantity)||0, rate=Number(item.purchase_rate)||0;
  const disc=Number(item.discount_percent)||0, gst=Number(item.gst_rate)||0;
  const taxable=rate*qty*(1-disc/100);
- igstTotal+=taxable*gst/100; discTotal+=rate*qty*disc/100; grandTotal+=taxable*(1+gst/100);
+ igstTotal+=taxable*gst/100; discTotal+=rate*qty*disc/100; taxableTotal+=taxable;
  });
- const roundOff = Math.round(grandTotal)-grandTotal;
+ const netTotal = taxableTotal + igstTotal;
+ const roundOff = Math.round(netTotal)-netTotal;
+ const grandTotal = netTotal + roundOff;
  const response = await apiClient.post('/api/purchase', {
  invoice_no: (newOrderForm as any).supplier_invoice_no || newOrderForm.invoice_no,
  supplier_invoice_no: (newOrderForm as any).supplier_invoice_no,
@@ -1195,8 +1197,8 @@ const PurchaseEnhanced: React.FC = () => {
  {newOrderItems.map((item, idx) => {
  const qty=Number(item.quantity)||0, rate=Number(item.purchase_rate)||0;
  const disc=Number(item.discount_percent)||0, gst=Number(item.gst_rate)||0;
- const taxable=rate*qty*(1-disc/100);
- const amount=taxable*(1+gst/100);
+ const taxable=rate*qty*(1-disc/100); // AMOUNT col = taxable (pharma format)
+ const igstAmt=taxable*gst/100;      // VALUE col = tax only (pharma format)
  const iCls='w-full border-0 outline-none font-bold text-slate-800 bg-transparent text-center px-0.5';
  const isCharge = item.is_charge;
  return (
@@ -1277,11 +1279,11 @@ const PurchaseEnhanced: React.FC = () => {
  {[0,5,12,18,28].map(g => <option key={g} value={g}>{g}%</option>)}
  </select>
  </td>
- <td className="px-1.5 py-1 text-right font-bold text-slate-700 border-r border-slate-100 whitespace-nowrap" style={{minWidth:'75px'}}>
- {taxable.toFixed(2)}
+ <td className="px-1.5 py-1 text-right font-bold text-blue-700 border-r border-slate-100 whitespace-nowrap" style={{minWidth:'75px'}}>
+ {igstAmt.toFixed(2)}
  </td>
  <td className="px-1.5 py-1 text-right font-bold text-slate-900 border-r border-slate-100 whitespace-nowrap" style={{minWidth:'80px'}}>
- {amount.toFixed(2)}
+ {taxable.toFixed(2)}
  </td>
  <td className="px-1 py-1" style={{minWidth:'25px'}}>
  <button onClick={() => handleRemoveItem(idx,true)} className="text-rose-400 hover:text-rose-600"><Trash2 size={12}/></button>
@@ -1306,16 +1308,17 @@ const PurchaseEnhanced: React.FC = () => {
  const taxable=rate*qty-discAmt;
  const igstAmt=taxable*gst/100;
  const amount=taxable+igstAmt;
- totalValue+=taxable; totalIgst+=igstAmt; totalDisc+=discAmt; totalAmt+=amount;
+ totalValue+=taxable; totalIgst+=igstAmt; totalDisc+=discAmt; totalAmt+=taxable;
  totalQty+=qty; totalFree+=Number(item.free_quantity)||0;
  const gKey=`IGST ${gst}%`;
  if(!gstGroups[gKey]) gstGroups[gKey]={total:0,scheme:0,disc:0,igst:0};
- gstGroups[gKey].total+=taxable+igstAmt;
+ gstGroups[gKey].total+=taxable; // taxable only, not including IGST
  gstGroups[gKey].disc+=discAmt;
  gstGroups[gKey].igst+=igstAmt;
  });
- const roundOff = Math.round(totalAmt) - totalAmt;
- const grandTotal = totalAmt + roundOff;
+ const netTotal = totalAmt + totalIgst; // taxable + igst
+ const roundOff = Math.round(netTotal) - netTotal;
+ const grandTotal = netTotal + roundOff;
  return (
  <div className="border border-slate-300 rounded-lg overflow-hidden">
  <div className="grid grid-cols-2 divide-x divide-slate-200">
