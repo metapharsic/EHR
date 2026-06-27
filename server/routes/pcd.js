@@ -468,7 +468,7 @@ router.get("/targets", async (req, res) => {
     const { partner_id } = req.query;
     const companyId = req.user?.companyId || 1;
 
-    let q = "SELECT t.*, p.name AS partner_name, p.partner_grade FROM pcd_targets t LEFT JOIN pcd_partners p ON p.id = t.partner_id WHERE t.company_id = $1";
+    let q = "SELECT t.*, COALESCE(par.name, p.name) AS partner_name, p.partner_grade FROM pcd_targets t LEFT JOIN pcd_partners p ON p.id = t.partner_id LEFT JOIN parties par ON par.id = p.converted_party_id WHERE t.company_id = $1";
     const params = [companyId];
 
     if (partner_id) {
@@ -583,7 +583,7 @@ router.get("/transactions", async (req, res) => {
     const { partner_id, payment_status, from, to } = req.query;
     const companyId = req.user?.companyId || 1;
 
-    let q = "SELECT t.*, p.name AS partner_name FROM pcd_transactions t LEFT JOIN pcd_partners p ON p.id = t.partner_id WHERE t.company_id = $1";
+    let q = "SELECT t.*, COALESCE(par.name, p.name) AS partner_name FROM pcd_transactions t LEFT JOIN pcd_partners p ON p.id = t.partner_id LEFT JOIN parties par ON par.id = p.converted_party_id WHERE t.company_id = $1";
     const params = [companyId];
 
     if (partner_id) { params.push(partner_id); q += ` AND t.partner_id = $${params.length}`; }
@@ -848,9 +848,10 @@ router.get("/commissions", async (req, res) => {
   try {
     const { partner_id, payment_status, period } = req.query;
     const companyId = req.user?.companyId || 1;
-    let q = `SELECT c.*, p.name AS partner_name, p.partner_grade
+    let q = `SELECT c.*, COALESCE(par.name, p.name) AS partner_name, p.partner_grade
              FROM pcd_commissions c
              LEFT JOIN pcd_partners p ON p.id = c.partner_id
+             LEFT JOIN parties par ON par.id = p.converted_party_id
              WHERE c.company_id = $1`;
     const params = [companyId];
     if (partner_id) { params.push(partner_id); q += ` AND c.partner_id = $${params.length}`; }
@@ -996,9 +997,10 @@ router.get("/receivables", async (req, res) => {
                r.created_at, r.updated_at, r.company_id,
                GREATEST(0, (CURRENT_DATE - r.due_date)::int) AS days_overdue,
                CASE WHEN r.outstanding_amount > COALESCE(p.credit_limit, 100000) THEN true ELSE false END AS credit_limit_exceeded,
-               p.name AS partner_name
+               COALESCE(par.name, p.name) AS partner_name
              FROM pcd_receivables r
              LEFT JOIN pcd_partners p ON p.id = r.partner_id
+             LEFT JOIN parties par ON par.id = p.converted_party_id
              WHERE r.company_id = $1`;
     const params = [companyId];
     if (partner_id) { params.push(partner_id); q += ` AND r.partner_id = $${params.length}`; }

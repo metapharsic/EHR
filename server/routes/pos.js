@@ -150,6 +150,19 @@ router.put('/parties/:id', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Customer not found' });
         }
 
+        const partyId = req.params.id;
+        const updatedName = rows[0].name;
+
+        // Cascade name change to denormalized columns across ERP
+        await Promise.allSettled([
+            // OMS orders store distributor_name as text
+            db.query("UPDATE orders SET distributor_name=$1 WHERE distributor_id=$2", [updatedName, partyId]),
+            // PCD partners linked via converted_party_id
+            db.query("UPDATE pcd_partners SET name=$1 WHERE converted_party_id=$2", [updatedName, partyId]),
+            // Sales invoices store customer_name as text
+            db.query("UPDATE sales_invoices SET customer_name=$1 WHERE party_id=$2", [updatedName, partyId]),
+        ]);
+
         res.json({ success: true, data: { ...rows[0], ledger: [] } });
     } catch (error) {
         logger.error('Failed to update party', { error: error.message, partyId: req.params.id });

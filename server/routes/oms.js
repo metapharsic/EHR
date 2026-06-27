@@ -1154,7 +1154,7 @@ router.get('/outstanding', verifyTokenMiddleware, asyncRoute(async (req, res) =>
         const result = await db.query(`
             SELECT
                 o.distributor_id,
-                o.distributor_name,
+                COALESCE(p.name, o.distributor_name) AS distributor_name,
                 COALESCE(p.current_balance, 0)                                            AS current_balance,
                 COALESCE(SUM(o.total_amount) FILTER (WHERE CURRENT_DATE - o.order_date <= 30), 0)  AS orders_0_30,
                 COALESCE(SUM(o.total_amount) FILTER (WHERE CURRENT_DATE - o.order_date BETWEEN 31 AND 60), 0) AS orders_31_60,
@@ -1164,7 +1164,7 @@ router.get('/outstanding', verifyTokenMiddleware, asyncRoute(async (req, res) =>
             FROM orders o
             LEFT JOIN parties p ON p.id = o.distributor_id
             WHERE o.status = 'Invoiced'
-            GROUP BY o.distributor_id, o.distributor_name, p.current_balance
+            GROUP BY o.distributor_id, o.distributor_name, p.name, p.current_balance
             ORDER BY total_invoiced_unpaid DESC
         `);
         res.json({ success: true, data: result.rows });

@@ -28,19 +28,25 @@ router.get('/', async (req, res) => {
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT si.*, si.customer_name as party_name,
+      SELECT si.*,
+             COALESCE(p.name, si.customer_name) as party_name,
              si.invoice_number as invoice_no,
              si.date as invoice_date,
              si.net_amount as net_payable,
+             p.gstin as party_gstin,
+             p.mobile as party_mobile,
+             p.status as party_status,
              (SELECT COUNT(*) FROM sales_invoice_items WHERE invoice_id = si.id) as item_count
       FROM sales_invoices si
+      LEFT JOIN parties p ON p.id = si.party_id
       WHERE (si.invoice_number LIKE 'PCD-%' OR si.invoice_number LIKE 'WHO-%')
     `;
     const params = [];
 
     if (search) {
-      query += ` AND (si.invoice_number ILIKE $${params.length + 1} 
-                  OR si.customer_name ILIKE $${params.length + 1})`;
+      query += ` AND (si.invoice_number ILIKE $${params.length + 1}
+                  OR si.customer_name ILIKE $${params.length + 1}
+                  OR p.name ILIKE $${params.length + 1})`;
       params.push(`%${search}%`);
     }
 
@@ -66,10 +72,10 @@ router.get('/', async (req, res) => {
     const { rows } = await db.query(query, params);
 
     // Get total count
-    let countQuery = "SELECT COUNT(*) as count FROM sales_invoices WHERE (invoice_number LIKE 'PCD-%' OR invoice_number LIKE 'WHO-%')";
+    let countQuery = "SELECT COUNT(*) as count FROM sales_invoices si LEFT JOIN parties p ON p.id=si.party_id WHERE (si.invoice_number LIKE 'PCD-%' OR si.invoice_number LIKE 'WHO-%')";
     const countParams = [];
     if (search) {
-      countQuery += ` AND (invoice_number ILIKE $${countParams.length + 1} OR customer_name ILIKE $${countParams.length + 1})`;
+      countQuery += ` AND (si.invoice_number ILIKE $${countParams.length + 1} OR si.customer_name ILIKE $${countParams.length + 1} OR p.name ILIKE $${countParams.length + 1})`;
       countParams.push(`%${search}%`);
     }
     if (status !== 'All') {
