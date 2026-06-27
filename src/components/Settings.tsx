@@ -1256,6 +1256,7 @@ const PartiesTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [entityFilter, setEntityFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('Active');
   const [editing, setEditing] = useState<any>(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: '', entity_type: '', mobile: '', email: '', city: '', type: 'Debtor' });
@@ -1267,14 +1268,14 @@ const PartiesTab: React.FC = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/customers?limit=200${entityFilter !== 'All' ? `&entity_type=${entityFilter}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`, { headers: hdr() });
+      const r = await fetch(`/api/customers?limit=200&status=${statusFilter}${entityFilter !== 'All' ? `&entity_type=${entityFilter}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`, { headers: hdr() });
       const d = await r.json();
       setParties(d.data || []);
     } catch { setParties([]); }
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [entityFilter, search]);
+  useEffect(() => { load(); }, [entityFilter, search, statusFilter]);
 
   const invalidatePartyCache = () => {
     invalidateCache('/api/pos/parties');
@@ -1321,6 +1322,14 @@ const PartiesTab: React.FC = () => {
     setDeleting(false);
   };
 
+  const restore = async (party: any) => {
+    try {
+      await fetch(`/api/customers/${party.id}`, { method: 'PUT', headers: hdr(), body: JSON.stringify({ status: 'Active' }) });
+      invalidatePartyCache();
+      setParties(prev => prev.filter(p => p.id !== party.id));
+    } catch { /* silent */ }
+  };
+
   const filtered = parties.filter(p =>
     (!search || p.name?.toLowerCase().includes(search.toLowerCase()))
   );
@@ -1346,6 +1355,12 @@ const PartiesTab: React.FC = () => {
           <option value="All">All Entities</option>
           {ENTITY_TYPES.map(e => <option key={e}>{e}</option>)}
           <option value="__null__">— Not Set —</option>
+        </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-accent bg-white">
+          <option value="Active">Active</option>
+          <option value="Inactive">Deleted / Inactive</option>
+          <option value="All">All</option>
         </select>
         <button onClick={load} className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-600 hover:bg-slate-50">↺</button>
       </div>
@@ -1378,7 +1393,9 @@ const PartiesTab: React.FC = () => {
                 <td className="px-4 py-2 text-slate-500 text-xs">{p.city || '—'}</td>
                 <td className="px-4 py-2 text-center flex items-center justify-center gap-3">
                   <button onClick={() => setEditing({ ...p })} className="text-xs text-accent font-bold hover:underline">Edit</button>
-                  <button onClick={() => openDel(p)} className="text-xs text-red-500 font-bold hover:underline">Delete</button>
+                  {p.status === 'Inactive'
+                    ? <button onClick={() => restore(p)} className="text-xs text-emerald-600 font-bold hover:underline">Restore</button>
+                    : <button onClick={() => openDel(p)} className="text-xs text-red-500 font-bold hover:underline">Delete</button>}
                 </td>
               </tr>
             ))}

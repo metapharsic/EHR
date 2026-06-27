@@ -78,10 +78,17 @@ function computeCompliance(p) {
 // ── GET /api/customers — list with compliance ───────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    const { search = '', entity_type = 'All', compliance = 'All', page = 1, limit = 50 } = req.query;
+    const { search = '', entity_type = 'All', compliance = 'All', status = 'Active', page = 1, limit = 50 } = req.query;
     const offset = (page - 1) * limit;
     const params = [];
-    let where = "WHERE p.type IN ('Debtor','Both') AND p.status != 'Deleted'";
+    let where = "WHERE p.type IN ('Debtor','Both')";
+
+    // status filter: 'Active' (default) hides deleted/inactive, 'All' shows everything except hard-Deleted, else exact match
+    if (status === 'All') {
+      where += " AND p.status != 'Deleted'";
+    } else {
+      params.push(status); where += ` AND p.status = $${params.length}`;
+    }
 
     if (search) { params.push(`%${search}%`); where += ` AND (p.name ILIKE $${params.length} OR p.mobile ILIKE $${params.length} OR p.drug_license_no ILIKE $${params.length})`; }
     if (entity_type !== 'All') { params.push(entity_type); where += ` AND p.entity_type = $${params.length}`; }
