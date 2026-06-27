@@ -127,7 +127,7 @@ router.get('/stats', async (req, res) => {
  */
 router.get('/dropdown', async (req, res) => {
   try {
-    const partiesQuery = "SELECT id as value, name as label FROM parties WHERE type = 'Debtor' ORDER BY name";
+    const partiesQuery = "SELECT id as value, name as label FROM parties WHERE type = 'Debtor' AND status = 'Active' ORDER BY name";
     const partiesResult = await db.query(partiesQuery);
 
     res.json({

@@ -220,7 +220,7 @@ router.get('/dropdown', verifyTokenMiddleware, asyncRoute(async (req, res) => {
     try {
         const distributors = await db.query(
             `SELECT id, name, id AS value, name AS label, credit_limit, current_balance
-             FROM parties WHERE type = 'Debtor' ORDER BY name`
+             FROM parties WHERE type = 'Debtor' AND status = 'Active' ORDER BY name`
         );
         const godowns = await db.query(
             `SELECT id, name, id AS value, name AS label FROM godowns WHERE COALESCE(status,'Active') <> 'Inactive' ORDER BY name`
@@ -661,7 +661,7 @@ router.post('/ai/insights', verifyTokenMiddleware, asyncRoute(async (req, res) =
             SELECT id, order_number, distributor_name, status, priority, total_amount, ai_risk_level
             FROM orders WHERE status NOT IN ('Rejected','Cancelled') ORDER BY order_date DESC LIMIT 100`);
         const distributors = await db.query(
-            `SELECT id, name, credit_limit, current_balance FROM parties WHERE type = 'Debtor' LIMIT 100`);
+            `SELECT id, name, credit_limit, current_balance FROM parties WHERE type = 'Debtor' AND status = 'Active' LIMIT 100`);
         let demand = { rows: [] };
         try { demand = await db.query('SELECT * FROM regional_pharmaceutical_demand LIMIT 50'); } catch (_) { /* optional table */ }
 
@@ -1246,7 +1246,7 @@ router.post('/ai/predict-orders', verifyTokenMiddleware, asyncRoute(async (req, 
         }
 
         const distributorsRes = await db.query(
-            `SELECT id, name FROM parties WHERE type = 'Debtor' ORDER BY name`
+            `SELECT id, name FROM parties WHERE type = 'Debtor' AND status = 'Active' ORDER BY name`
         );
 
         const result = await aiAgent.predictNextOrders(orders, distributorsRes.rows);
