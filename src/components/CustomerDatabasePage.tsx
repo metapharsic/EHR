@@ -14,6 +14,7 @@ import { getAllParties, saveParty, deleteParty } from '../services/databaseServi
 import { useNotifications } from '../context/NotificationContext';
 import { useAppStore } from '../store/useAppStore';
 import { apiClient } from '../services/apiClient';
+import { invalidateCache } from '../hooks/useDataFetch';
 
 
 /* ─────────────────────────────── Constants ─────────────────────────────── */
@@ -1209,6 +1210,13 @@ const CustomerDatabasePage: React.FC = () => {
     try {
       const ok = await deleteParty(party.id);
       if (!ok) throw new Error('Delete failed');
+      // Bust all party caches so every module dropdown reflects immediately
+      invalidateCache('/api/pos/parties');
+      invalidateCache('/api/customers');
+      invalidateCache('/api/sales/dropdown');
+      invalidateCache('/api/purchase/lists/dropdown');
+      invalidateCache('/api/oms/dropdown');
+      invalidateCache('/api/pcd');
       setCustomers(prev => prev.filter(c => c.id !== party.id));
       notify({ type: 'success', message: `${party.name} deactivated across ERP` });
     } catch (e: any) {

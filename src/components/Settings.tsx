@@ -11,6 +11,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { useCompany } from '../context/CompanyContext';
 import { useAppStore } from '../store/useAppStore';
 import settingsService from '../services/settingsService';
+import { invalidateCache } from '../hooks/useDataFetch';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1275,6 +1276,15 @@ const PartiesTab: React.FC = () => {
 
   useEffect(() => { load(); }, [entityFilter, search]);
 
+  const invalidatePartyCache = () => {
+    invalidateCache('/api/pos/parties');
+    invalidateCache('/api/customers');
+    invalidateCache('/api/sales/dropdown');
+    invalidateCache('/api/purchase/lists/dropdown');
+    invalidateCache('/api/oms/dropdown');
+    invalidateCache('/api/pcd');
+  };
+
   const save = async () => {
     setSaving(true);
     try {
@@ -1283,6 +1293,7 @@ const PartiesTab: React.FC = () => {
       } else {
         await fetch('/api/customers', { method: 'POST', headers: hdr(), body: JSON.stringify(form) });
       }
+      invalidatePartyCache();
       setEditing(null); setAdding(false); load();
     } catch { /* notify handled by global */ }
     setSaving(false);
@@ -1303,6 +1314,7 @@ const PartiesTab: React.FC = () => {
     setDeleting(true);
     try {
       await fetch(`/api/pos/parties/${confirmDel.id}`, { method: 'DELETE', headers: hdr() });
+      invalidatePartyCache();
       setParties(prev => prev.filter(p => p.id !== confirmDel.id));
       setConfirmDel(null); setDelUsage(null);
     } catch { /* silent */ }
