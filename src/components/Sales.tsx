@@ -31,7 +31,7 @@ const Sales: React.FC = () => {
   const { data: salesData, loading, refetch } = useDataFetch<any[]>('/api/sales', { cacheTime: 60000 });
   const { data: statsResponse, loading: statsLoading, refetch: refetchStats } = useDataFetch<any>('/api/sales/stats');
   const { data: dropdownData } = useDataFetch<any>('/api/sales/dropdown');
-  const { data: partiesData, loading: partiesLoading, refetch: refetchParties } = useDataFetch<any[]>('/api/pos/parties?status=Active');
+  const { data: partiesData, loading: partiesLoading, refetch: refetchParties } = useDataFetch<any[]>('/api/pos/parties?status=Active', { cacheTime: 0 });
   const { data: productsData } = useDataFetch<any[]>('/api/sales/products');
   const { data: analyticsResp } = useDataFetch<any>('/api/sales/analytics');
 
