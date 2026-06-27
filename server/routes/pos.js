@@ -244,66 +244,49 @@ router.delete('/parties/:id', async (req, res) => {
             return res.json({ success: true, deleted: true, message: 'Party permanently deleted' });
         }
 
-        // Soft delete: mark Inactive + cascade to related module records
-        const client = await db.pool.connect();
-        try {
-            await client.query('BEGIN');
-
-            // 1. Mark party inactive
-            const { rowCount } = await client.query(
-                "UPDATE parties SET status='Inactive', updated_at=NOW() WHERE id=$1", [id]
-            );
-            if (!rowCount) {
-                await client.query('ROLLBACK');
-                return res.status(404).json({ success: false, error: 'Party not found' });
-            }
-
-            // 2. Deactivate drug licenses for this party
-            await client.query(
-                "UPDATE drug_licenses SET status='Inactive' WHERE party_id=$1",
-                [id]
-            ).catch(() => {}); // table may not always exist
-
-            // 3. Deactivate CRM leads linked to this party
-            await client.query(
-                "UPDATE leads SET status='Closed' WHERE converted_party_id=$1",
-                [id]
-            ).catch(() => {});
-
-            // 4. Deactivate PCD partner links
-            await client.query(
-                "UPDATE pcd_partners SET status='Inactive' WHERE converted_party_id=$1",
-                [id]
-            ).catch(() => {});
-
-            // 5. Cancel pending OMS orders (status=Pending only — don't touch delivered)
-            await client.query(
-                "UPDATE orders SET status='Cancelled' WHERE distributor_id=$1 AND status='Pending'",
-                [id]
-            ).catch(() => {});
-
-            // 6. Cancel pending PDC cheques
-            await client.query(
-                "UPDATE pdc_cheques SET status='Cancelled' WHERE party_id=$1 AND status IN ('Pending','Scheduled')",
-                [id]
-            ).catch(() => {});
-
-            await client.query('COMMIT');
-            logger.info('Party soft-deleted with cascade', { partyId: id });
-            res.json({
-                success: true,
-                deleted: false,
-                message: 'Party deactivated and propagated across ERP modules'
-            });
-        } catch (err) {
-            await client.query('ROLLBACK');
-            throw err;
-        } finally {
-            client.release();
+        // SOFT DELETE
+        // Core party deactivation runs FIRST as its own atomic statement so it always
+        // persists. Cascades run independently afterwards — a cascade failure is logged
+        // but never rolls back the party deactivation (avoids aborted-transaction trap).
+        const { rowCount } = await db.query(
+            "UPDATE parties SET status='Inactive', updated_at=NOW() WHERE id=$1", [id]
+        );
+        if (!rowCount) {
+            return res.status(404).json({ success: false, error: 'Party not found' });
         }
+
+        // Cascade to linked module MASTER records only. Enums verified against live DB:
+        //   pcd_partners.status -> 'TERMINATED' (uppercase enum)
+        //   leads.status        -> 'Lost' (CRM terminal state)
+        // We deliberately do NOT touch orders / pdc_cheques / general_ledger here —
+        // those carry stock/financial side-effects that must go through their own
+        // state machines (releaseOrderReservations, voucher reversal). Deactivating the
+        // party already removes it from every "new transaction" dropdown, which is the goal.
+        const cascades = await Promise.allSettled([
+            db.query(
+                "UPDATE pcd_partners SET status='TERMINATED', updated_at=NOW() WHERE converted_party_id=$1 AND status IN ('ACTIVE','APPROVED','APPLIED')",
+                [id]
+            ),
+            db.query(
+                "UPDATE leads SET status='Lost' WHERE converted_party_id=$1 AND status NOT IN ('Converted','Lost')",
+                [id]
+            ),
+        ]);
+        cascades.forEach((c, i) => {
+            if (c.status === 'rejected') {
+                logger.warn('Party delete cascade step failed (non-fatal)', { step: i, error: c.reason?.message, partyId: id });
+            }
+        });
+
+        logger.info('Party soft-deleted with cascade', { partyId: id });
+        res.json({
+            success: true,
+            deleted: false,
+            message: 'Party deactivated across ERP modules'
+        });
     } catch (error) {
         logger.error('Failed to delete party', { error: error.message, partyId: id });
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: 'Failed to delete party' });
     }
 });
 
