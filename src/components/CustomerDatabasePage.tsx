@@ -162,7 +162,7 @@ const ConfirmModal = ({
   open, title, message, confirmLabel = 'Confirm', danger = false,
   onConfirm, onCancel,
 }: {
-  open: boolean; title: string; message: string; confirmLabel?: string;
+  open: boolean; title: string; message: React.ReactNode; confirmLabel?: string;
   danger?: boolean; onConfirm: () => void; onCancel: () => void;
 }) => {
   if (!open) return null;
@@ -176,7 +176,7 @@ const ConfirmModal = ({
           <AlertCircle size={24} className={danger ? 'text-red-600' : 'text-amber-600'}/>
         </div>
         <h3 id="confirm-title" className="text-base font-bold text-slate-800 text-center mb-2">{title}</h3>
-        <p className="text-sm text-slate-600 text-center mb-6">{message}</p>
+        <div className="text-sm text-slate-600 text-center mb-6">{message}</div>
         <div className="flex gap-3">
           <button onClick={onCancel}
             className="flex-1 px-4 py-2 text-sm font-medium border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors">
@@ -1046,6 +1046,8 @@ const CustomerDatabasePage: React.FC = () => {
   const [profileParty, setProfileParty] = useState<Party | null>(null);
   const [ledgerParty, setLedgerParty]   = useState<Party | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Party | null>(null);
+  const [deleteUsage, setDeleteUsage] = useState<Record<string, number> | null>(null);
+  const [loadingUsage, setLoadingUsage] = useState(false);
 
   // Filters / search / sort / pagination / view
   const [search, setSearch]           = useState('');
@@ -1191,18 +1193,30 @@ const CustomerDatabasePage: React.FC = () => {
     }
   };
 
+  const openDeleteConfirm = async (party: Party) => {
+    setConfirmDelete(party);
+    setDeleteUsage(null);
+    setLoadingUsage(true);
+    try {
+      const res = await apiClient.get(`/api/pos/parties/${party.id}/usage`);
+      if (res.success) setDeleteUsage(res.data.usage);
+    } catch { /* show dialog without usage */ }
+    finally { setLoadingUsage(false); }
+  };
+
   const handleDelete = async (party: Party) => {
     setDeletingId(party.id);
     try {
       const ok = await deleteParty(party.id);
       if (!ok) throw new Error('Delete failed');
       setCustomers(prev => prev.filter(c => c.id !== party.id));
-      notify({ type: 'success', message: `${party.name} has been deactivated` });
+      notify({ type: 'success', message: `${party.name} deactivated across ERP` });
     } catch (e: any) {
-      notify({ type: 'error', message: e.message ?? 'Failed to deactivate customer' });
+      notify({ type: 'error', message: e.message ?? 'Failed to deactivate' });
     } finally {
       setDeletingId(null);
       setConfirmDelete(null);
+      setDeleteUsage(null);
     }
   };
 
@@ -1305,12 +1319,33 @@ const CustomerDatabasePage: React.FC = () => {
       {ledgerParty && <LedgerModal party={ledgerParty} onClose={() => setLedgerParty(null)}/>}
       <ConfirmModal
         open={!!confirmDelete}
-        title="Deactivate customer?"
-        message={`"${confirmDelete?.name}" will be marked as Inactive. They can be reactivated later. All their transaction history will be preserved.`}
+        title="Deactivate party?"
+        message={
+          <div>
+            <p className="mb-2"><strong>{confirmDelete?.name}</strong> will be marked Inactive across the entire ERP.</p>
+            {loadingUsage && <p className="text-xs text-slate-400">Loading usage data…</p>}
+            {deleteUsage && (() => {
+              const entries = Object.entries(deleteUsage).filter(([,v]) => v > 0);
+              return entries.length > 0 ? (
+                <div className="mt-2 bg-amber-50 border border-amber-200 rounded p-2 text-xs">
+                  <p className="font-bold text-amber-700 mb-1">Linked records (preserved, not deleted):</p>
+                  <ul className="space-y-0.5 text-amber-800">
+                    {entries.map(([k, v]) => (
+                      <li key={k}>• {k.replace(/_/g,' ')}: <strong>{v}</strong></li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-amber-600 text-[10px]">Pending orders & PDC cheques will be cancelled. Drug licenses & leads will be closed.</p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 mt-1">No linked transactions found. Safe to deactivate.</p>
+              );
+            })()}
+          </div>
+        }
         confirmLabel="Deactivate"
         danger
         onConfirm={() => confirmDelete && handleDelete(confirmDelete)}
-        onCancel={() => setConfirmDelete(null)}
+        onCancel={() => { setConfirmDelete(null); setDeleteUsage(null); }}
       />
 
       {/* ─── Page Header ─── */}
@@ -1525,7 +1560,7 @@ const CustomerDatabasePage: React.FC = () => {
                               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-amber-700 transition-colors">
                               <Pencil size={14}/>
                             </button>
-                            <button onClick={() => setConfirmDelete(c)} disabled={isDeleting} title="Deactivate"
+                            <button onClick={() => openDeleteConfirm(c)} disabled={isDeleting} title="Deactivate"
                               className="p-1.5 rounded-lg hover:bg-red-50 text-slate-500 hover:text-red-700 disabled:opacity-40 transition-colors">
                               {isDeleting ? <Loader2 size={14} className="animate-spin"/> : <Trash2 size={14}/>}
                             </button>
@@ -1650,7 +1685,7 @@ const CustomerDatabasePage: React.FC = () => {
                       className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition-colors border border-slate-200">
                       <Pencil size={13}/>
                     </button>
-                    <button onClick={() => setConfirmDelete(c)} disabled={isDeleting} title="Deactivate"
+                    <button onClick={() => openDeleteConfirm(c)} disabled={isDeleting} title="Deactivate"
                       className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors border border-slate-200 disabled:opacity-40">
                       {isDeleting ? <Loader2 size={13} className="animate-spin"/> : <Trash2 size={13}/>}
                     </button>

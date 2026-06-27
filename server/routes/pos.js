@@ -158,24 +158,138 @@ router.put('/parties/:id', async (req, res) => {
 });
 
 /**
+ * GET /api/pos/parties/:id/usage
+ * Return transaction counts across all ERP modules referencing this party
+ */
+router.get('/parties/:id/usage', async (req, res) => {
+    const id = req.params.id;
+    try {
+        const [sales, purchases, pos, orders, payments, receipts, ledger, vouchers, pdc, returns, assets] = await Promise.all([
+            db.query("SELECT COUNT(*) AS cnt FROM sales_invoices WHERE party_id=$1", [id]),
+            db.query("SELECT COUNT(*) AS cnt FROM purchase_orders WHERE supplier_id=$1", [id]),
+            db.query("SELECT COUNT(*) AS cnt FROM pos_bills WHERE party_id=$1", [id]),
+            db.query("SELECT COUNT(*) AS cnt FROM orders WHERE distributor_id=$1", [id]),
+            db.query("SELECT COUNT(*) AS cnt FROM payment_vouchers WHERE party_id=$1", [id]),
+            db.query("SELECT COUNT(*) AS cnt FROM receipt_vouchers WHERE party_id=$1", [id]),
+            db.query("SELECT COUNT(*) AS cnt FROM general_ledger WHERE party_id=$1", [id]),
+            db.query("SELECT COUNT(*) AS cnt FROM journal_vouchers WHERE party_id=$1", [id]),
+            db.query("SELECT COUNT(*) AS cnt FROM pdc_cheques WHERE party_id=$1", [id]),
+            db.query("SELECT COUNT(*) AS cnt FROM return_notes WHERE party_id=$1", [id]),
+            db.query("SELECT COUNT(*) AS cnt FROM fixed_assets WHERE vendor_id=$1", [id]),
+        ]);
+        const usage = {
+            sales_invoices:    parseInt(sales.rows[0].cnt),
+            purchase_orders:   parseInt(purchases.rows[0].cnt),
+            pos_bills:         parseInt(pos.rows[0].cnt),
+            oms_orders:        parseInt(orders.rows[0].cnt),
+            payment_vouchers:  parseInt(payments.rows[0].cnt),
+            receipt_vouchers:  parseInt(receipts.rows[0].cnt),
+            ledger_entries:    parseInt(ledger.rows[0].cnt),
+            journal_vouchers:  parseInt(vouchers.rows[0].cnt),
+            pdc_cheques:       parseInt(pdc.rows[0].cnt),
+            return_notes:      parseInt(returns.rows[0].cnt),
+            fixed_assets:      parseInt(assets.rows[0].cnt),
+        };
+        const total = Object.values(usage).reduce((s, v) => s + v, 0);
+        res.json({ success: true, data: { usage, total } });
+    } catch (error) {
+        logger.error('Failed to fetch party usage', { error: error.message, partyId: id });
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * DELETE /api/pos/parties/:id
- * Soft-delete a customer/debtor party master record
+ * Soft-delete a party — propagates Inactive status across dependent ERP modules.
+ * Hard delete (ADMIN + ?hard=true) blocked if active transactions exist.
  */
 router.delete('/parties/:id', async (req, res) => {
+    const id = req.params.id;
     try {
         const hard = req.query.hard === 'true' && req.user?.role === 'ADMIN';
-        const sql = hard
-            ? 'DELETE FROM parties WHERE id = $1'
-            : "UPDATE parties SET status = 'Inactive', updated_at = NOW() WHERE id = $1";
-        const { rowCount } = await db.query(sql, [req.params.id]);
 
-        if (!rowCount) {
-            return res.status(404).json({ success: false, error: 'Customer not found' });
+        if (hard) {
+            // Block hard delete if any transaction records exist
+            const { rows } = await db.query(`
+                SELECT (
+                  (SELECT COUNT(*) FROM sales_invoices WHERE party_id=$1) +
+                  (SELECT COUNT(*) FROM purchase_orders WHERE supplier_id=$1) +
+                  (SELECT COUNT(*) FROM pos_bills WHERE party_id=$1) +
+                  (SELECT COUNT(*) FROM payment_vouchers WHERE party_id=$1) +
+                  (SELECT COUNT(*) FROM receipt_vouchers WHERE party_id=$1) +
+                  (SELECT COUNT(*) FROM general_ledger WHERE party_id=$1) +
+                  (SELECT COUNT(*) FROM journal_vouchers WHERE party_id=$1)
+                ) AS total
+            `, [id]);
+            if (parseInt(rows[0].total) > 0) {
+                return res.status(409).json({
+                    success: false,
+                    error: `Cannot permanently delete: ${rows[0].total} transaction records exist across ERP modules. Use soft-delete instead.`
+                });
+            }
+            await db.query('DELETE FROM parties WHERE id=$1', [id]);
+            return res.json({ success: true, deleted: true, message: 'Party permanently deleted' });
         }
 
-        res.json({ success: true, deleted: hard });
+        // Soft delete: mark Inactive + cascade to related module records
+        const client = await db.pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // 1. Mark party inactive
+            const { rowCount } = await client.query(
+                "UPDATE parties SET status='Inactive', updated_at=NOW() WHERE id=$1", [id]
+            );
+            if (!rowCount) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ success: false, error: 'Party not found' });
+            }
+
+            // 2. Deactivate drug licenses for this party
+            await client.query(
+                "UPDATE drug_licenses SET status='Inactive' WHERE party_id=$1",
+                [id]
+            ).catch(() => {}); // table may not always exist
+
+            // 3. Deactivate CRM leads linked to this party
+            await client.query(
+                "UPDATE leads SET status='Closed' WHERE converted_party_id=$1",
+                [id]
+            ).catch(() => {});
+
+            // 4. Deactivate PCD partner links
+            await client.query(
+                "UPDATE pcd_partners SET status='Inactive' WHERE converted_party_id=$1",
+                [id]
+            ).catch(() => {});
+
+            // 5. Cancel pending OMS orders (status=Pending only — don't touch delivered)
+            await client.query(
+                "UPDATE orders SET status='Cancelled' WHERE distributor_id=$1 AND status='Pending'",
+                [id]
+            ).catch(() => {});
+
+            // 6. Cancel pending PDC cheques
+            await client.query(
+                "UPDATE pdc_cheques SET status='Cancelled' WHERE party_id=$1 AND status IN ('Pending','Scheduled')",
+                [id]
+            ).catch(() => {});
+
+            await client.query('COMMIT');
+            logger.info('Party soft-deleted with cascade', { partyId: id });
+            res.json({
+                success: true,
+                deleted: false,
+                message: 'Party deactivated and propagated across ERP modules'
+            });
+        } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+        } finally {
+            client.release();
+        }
     } catch (error) {
-        logger.error('Failed to delete party', { error: error.message, partyId: req.params.id });
+        logger.error('Failed to delete party', { error: error.message, partyId: id });
         res.status(500).json({ success: false, error: error.message });
     }
 });
