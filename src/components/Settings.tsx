@@ -1259,6 +1259,9 @@ const PartiesTab: React.FC = () => {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: '', entity_type: '', mobile: '', email: '', city: '', type: 'Debtor' });
   const [saving, setSaving] = useState(false);
+  const [confirmDel, setConfirmDel] = useState<any>(null);
+  const [delUsage, setDelUsage] = useState<Record<string,number>|null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -1283,6 +1286,27 @@ const PartiesTab: React.FC = () => {
       setEditing(null); setAdding(false); load();
     } catch { /* notify handled by global */ }
     setSaving(false);
+  };
+
+  const openDel = async (party: any) => {
+    setConfirmDel(party);
+    setDelUsage(null);
+    try {
+      const r = await fetch(`/api/pos/parties/${party.id}/usage`, { headers: hdr() });
+      const d = await r.json();
+      if (d.success) setDelUsage(d.data.usage);
+    } catch { /* show dialog without usage */ }
+  };
+
+  const doDelete = async () => {
+    if (!confirmDel) return;
+    setDeleting(true);
+    try {
+      await fetch(`/api/pos/parties/${confirmDel.id}`, { method: 'DELETE', headers: hdr() });
+      setParties(prev => prev.filter(p => p.id !== confirmDel.id));
+      setConfirmDel(null); setDelUsage(null);
+    } catch { /* silent */ }
+    setDeleting(false);
   };
 
   const filtered = parties.filter(p =>
@@ -1340,8 +1364,9 @@ const PartiesTab: React.FC = () => {
                 </td>
                 <td className="px-4 py-2 text-slate-500 text-xs">{p.mobile || '—'}</td>
                 <td className="px-4 py-2 text-slate-500 text-xs">{p.city || '—'}</td>
-                <td className="px-4 py-2 text-center">
+                <td className="px-4 py-2 text-center flex items-center justify-center gap-3">
                   <button onClick={() => setEditing({ ...p })} className="text-xs text-accent font-bold hover:underline">Edit</button>
+                  <button onClick={() => openDel(p)} className="text-xs text-red-500 font-bold hover:underline">Delete</button>
                 </td>
               </tr>
             ))}
@@ -1403,6 +1428,41 @@ const PartiesTab: React.FC = () => {
             <button onClick={save} disabled={saving || !form.name} className="w-full py-2 bg-accent text-white rounded-xl text-sm font-bold disabled:opacity-50">
               {saving ? 'Saving…' : 'Add Party'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {confirmDel && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-96 border border-slate-200 p-6 space-y-4">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+              <X size={20} className="text-red-600"/>
+            </div>
+            <h4 className="font-bold text-slate-800 text-center">Deactivate party?</h4>
+            <div className="text-sm text-slate-600 text-center">
+              <p><strong>{confirmDel.name}</strong> will be marked Inactive across ERP.</p>
+              {delUsage && (() => {
+                const entries = Object.entries(delUsage).filter(([,v]) => (v as number) > 0);
+                return entries.length > 0 ? (
+                  <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-2 text-left text-xs">
+                    <p className="font-bold text-amber-700 mb-1">Linked records (preserved):</p>
+                    <ul className="space-y-0.5 text-amber-800">
+                      {entries.map(([k, v]) => <li key={k}>• {k.replace(/_/g,' ')}: <strong>{v as number}</strong></li>)}
+                    </ul>
+                    <p className="mt-1 text-amber-600 text-[10px]">Pending orders & PDC cheques will be cancelled.</p>
+                  </div>
+                ) : <p className="text-xs text-slate-400 mt-1">No linked transactions. Safe to deactivate.</p>;
+              })()}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { setConfirmDel(null); setDelUsage(null); }}
+                className="flex-1 py-2 border border-slate-300 rounded-xl text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button onClick={doDelete} disabled={deleting}
+                className="flex-1 py-2 bg-red-600 text-white rounded-xl text-sm font-bold disabled:opacity-50">
+                {deleting ? 'Deactivating…' : 'Deactivate'}
+              </button>
+            </div>
           </div>
         </div>
       )}
