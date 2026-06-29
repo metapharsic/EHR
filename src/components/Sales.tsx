@@ -47,6 +47,7 @@ const Sales: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingInvoiceNo, setEditingInvoiceNo] = useState<string>('');
   const [loadingEdit, setLoadingEdit] = useState<string | null>(null);
+  const [selectedPrintRows, setSelectedPrintRows] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState({ searchTerm: '', status: 'All' });
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -122,11 +123,23 @@ const Sales: React.FC = () => {
     } else setPendingItem(prev => ({ ...prev, product_id: '', name: '' }));
   };
 
+  const updateItem = (idx: number, field: string, value: any) => {
+    setInvoiceForm(prev => {
+      const items = [...prev.items];
+      items[idx] = { ...items[idx], [field]: value };
+      return { ...prev, items };
+    });
+  };
+
   const handleAddItem = () => {
     if (!pendingItem.product_id) { alert('Select a product.'); return; }
     if (!pendingItem.quantity || pendingItem.quantity <= 0) { alert('Enter valid qty.'); return; }
     if (!pendingItem.rate || pendingItem.rate <= 0) { alert('Enter valid rate.'); return; }
-    setInvoiceForm(prev => ({ ...prev, items: [...prev.items, { ...pendingItem }] }));
+    setInvoiceForm(prev => {
+      const newItems = [...prev.items, { ...pendingItem }];
+      setSelectedPrintRows(s => { const ns = new Set(s); ns.add(newItems.length - 1); return ns; });
+      return { ...prev, items: newItems };
+    });
     setPendingItem(blankItem());
   };
 
@@ -136,6 +149,7 @@ const Sales: React.FC = () => {
     setEditingInvoiceNo('');
     setInvoiceForm(blankForm());
     setPendingItem(blankItem());
+    setSelectedPrintRows(new Set());
   };
 
   const handleSaveInvoice = async (e: React.FormEvent) => {
@@ -191,6 +205,7 @@ const Sales: React.FC = () => {
         }))
       });
       setPendingItem(blankItem());
+      setSelectedPrintRows(new Set((d.items || []).map((_: any, i: number) => i)));
       setEditingId(row.id);
       setEditingInvoiceNo(d.invoice_no || row.invoice_no || '');
       setShowInvoiceModal(true);
@@ -519,6 +534,85 @@ const Sales: React.FC = () => {
     a.click();
   };
 
+  const handlePrintSelected = () => {
+    if (invoiceForm.items.length === 0) { alert('No items to print.'); return; }
+    const itemsToPrint = invoiceForm.items.filter((_, i) => selectedPrintRows.size === 0 || selectedPrintRows.has(i));
+    if (itemsToPrint.length === 0) { alert('No items selected.'); return; }
+    const w = window.open('', '_blank', 'width=1200,height=900');
+    if (!w) return;
+    const isIGST = true;
+    const fmtDate = (d: string) => { try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g,'-'); } catch { return d||''; } };
+    const fmtExp  = (d: string) => { if (!d) return ''; try { const dt=new Date(d); return `${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getFullYear()).slice(-2)}`; } catch { return d; } };
+    const subTotal = itemsToPrint.reduce((s,i) => s + (Number(i.quantity)||0)*(Number(i.rate)||0)*(1-(Number(i.discount_percent)||0)/100), 0);
+    const totalGst = itemsToPrint.reduce((s,i) => { const t=(Number(i.quantity)||0)*(Number(i.rate)||0)*(1-(Number(i.discount_percent)||0)/100); return s+t*(Number(i.gst_percent)||12)/100; }, 0);
+    const grandTotal = Math.round(subTotal + totalGst);
+    const rows = itemsToPrint.map((item, idx) => {
+      const qty=Number(item.quantity)||0; const rate=Number(item.rate)||0; const disc=Number(item.discount_percent)||0; const gst=Number(item.gst_percent)||12;
+      const taxable=+(qty*rate*(1-disc/100)).toFixed(2); const igst=+(taxable*gst/100).toFixed(2);
+      return `<tr style="background:${idx%2===0?'#fff':'#f8fafc'}">
+        <td style="padding:4px 6px;text-align:center">${idx+1}</td>
+        <td style="padding:4px 6px">${item.hsn_code||''}</td>
+        <td style="padding:4px 6px;font-weight:600">${item.name}</td>
+        <td style="padding:4px 6px;text-align:center">${item.pack||''}</td>
+        <td style="padding:4px 6px;text-align:right;font-weight:700">${qty}</td>
+        <td style="padding:4px 6px;text-align:right">${item.free_quantity||0}</td>
+        <td style="padding:4px 6px;font-family:monospace;font-size:10px">${item.batch_no||''}</td>
+        <td style="padding:4px 6px;text-align:center">${fmtExp(item.expiry_date||'')}</td>
+        <td style="padding:4px 6px;text-align:right">${Number(item.mrp).toFixed(2)}</td>
+        <td style="padding:4px 6px;text-align:right;font-weight:700">${rate.toFixed(2)}</td>
+        <td style="padding:4px 6px;text-align:right">${disc.toFixed(2)}</td>
+        <td style="padding:4px 6px;text-align:right">${gst}</td>
+        <td style="padding:4px 6px;text-align:right;color:#1d4ed8;font-weight:700">${igst.toFixed(2)}</td>
+        <td style="padding:4px 6px;text-align:right;font-weight:700">${taxable.toFixed(2)}</td>
+      </tr>`;
+    }).join('');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice Preview</title>
+    <style>body{font-family:Arial,sans-serif;font-size:11px;margin:0;padding:16px}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #e2e8f0}
+    thead th{background:#1e293b;color:#fff;padding:5px 6px;font-size:9px;text-transform:uppercase;white-space:nowrap}
+    .header{border:1px solid #cbd5e1;border-radius:6px;overflow:hidden;margin-bottom:12px}
+    .hcell{padding:10px;vertical-align:top;font-size:10px}
+    @media print{@page{size:A4 landscape;margin:8mm}}</style></head><body>
+    <div class="header"><table><tr>
+      <td class="hcell" style="width:33%;border-right:1px solid #cbd5e1;background:#f8fafc">
+        <strong style="font-size:13px">${COMPANY.name}</strong><br/><span style="color:#64748b">${COMPANY.address}</span><br/>
+        GSTIN: <strong>${COMPANY.gstin}</strong><br/>Ph: ${COMPANY.phone}<br/>D.L.: <strong>${COMPANY.dl}</strong>
+      </td>
+      <td class="hcell" style="width:33%;text-align:center;border-right:1px solid #cbd5e1">
+        <strong style="font-size:15px;letter-spacing:3px">GST INVOICE</strong><br/>
+        <table style="width:100%;border:none;margin-top:6px"><tbody>
+          <tr><td style="border:none;color:#64748b">Invoice No</td><td style="border:none;font-weight:700;color:#0369a1;font-family:monospace">${editingInvoiceNo||'PREVIEW'}</td></tr>
+          <tr><td style="border:none;color:#64748b">Date</td><td style="border:none;font-weight:700">${fmtDate(invoiceForm.invoice_date)}</td></tr>
+          ${invoiceForm.lr_no?`<tr><td style="border:none;color:#64748b">L.R. No</td><td style="border:none">${invoiceForm.lr_no}</td></tr>`:''}
+          ${invoiceForm.order_no?`<tr><td style="border:none;color:#64748b">Order No</td><td style="border:none">${invoiceForm.order_no}</td></tr>`:''}
+        </tbody></table>
+      </td>
+      <td class="hcell" style="width:33%">
+        <strong style="font-size:10px;color:#94a3b8;text-transform:uppercase;text-decoration:underline">Billing Details</strong><br/>
+        <strong style="font-size:12px">${invoiceForm.party_name||''}</strong>
+      </td>
+    </tr></table></div>
+    <table><thead><tr>
+      <th>S.N</th><th style="text-align:left">HSN</th><th style="text-align:left">Product Name</th><th>Pack</th>
+      <th style="text-align:right">Qty</th><th style="text-align:right">Free</th><th style="text-align:left">Batch</th>
+      <th>Exp</th><th style="text-align:right">MRP</th><th style="text-align:right">Rate</th>
+      <th style="text-align:right">Dis%</th><th style="text-align:right">IGST%</th>
+      <th style="text-align:right">VALUE</th><th style="text-align:right">AMOUNT</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <div></div>
+      <div style="border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:11px">
+        <div style="display:flex;justify-content:space-between"><span style="color:#64748b">Taxable Amount</span><span style="font-weight:700">₹${subTotal.toFixed(2)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:#64748b">IGST</span><span style="font-weight:700;color:#1d4ed8">₹${totalGst.toFixed(2)}</span></div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid #e2e8f0;padding-top:6px;margin-top:6px">
+          <span style="font-weight:900;font-size:13px">Grand Total</span><span style="font-weight:900;font-size:13px;color:#0369a1">₹${grandTotal.toLocaleString('en-IN')}</span>
+        </div>
+      </div>
+    </div>
+    <script>window.onload=()=>{window.print();}<\/script></body></html>`);
+    w.document.close();
+  };
+
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     pagination.goToPage(1);
@@ -836,9 +930,17 @@ const Sales: React.FC = () => {
 
           {/* ── LINE ITEMS TABLE (Arelion style) ── */}
           <div className="mt-3 border border-slate-300 rounded-lg overflow-auto">
-            <table className="w-full text-xs" style={{minWidth:'900px'}}>
+            <table className="w-full text-xs" style={{minWidth:'980px'}}>
               <thead className="bg-slate-900 text-white">
                 <tr>
+                  <th className="px-2 py-1.5 text-center w-6">
+                    <input type="checkbox" className="cursor-pointer"
+                      checked={invoiceForm.items.length > 0 && selectedPrintRows.size === invoiceForm.items.length}
+                      onChange={e => {
+                        if (e.target.checked) setSelectedPrintRows(new Set(invoiceForm.items.map((_,i)=>i)));
+                        else setSelectedPrintRows(new Set());
+                      }} />
+                  </th>
                   {['S.N','HSN','Product Name','Pack','Qty','Free','Batch No.','Exp. DT','MRP','Rate','Dis%','IGST%','VALUE','AMOUNT',''].map((h,i)=>(
                     <th key={i} className={`px-2 py-1.5 font-bold text-[9px] uppercase whitespace-nowrap ${['Qty','Free','Dis%','IGST%','VALUE','AMOUNT','MRP','Rate'].includes(h)?'text-right':h==='S.N'?'text-center':'text-left'}`}>{h}</th>
                   ))}
@@ -846,27 +948,42 @@ const Sales: React.FC = () => {
               </thead>
               <tbody>
                 {invoiceForm.items.length === 0
-                  ? <tr><td colSpan={15} className="py-8 text-center text-slate-400 italic">No items — add product above.</td></tr>
+                  ? <tr><td colSpan={16} className="py-8 text-center text-slate-400 italic">No items — add product above.</td></tr>
                   : invoiceForm.items.map((item,idx)=>{
                     const qty=Number(item.quantity)||0; const rate=Number(item.rate)||0; const disc=Number(item.discount_percent)||0; const gst=Number(item.gst_percent)||12;
                     const taxable=+(qty*rate*(1-disc/100)).toFixed(2);
                     const igstAmt=+(taxable*gst/100).toFixed(2);
-                    return <tr key={idx} className={idx%2===0?'bg-white':'bg-slate-50'}>
+                    const inpCls = "w-full border border-slate-200 rounded px-1 py-0.5 text-xs bg-white focus:border-sky-400 focus:outline-none";
+                    return <tr key={idx} className={`${idx%2===0?'bg-white':'bg-slate-50'} ${selectedPrintRows.has(idx)?'':'opacity-50'}`}>
+                      <td className="px-2 py-1 text-center">
+                        <input type="checkbox" className="cursor-pointer" checked={selectedPrintRows.has(idx)}
+                          onChange={e => {
+                            setSelectedPrintRows(s => { const ns = new Set(s); e.target.checked ? ns.add(idx) : ns.delete(idx); return ns; });
+                          }} />
+                      </td>
                       <td className="px-2 py-1 text-center text-slate-400">{idx+1}</td>
-                      <td className="px-2 py-1">{item.hsn_code||''}</td>
-                      <td className="px-2 py-1 font-semibold">{item.name}</td>
-                      <td className="px-2 py-1 text-center">{item.pack||''}</td>
-                      <td className="px-2 py-1 text-right font-bold">{qty}</td>
-                      <td className="px-2 py-1 text-right text-emerald-600">{item.free_quantity||0}</td>
-                      <td className="px-2 py-1 font-mono text-[9px]">{item.batch_no||''}</td>
-                      <td className="px-2 py-1 text-center">{item.expiry_date?item.expiry_date.slice(0,7).replace('-','/')?.split('/').reverse().join('/')?.slice(0,5):''}</td>
-                      <td className="px-2 py-1 text-right">{rate.toFixed(2)}</td>
-                      <td className="px-2 py-1 text-right font-bold text-sky-700">{rate.toFixed(2)}</td>
-                      <td className="px-2 py-1 text-right">{disc.toFixed(2)}</td>
-                      <td className="px-2 py-1 text-right">{gst}</td>
+                      <td className="px-1 py-1"><input className={inpCls} style={{minWidth:'52px'}} value={item.hsn_code||''} onChange={e=>updateItem(idx,'hsn_code',e.target.value)} /></td>
+                      <td className="px-1 py-1 font-semibold min-w-[120px]">{item.name}</td>
+                      <td className="px-1 py-1"><input className={inpCls} style={{minWidth:'42px'}} value={item.pack||''} onChange={e=>updateItem(idx,'pack',e.target.value)} /></td>
+                      <td className="px-1 py-1"><input type="number" min="0" step="1" className={inpCls+' text-right font-bold'} style={{minWidth:'44px'}} value={item.quantity} onChange={e=>updateItem(idx,'quantity',parseFloat(e.target.value)||0)} /></td>
+                      <td className="px-1 py-1"><input type="number" min="0" step="1" className={inpCls+' text-right text-emerald-600'} style={{minWidth:'36px'}} value={item.free_quantity||0} onChange={e=>updateItem(idx,'free_quantity',parseFloat(e.target.value)||0)} /></td>
+                      <td className="px-1 py-1"><input className={inpCls+' font-mono text-[9px]'} style={{minWidth:'64px'}} value={item.batch_no||''} onChange={e=>updateItem(idx,'batch_no',e.target.value)} /></td>
+                      <td className="px-1 py-1"><input type="month" className={inpCls} style={{minWidth:'90px'}} value={item.expiry_date?item.expiry_date.slice(0,7):''} onChange={e=>updateItem(idx,'expiry_date',e.target.value?e.target.value+'-01':'')} /></td>
+                      <td className="px-1 py-1"><input type="number" min="0" step="0.01" className={inpCls+' text-right'} style={{minWidth:'52px'}} value={item.mrp} onChange={e=>updateItem(idx,'mrp',parseFloat(e.target.value)||0)} /></td>
+                      <td className="px-1 py-1"><input type="number" min="0" step="0.01" className={inpCls+' text-right font-bold text-sky-700'} style={{minWidth:'52px'}} value={item.rate} onChange={e=>updateItem(idx,'rate',parseFloat(e.target.value)||0)} /></td>
+                      <td className="px-1 py-1"><input type="number" min="0" step="0.01" className={inpCls+' text-right'} style={{minWidth:'44px'}} value={item.discount_percent} onChange={e=>updateItem(idx,'discount_percent',parseFloat(e.target.value)||0)} /></td>
+                      <td className="px-1 py-1">
+                        <select className={inpCls+' text-right'} style={{minWidth:'44px'}} value={item.gst_percent} onChange={e=>updateItem(idx,'gst_percent',parseFloat(e.target.value))}>
+                          <option value="0">0</option><option value="5">5</option><option value="12">12</option><option value="18">18</option><option value="28">28</option>
+                        </select>
+                      </td>
                       <td className="px-2 py-1 text-right text-blue-700 font-bold">{igstAmt.toFixed(2)}</td>
                       <td className="px-2 py-1 text-right font-bold">{taxable.toFixed(2)}</td>
-                      <td className="px-2 py-1 text-center"><button type="button" onClick={()=>{const ni=[...invoiceForm.items];ni.splice(idx,1);setInvoiceForm(f=>({...f,items:ni}));}} className="text-red-400 hover:text-red-600"><Trash2 size={12}/></button></td>
+                      <td className="px-2 py-1 text-center"><button type="button" onClick={()=>{
+                        const ni=[...invoiceForm.items]; ni.splice(idx,1);
+                        setInvoiceForm(f=>({...f,items:ni}));
+                        setSelectedPrintRows(s=>{const ns=new Set<number>();s.forEach(i=>{if(i<idx)ns.add(i);else if(i>idx)ns.add(i-1);});return ns;});
+                      }} className="text-red-400 hover:text-red-600"><Trash2 size={12}/></button></td>
                     </tr>;
                   })
                 }
@@ -920,6 +1037,12 @@ const Sales: React.FC = () => {
             <p className="text-slate-400 text-xs">{editingId ? <>Editing <span className="font-mono font-bold text-slate-600">{editingInvoiceNo}</span> — changes overwrite stored items.</> : <>Invoice posted under <span className="font-mono font-bold text-slate-600">WHO-</span> prefix.</>}</p>
             <div className="flex gap-3">
               <button type="button" onClick={closeInvoiceModal} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
+              {invoiceForm.items.length > 0 && (
+                <button type="button" onClick={handlePrintSelected}
+                  className="px-4 py-2 border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 flex items-center gap-2 text-sm">
+                  <Printer size={15} /> Print {selectedPrintRows.size > 0 && selectedPrintRows.size < invoiceForm.items.length ? `(${selectedPrintRows.size})` : 'All'}
+                </button>
+              )}
               <button type="submit" disabled={isSaving || invoiceForm.items.length === 0}
                 className="px-8 py-2 bg-primary text-white font-bold rounded-lg hover:bg-sky-600 flex items-center gap-2 disabled:opacity-50 text-sm">
                 {isSaving ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle size={16} />} {editingId ? 'Save Changes' : 'Finalize & Post'}
