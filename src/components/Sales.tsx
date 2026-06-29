@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import {
   FileText, Download, AlertCircle, TrendingUp, ShoppingBag,
   CheckCircle, ExternalLink, Trash2, Loader2, Printer, X,
-  Building2, Phone, Mail, MapPin, Hash
+  Building2, Phone, Mail, MapPin, Hash, Pencil
 } from 'lucide-react';
 import {
   ERPLayout, FilterBar, DataTable, StatCard, Badge, Tabs, Modal
@@ -44,6 +44,9 @@ const Sales: React.FC = () => {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingInvoiceNo, setEditingInvoiceNo] = useState<string>('');
+  const [loadingEdit, setLoadingEdit] = useState<string | null>(null);
   const [filters, setFilters] = useState({ searchTerm: '', status: 'All' });
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -127,22 +130,73 @@ const Sales: React.FC = () => {
     setPendingItem(blankItem());
   };
 
-  const handleCreateInvoice = async (e: React.FormEvent) => {
+  const closeInvoiceModal = () => {
+    setShowInvoiceModal(false);
+    setEditingId(null);
+    setEditingInvoiceNo('');
+    setInvoiceForm(blankForm());
+    setPendingItem(blankItem());
+  };
+
+  const handleSaveInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!invoiceForm.party_id || invoiceForm.items.length === 0) { alert('Select distributor and add at least one item.'); return; }
     setIsSaving(true);
     try {
-      const res = await apiClient.post('/api/sales', invoiceForm);
+      const res = editingId
+        ? await apiClient.put(`/api/sales/${editingId}`, invoiceForm)
+        : await apiClient.post('/api/sales', invoiceForm);
       if (res.success) {
-        setShowInvoiceModal(false);
+        closeInvoiceModal();
         invalidateCache('/api/sales');
         handleRefresh();
-        setInvoiceForm(blankForm());
-        setPendingItem(blankItem());
-      } else alert(res.error || 'Failed to create invoice');
+      } else alert(res.error || `Failed to ${editingId ? 'update' : 'create'} invoice`);
     } catch (error: any) {
-      alert(error.message || 'Failed to create invoice');
+      alert(error?.data?.error || error.message || `Failed to ${editingId ? 'update' : 'create'} invoice`);
     } finally { setIsSaving(false); }
+  };
+
+  // Open the invoice modal pre-filled for editing / appending items
+  const handleEditInvoice = async (row: any) => {
+    setLoadingEdit(row.id);
+    try {
+      const r = await apiClient.get(`/api/sales/${row.id}`);
+      if (!r.success) { alert(r.error || 'Failed to load invoice'); return; }
+      const d = r.data;
+      const slice10 = (v: any) => (v ? String(v).slice(0, 10) : '');
+      setInvoiceForm({
+        party_id: d.party_id || '',
+        party_name: d.party_name || '',
+        invoice_date: slice10(d.invoice_date) || new Date().toISOString().split('T')[0],
+        payment_mode: d.payment_mode || 'Credit',
+        lr_no: d.lr_no || '', lr_date: slice10(d.lr_date),
+        order_no: d.order_no || '', due_date: slice10(d.due_date),
+        ewaybill_no: d.ewaybill_no || '', transport: d.transport || '', weight: d.weight || '',
+        items: (d.items || []).map((it: any) => ({
+          product_id: it.product_id || '',
+          name: it.product_name || '',
+          hsn_code: it.hsn_code || '',
+          pack: it.pack || '',
+          quantity: Number(it.quantity) || 1,
+          free_quantity: Number(it.free_quantity) || 0,
+          batch_no: it.batch_no || '',
+          manufacturer_code: it.manufacturer_code || '',
+          expiry_date: slice10(it.expiry || it.expiry_date),
+          old_mrp: Number(it.old_mrp) || 0,
+          mrp: Number(it.mrp) || 0,
+          rate: Number(it.ptr ?? it.rate) || 0,
+          discount_percent: Number(it.discount_percent) || 0,
+          gst_percent: Number(it.gst_percent) || 12,
+          scheme_type: it.scheme_type || 'none'
+        }))
+      });
+      setPendingItem(blankItem());
+      setEditingId(row.id);
+      setEditingInvoiceNo(d.invoice_no || row.invoice_no || '');
+      setShowInvoiceModal(true);
+    } catch (e: any) {
+      alert(e?.data?.error || e?.message || 'Failed to load invoice');
+    } finally { setLoadingEdit(null); }
   };
 
   const handleDeleteInvoice = async (inv: any) => {
@@ -162,6 +216,9 @@ const Sales: React.FC = () => {
     if (!inv2) return;
     const w = window.open('', '_blank', 'width=1200,height=900');
     if (!w) return;
+
+    // Print popup is about:blank — relative asset paths won't resolve. Use absolute origin URL.
+    const logoUrl = `${window.location.origin}/logo.png`;
 
     const fmtDate = (d: string) => { try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g,'-'); } catch { return d||''; } };
     const fmtExp  = (d: string) => { if (!d) return ''; try { const dt=new Date(d); return `${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getFullYear()).slice(-2)}`; } catch { return d; } };
@@ -242,7 +299,7 @@ const Sales: React.FC = () => {
         ${td(n2(Number(item.ptr||item.rate||0)),'right',true)}
         ${td(n2(Number(item.discount_percent||0)),'right')}
         ${td(n2(c.gst),'right')}
-        ${td(n2(isIGST?c.igst:c.cgst+c.sgst),'right','color:#00008B')}
+        ${td(n2(isIGST?c.igst:c.cgst+c.sgst),'right',false,'color:#00008B')}
         ${td(n2(c.taxable),'right',true)}
       </tr>`;
     }).join('');
@@ -267,23 +324,30 @@ const Sales: React.FC = () => {
       <style>
         *{box-sizing:border-box;margin:0;padding:0;}
         body{font-family:Arial,sans-serif;font-size:9.5px;color:#000;background:#fff;}
-        .page{width:210mm;padding:6mm 8mm;margin:0 auto;}
+        .page{width:210mm;padding:6mm 8mm;margin:0 auto;position:relative;}
+        .wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:130mm;height:130mm;
+          background:url('${logoUrl}') center/contain no-repeat;opacity:0.06;z-index:0;pointer-events:none;}
+        .sheet{position:relative;z-index:1;}
         table{border-collapse:collapse;}
         @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
           @page{size:A4 portrait;margin:6mm;}}
       </style></head><body>
       <div class="page">
+        <div class="wm"></div>
 
         <!-- TOP BORDER -->
-        <div style="border:2px solid #000;padding:0;">
+        <div class="sheet" style="border:2px solid #000;padding:0;background:rgba(255,255,255,0.86);">
 
           <!-- ROW 1: Seller | Invoice | Buyer -->
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1.5px solid #000;">
 
             <!-- SELLER -->
             <div style="padding:6px 8px;border-right:1px solid #000;">
-              <div style="font-size:13px;font-weight:900;color:#000;letter-spacing:0.5px;">${COMPANY.name}</div>
-              <div style="font-size:8px;margin-top:2px;line-height:1.6;">${COMPANY.address}</div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <img src="${logoUrl}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:contain;flex-shrink:0;" onerror="this.style.display='none'"/>
+                <div style="font-size:13px;font-weight:900;color:#000;letter-spacing:0.5px;line-height:1.05;">${COMPANY.name}</div>
+              </div>
+              <div style="font-size:8px;margin-top:3px;line-height:1.6;">${COMPANY.address}</div>
               <div style="font-size:8px;margin-top:2px;">GSTIN : <strong>${COMPANY.gstin}</strong></div>
               <div style="font-size:8px;">Phone : ${COMPANY.phone}</div>
               <div style="font-size:8px;">D.L. NO.: <strong>${COMPANY.dl}</strong></div>
@@ -485,7 +549,7 @@ const Sales: React.FC = () => {
       onRefresh={handleRefresh}
       onExport={handleExport}
       isLoading={loading || statsLoading || partiesLoading}
-      actionButtons={[{ label: '+ New Wholesale Invoice', onClick: () => setShowInvoiceModal(true), variant: 'primary' }]}
+      actionButtons={[{ label: '+ New Wholesale Invoice', onClick: () => { setEditingId(null); setEditingInvoiceNo(''); setInvoiceForm(blankForm()); setPendingItem(blankItem()); setShowInvoiceModal(true); }, variant: 'primary' }]}
     >
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -536,6 +600,12 @@ const Sales: React.FC = () => {
                       className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors">
                       <ExternalLink size={15} />
                     </button>
+                    {row.status !== 'Cancelled' && (
+                      <button onClick={() => handleEditInvoice(row)} disabled={loadingEdit === row.id} title="Edit / Append Items"
+                        className="p-1.5 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors disabled:opacity-40">
+                        {loadingEdit === row.id ? <Loader2 size={15} className="animate-spin" /> : <Pencil size={15} />}
+                      </button>
+                    )}
                     {row.status !== 'Cancelled' && (
                       <button onClick={() => handleDeleteInvoice(row)} disabled={deletingId === row.id} title="Cancel Invoice"
                         className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-40">
@@ -652,8 +722,8 @@ const Sales: React.FC = () => {
       )}
 
       {/* ── NEW INVOICE MODAL ── */}
-      <Modal isOpen={showInvoiceModal} title="GST Invoice Entry — Wholesale" onClose={() => { setShowInvoiceModal(false); setInvoiceForm(blankForm()); setPendingItem(blankItem()); }} size="xl">
-        <form onSubmit={handleCreateInvoice} className="space-y-0">
+      <Modal isOpen={showInvoiceModal} title={editingId ? 'Edit Wholesale Invoice' : 'GST Invoice Entry — Wholesale'} onClose={closeInvoiceModal} size="xl">
+        <form onSubmit={handleSaveInvoice} className="space-y-0">
 
           {/* ── HEADER: 3-column Arelion layout ── */}
           <div className="grid grid-cols-3 border border-slate-300 rounded-t-lg overflow-hidden text-xs mb-0">
@@ -669,7 +739,7 @@ const Sales: React.FC = () => {
             <div className="p-3 border-r border-slate-300 text-center">
               <div className="font-black text-base tracking-widest">GST INVOICE</div>
               <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-2 text-left">
-                <div className="text-slate-500">Invoice No</div><div className="font-mono font-bold text-sky-700">AUTO (WHO-...)</div>
+                <div className="text-slate-500">Invoice No</div><div className="font-mono font-bold text-sky-700">{editingId ? editingInvoiceNo : 'AUTO (WHO-...)'}</div>
                 <div className="text-slate-500">Date *</div>
                 <div><input type="date" required className="w-full border border-slate-300 rounded px-1 py-0.5 text-xs" value={invoiceForm.invoice_date} onChange={e => setInvoiceForm(f => ({...f, invoice_date: e.target.value}))} /></div>
                 <div className="text-slate-500">L.R. No.</div>
@@ -847,12 +917,12 @@ const Sales: React.FC = () => {
           )}
 
           <div className="pt-3 border-t flex justify-between items-center">
-            <p className="text-slate-400 text-xs">Invoice posted under <span className="font-mono font-bold text-slate-600">WHO-</span> prefix.</p>
+            <p className="text-slate-400 text-xs">{editingId ? <>Editing <span className="font-mono font-bold text-slate-600">{editingInvoiceNo}</span> — changes overwrite stored items.</> : <>Invoice posted under <span className="font-mono font-bold text-slate-600">WHO-</span> prefix.</>}</p>
             <div className="flex gap-3">
-              <button type="button" onClick={() => { setShowInvoiceModal(false); setInvoiceForm(blankForm()); setPendingItem(blankItem()); }} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
+              <button type="button" onClick={closeInvoiceModal} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm">Cancel</button>
               <button type="submit" disabled={isSaving || invoiceForm.items.length === 0}
                 className="px-8 py-2 bg-primary text-white font-bold rounded-lg hover:bg-sky-600 flex items-center gap-2 disabled:opacity-50 text-sm">
-                {isSaving ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle size={16} />} Finalize & Post
+                {isSaving ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle size={16} />} {editingId ? 'Save Changes' : 'Finalize & Post'}
               </button>
             </div>
           </div>
