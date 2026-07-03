@@ -3,6 +3,8 @@ const express = require('express');
 const { WebSocketServer } = require('ws');
 const metrics = require('./services/metrics');
 const kafkaService = require('./services/kafka');
+const { universalEventMiddleware } = require('./middleware/eventMiddleware');
+const { startAllConsumers } = require('./services/eventConsumers');
 const db = require('./db');
 const logger = require('./utils/logger');
 const authController = require('./controllers/authController');
@@ -72,6 +74,9 @@ app.use(validateHeaders);
 // Body parser with size limits
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// ── Universal event middleware: fires Kafka event on every mutation ────────
+app.use(universalEventMiddleware(app));
 
 // Input sanitization
 app.use(mongoSanitizeMiddleware);
@@ -276,6 +281,15 @@ app.set('metrics', metrics);
     );
   } catch (e) {
     console.warn('[Kafka] Consumer start failed (Kafka may be unreachable):', e.message);
+  }
+})();
+
+// ── Cross-module event consumers ──────────────────────────────────────────────
+(async () => {
+  try {
+    await startAllConsumers(app);
+  } catch (e) {
+    console.warn('[EventConsumers] Failed to start (Kafka may be unreachable):', e.message);
   }
 })();
 app.use('/api/dms', dmsRoutes);

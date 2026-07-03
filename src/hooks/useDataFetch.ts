@@ -193,6 +193,21 @@ export const useDataFetch = <T = any>(
     };
   }, []);
 
+  // Listen for Kafka CACHE_INVALIDATE — auto-refetch if this endpoint is affected
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { invalidate_keys } = (e as CustomEvent).detail || {};
+      if (!Array.isArray(invalidate_keys)) return;
+      const hit = invalidate_keys.some((k: string) => endpoint.startsWith(k));
+      if (hit) {
+        invalidateCache(endpoint);
+        fetchData();
+      }
+    };
+    window.addEventListener('erp:cache-invalidated', handler);
+    return () => window.removeEventListener('erp:cache-invalidated', handler);
+  }, [endpoint, fetchData]);
+
   return {
     data,
     fullResponse,

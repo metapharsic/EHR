@@ -41,7 +41,7 @@ import { KeyboardShortcutProvider } from './context/KeyboardShortcutContext';
 import { NotificationProvider, NotificationBell } from './context/NotificationContext';
 import { useAppStore } from './store/useAppStore';
 import { Menu, ShieldOff, ShieldAlert, X } from 'lucide-react';
-import { useDataFetch } from './hooks/useDataFetch';
+import { useDataFetch, invalidateCache } from './hooks/useDataFetch';
 
 // ── Compliance Alert Banner ───────────────────────────────────────────────────
 const ComplianceAlertBanner: React.FC = () => {
@@ -51,8 +51,9 @@ const ComplianceAlertBanner: React.FC = () => {
   if (!summary || dismissed) return null;
   const critical = (summary.expired || 0) + (summary.critical || 0);
   const warn = summary.expiring || 0;
-  const incomplete = summary.incomplete || 0;
-  if (critical === 0 && warn === 0 && incomplete === 0) return null;
+  // NOTE: 'incomplete' profiles intentionally do NOT trigger this banner — incomplete
+  // is a data-entry nag, not a legal compliance risk. Only EXPIRED/CRITICAL/EXPIRING show.
+  if (critical === 0 && warn === 0) return null;
   const isRed = critical > 0;
   return (
     <div className={`relative flex items-center gap-3 px-4 py-2.5 text-sm font-semibold
@@ -64,7 +65,7 @@ const ComplianceAlertBanner: React.FC = () => {
       <span className="flex-1">
         {isRed
           ? `🚨 COMPLIANCE ALERT — ${summary.expired} customer(s) EXPIRED drug license · ${summary.critical} CRITICAL (< 30 days). Sales to these customers may be ILLEGAL.`
-          : `⚠ Compliance Warning — ${warn} customer(s) expiring within 90 days · ${incomplete} profile(s) incomplete.`
+          : `⚠ Compliance Warning — ${warn} customer(s) expiring within 90 days.`
         }
         <a href="#" onClick={(e) => { e.preventDefault(); (window as any).__erp_goto?.('CUSTOMER_DATABASE'); }}
           className="underline ml-2 font-bold">View Customers →</a>
@@ -76,8 +77,60 @@ const ComplianceAlertBanner: React.FC = () => {
   );
 };
 
+// ── Global WebSocket: receives CACHE_INVALIDATE from Kafka consumers ──────────
+function useGlobalEventSocket(user: any) {
+  const wsRef = React.useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${window.location.host}/ws`);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ token }));
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+
+        if (msg.type === 'CACHE_INVALIDATE' && Array.isArray(msg.invalidate_keys)) {
+          msg.invalidate_keys.forEach((key: string) => invalidateCache(key));
+          // Dispatch DOM event so any mounted component can optionally re-fetch
+          window.dispatchEvent(new CustomEvent('erp:cache-invalidated', { detail: msg }));
+        }
+
+        if (msg.type === 'BROADCAST') {
+          window.dispatchEvent(new CustomEvent('erp:broadcast', { detail: msg }));
+        }
+
+        if (msg.type === 'STOCK_ALERT') {
+          window.dispatchEvent(new CustomEvent('erp:stock-alert', { detail: msg }));
+        }
+
+        if (msg.type === 'NOTIFICATION') {
+          window.dispatchEvent(new CustomEvent('erp:notification', { detail: msg }));
+        }
+      } catch {}
+    };
+
+    ws.onerror = () => {};
+    ws.onclose = () => {
+      // Reconnect after 5s
+      setTimeout(() => { wsRef.current = null; }, 5000);
+    };
+
+    return () => { ws.close(); };
+  }, [user]);
+}
+
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
+  useGlobalEventSocket(user);
   const {
     activeTab,
     sidebarOpen,
