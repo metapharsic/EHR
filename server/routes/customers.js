@@ -78,10 +78,12 @@ function computeCompliance(p) {
 // ── GET /api/customers — list with compliance ───────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    const { search = '', entity_type = 'All', compliance = 'All', status = 'Active', page = 1, limit = 50 } = req.query;
+    const { search = '', entity_type = 'All', compliance = 'All', status = 'Active', page = 1, limit = 50, scope = '' } = req.query;
     const offset = (page - 1) * limit;
     const params = [];
-    let where = "WHERE p.type IN ('Debtor','Both')";
+    // scope=all → Party & Entity Registry master view (all parties incl. Creditors/suppliers).
+    // default → customers only (Debtor/Both), preserving behavior for CustomerDatabasePage.
+    let where = scope === 'all' ? "WHERE 1=1" : "WHERE p.type IN ('Debtor','Both')";
 
     // status filter: 'Active' (default) hides deleted/inactive, 'All' shows everything except hard-Deleted, else exact match
     if (status === 'All') {
@@ -91,11 +93,12 @@ router.get('/', async (req, res) => {
     }
 
     if (search) { params.push(`%${search}%`); where += ` AND (p.name ILIKE $${params.length} OR p.mobile ILIKE $${params.length} OR p.drug_license_no ILIKE $${params.length})`; }
-    if (entity_type !== 'All') { params.push(entity_type); where += ` AND p.entity_type = $${params.length}`; }
+    if (entity_type === '__null__') { where += ` AND p.entity_type IS NULL`; }
+    else if (entity_type !== 'All') { params.push(entity_type); where += ` AND p.entity_type = $${params.length}`; }
     if (compliance !== 'All') { params.push(compliance); where += ` AND p.compliance_status = $${params.length}`; }
 
     const { rows } = await db.query(`
-      SELECT p.id, p.name, p.entity_type, p.mobile, p.email, p.whatsapp_number,
+      SELECT p.id, p.name, p.type, p.entity_type, p.mobile, p.email, p.whatsapp_number,
              p.city, p.state, p.gstin, p.drug_license_no,
              p.dl_20a, p.dl_20a_expiry, p.dl_20b, p.dl_20b_expiry,
              p.dl_20c, p.dl_20c_expiry, p.dl_20d, p.dl_20d_expiry,
@@ -184,12 +187,12 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const companyId = req.user?.companyId || 1;
-    const { name, entity_type = null, mobile = null, email = null, city = null, type = 'Debtor' } = req.body;
+    const { name, entity_type = null, mobile = null, email = null, city = null, type = 'Debtor', status = 'Active' } = req.body;
     if (!name) return res.status(400).json({ success: false, error: 'Name required' });
     const { rows } = await db.query(
-      `INSERT INTO parties (company_id, name, entity_type, mobile, email, city, type, compliance_status, compliance_score)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'INCOMPLETE',0) RETURNING id, name`,
-      [companyId, name, entity_type, mobile, email, city, type]
+      `INSERT INTO parties (company_id, name, entity_type, mobile, email, city, type, status, compliance_status, compliance_score)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'INCOMPLETE',0) RETURNING id, name`,
+      [companyId, name, entity_type, mobile, email, city, type, status]
     );
     res.status(201).json({ success: true, data: rows[0] });
   } catch (e) {

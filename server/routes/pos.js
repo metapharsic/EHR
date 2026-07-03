@@ -27,7 +27,7 @@ router.get('/parties', async (req, res) => {
               account_number as "accountNumber", ifsc_code as "ifscCode",
               drug_license_no as "drugLicenseNo", created_at as "createdAt", updated_at as "updatedAt"
             FROM parties
-            WHERE type IN ('Debtor', 'Customer')
+            WHERE type IN ('Debtor', 'Customer', 'Both')
         `;
 
         // Status filter ('All' = no filter, else filter by status)
