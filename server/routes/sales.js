@@ -3,6 +3,8 @@ const router = express.Router();
 const db = require('../db');
 const { verifyTokenMiddleware, verifyRoleMiddleware } = require('../utils/jwt');
 const logger = require('../utils/logger');
+const kafka = require('../services/kafka');
+const metrics = require('../services/metrics');
 
 // Middleware
 router.use(verifyTokenMiddleware);
@@ -257,6 +259,8 @@ router.post('/', async (req, res) => {
 
     await client.query('COMMIT');
     logger.info('Wholesale invoice created', { invoiceNumber, net_amount });
+    kafka.events.invoice.created({ id: inv.id, invoice_number: inv.invoice_number, net_amount, party_name, payment_mode }, req.user?.username).catch(() => {});
+    metrics.recordInvoice('WHOLESALE', payment_mode, net_amount);
     res.status(201).json({ success: true, data: { id: inv.id, invoice_number: inv.invoice_number } });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -440,6 +444,8 @@ router.put('/:id', verifyRoleMiddleware(['ADMIN', 'SALES_MANAGER']), async (req,
 
     await client.query('COMMIT');
     logger.info('Wholesale invoice updated', { id, invoiceNumber: existing.invoice_number, net_amount });
+    kafka.events.invoice.updated({ id, invoice_number: existing.invoice_number, net_amount, party_name, payment_mode }, req.user?.username).catch(() => {});
+    metrics.recordInvoice('WHOLESALE_EDIT', payment_mode, net_amount);
     res.json({ success: true, data: { id, invoice_number: existing.invoice_number, net_amount } });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -463,6 +469,7 @@ router.delete('/:id', verifyRoleMiddleware(['ADMIN', 'SALES_MANAGER']), async (r
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Invoice not found or already cancelled' });
     logger.info('Wholesale invoice cancelled', { id: req.params.id, invoiceNumber: rows[0].invoice_number });
+    kafka.events.invoice.cancelled(rows[0], req.user?.username).catch(() => {});
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     logger.error('Failed to cancel invoice', { error: err.message });

@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const { WebSocketServer } = require('ws');
+const metrics = require('./services/metrics');
+const kafkaService = require('./services/kafka');
 const db = require('./db');
 const logger = require('./utils/logger');
 const authController = require('./controllers/authController');
@@ -27,6 +29,12 @@ const { swaggerUi, specs } = require('./config/swagger');
 
 const app = express();
 const port = process.env.PORT || 5000;
+
+// ── Prometheus HTTP metrics middleware (before all routes) ────────────────────
+app.use(metrics.httpMiddleware());
+
+// ── Prometheus scrape endpoint ────────────────────────────────────────────────
+app.get('/metrics', metrics.metricsHandler);
 
 // ============================================
 // API DOCUMENTATION
@@ -243,6 +251,33 @@ app.use('/api', posRoutes);       // Support /api/parties
 app.use('/uploads', require('express').static(require('path').join(__dirname, '..', 'uploads')));
 require('./services/complianceCron').startComplianceCron();
 require('./services/omsSlaService').startSlaCron();
+
+// ── Kafka: expose producer to routes ─────────────────────────────────────────
+app.set('kafka', kafkaService);
+app.set('metrics', metrics);
+
+// ── Kafka: start ERP internal consumer (audit + broadcasts + stock alerts) ────
+(async () => {
+  try {
+    await kafkaService.startConsumer(
+      'erp-internal',
+      ['erp.broadcasts', 'erp.stock.alerts', 'erp.audit'],
+      async (topic, eventType, payload) => {
+        metrics.recordConsumed(topic, eventType, 'erp-internal', 'PROCESSED');
+        if (topic === 'erp.broadcasts') {
+          // Push broadcast to all connected WebSocket clients
+          broadcastAll({ type: 'BROADCAST', eventType, payload });
+          metrics.recordBroadcast(payload.channel || 'ALL', payload.type || 'INFO');
+        }
+        if (topic === 'erp.stock.alerts') {
+          broadcastAll({ type: 'STOCK_ALERT', eventType, payload });
+        }
+      }
+    );
+  } catch (e) {
+    console.warn('[Kafka] Consumer start failed (Kafka may be unreachable):', e.message);
+  }
+})();
 app.use('/api/dms', dmsRoutes);
 app.use('/api/inventory-enterprise', inventoryEnterpriseRoutes);
 app.use('/api/vouchers', voucherRoutes);
@@ -393,8 +428,9 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
     logger.info('SIGTERM signal received: closing HTTP server');
+    await kafkaService.disconnect().catch(() => {});
     server.close(() => {
         logger.info('HTTP server closed');
         process.exit(0);
