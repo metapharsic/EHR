@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   FileText, Download, AlertCircle, TrendingUp, ShoppingBag,
   CheckCircle, ExternalLink, Trash2, Loader2, Printer, X,
@@ -50,6 +50,16 @@ const Sales: React.FC = () => {
   const [selectedPrintRows, setSelectedPrintRows] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState({ searchTerm: '', status: 'All' });
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Auto-filter when navigated from Party & Entity Registry
+  useEffect(() => {
+    const partyName = (window as any).__erp_invoice_party;
+    if (partyName) {
+      setFilters(f => ({ ...f, searchTerm: partyName }));
+      setQuery(partyName);
+      delete (window as any).__erp_invoice_party;
+    }
+  }, []);
 
   const blankForm = () => ({
     party_id: '', party_name: '',

@@ -382,10 +382,11 @@ const CustomerDocuments: React.FC<{ partyId: string }> = ({ partyId }) => {
 };
 
 const ProfileDrawer = ({
-  party, onClose, onEdit, onNavigateLedger,
+  party, onClose, onEdit, onNavigateLedger, onNavigateInvoices,
 }: {
   party: Party; onClose: () => void; onEdit: () => void;
   onNavigateLedger: (p: Party) => void;
+  onNavigateInvoices: (p: Party) => void;
 }) => {
   const score = completenessScore(party);
   return (
@@ -518,14 +519,18 @@ const ProfileDrawer = ({
         </div>
 
         {/* Footer actions */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-white flex gap-3">
+        <div className="px-6 py-4 border-t border-slate-100 bg-white flex gap-2">
           <button onClick={() => onNavigateLedger(party)}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700">
-            <BookOpen size={15}/> Ledger
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700">
+            <BookOpen size={14}/> Ledger
+          </button>
+          <button onClick={() => onNavigateInvoices(party)}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium border border-sky-300 rounded-lg hover:bg-sky-50 transition-colors text-sky-700">
+            <FileText size={14}/> Invoices
           </button>
           <button onClick={onEdit}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors">
-            <Pencil size={15}/> Edit Profile
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors">
+            <Pencil size={14}/> Edit
           </button>
         </div>
       </div>
@@ -1322,6 +1327,7 @@ const CustomerDatabasePage: React.FC = () => {
           onClose={() => setProfileParty(null)}
           onEdit={() => { setFormParty(profileParty); setProfileParty(null); }}
           onNavigateLedger={p => { setLedgerParty(p); setProfileParty(null); }}
+          onNavigateInvoices={p => { (window as any).__erp_invoice_party = p.name; setActiveTab(Tab.SALES); setProfileParty(null); }}
         />
       )}
       {ledgerParty && <LedgerModal party={ledgerParty} onClose={() => setLedgerParty(null)}/>}
