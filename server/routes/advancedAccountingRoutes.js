@@ -48,26 +48,35 @@ router.post('/bank-reconciliation', verifyTokenMiddleware, verifyRoleMiddleware(
 router.get('/budgets', verifyTokenMiddleware, asyncRoute(async (req, res) => {
     try {
         const { rows } = await db.query(
-            'SELECT * FROM budgets WHERE company_id = $1 ORDER BY financial_year DESC',
+            `SELECT b.*, coa.account_name, cc.name as cost_center_name,
+                    COALESCE(b.actual_amount, 0) - COALESCE(b.budget_amount, 0) as computed_variance
+             FROM budgets b
+             LEFT JOIN chart_of_accounts coa ON coa.id = b.account_id
+             LEFT JOIN cost_centers cc ON cc.id = b.cost_center_id
+             WHERE b.company_id = $1
+             ORDER BY b.period_from DESC`,
             [req.user.companyId || 1]
         );
         res.json(rows);
     } catch (error) {
+        logger.error('Failed to fetch budgets', { error: error.message });
         res.status(500).json({ error: 'Failed to fetch budgets' });
     }
 }));
 
 router.post('/budgets', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER']), asyncRoute(async (req, res) => {
     try {
-        const { accountId, costCenterId, financialYear, budgetAmount } = req.body;
+        const { accountId, costCenterId, periodFrom, periodTo, budgetAmount } = req.body;
+        if (!accountId || !budgetAmount) return res.status(400).json({ error: 'accountId and budgetAmount required' });
         const { rows } = await db.query(
-            `INSERT INTO budgets (account_id, cost_center_id, financial_year, budget_amount, company_id)
-             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-            [accountId, costCenterId, financialYear, budgetAmount, req.user.companyId || 1]
+            `INSERT INTO budgets (account_id, cost_center_id, period_from, period_to, budget_amount, company_id, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+            [accountId, costCenterId || null, periodFrom || null, periodTo || null, budgetAmount, req.user.companyId || 1, req.user.userId]
         );
         res.status(201).json(rows[0]);
     } catch (error) {
-        res.status(500).json({ error: String(error) });
+        logger.error('Failed to save budget', { error: error.message });
+        res.status(500).json({ error: String(error.message || error) });
     }
 }));
 

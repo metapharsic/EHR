@@ -105,9 +105,9 @@ router.get('/diagnostic', verifyTokenMiddleware, asyncRoute(async (req, res) => 
 // ============================================
 router.get('/chart-of-accounts', verifyTokenMiddleware, asyncRoute(async (req, res) => {
     try {
-        const { type } = req.query;
+        const { type, status } = req.query;
         let query = `
-            SELECT 
+            SELECT
                 coa.*,
                 ((CASE WHEN coa.account_format = 'credit' THEN -COALESCE(coa.opening_balance, 0) ELSE COALESCE(coa.opening_balance, 0) END) + COALESCE(gl.net_balance, 0)) as current_balance
             FROM chart_of_accounts coa
@@ -119,12 +119,22 @@ router.get('/chart-of-accounts', verifyTokenMiddleware, asyncRoute(async (req, r
             WHERE coa.company_id = $1
         `;
         let params = [req.user.companyId || 1];
-        
-        if (type && type !== 'All') {
-            query += ' AND coa.account_type = $2';
-            params.push(type);
+
+        // Default: hide soft-deleted (Inactive) accounts unless explicitly requested
+        if (status === 'All') {
+            // no status filter — show everything
+        } else if (status) {
+            params.push(status);
+            query += ` AND coa.status = $${params.length}`;
+        } else {
+            query += ` AND (coa.status IS NULL OR coa.status = 'Active')`;
         }
-        
+
+        if (type && type !== 'All') {
+            params.push(type);
+            query += ` AND coa.account_type = $${params.length}`;
+        }
+
         query += ' ORDER BY coa.account_code';
         
         const { rows } = await db.query(query, params);
@@ -135,7 +145,7 @@ router.get('/chart-of-accounts', verifyTokenMiddleware, asyncRoute(async (req, r
     }
 }));
 
-router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT']), verify2FAMiddleware, asyncRoute(async (req, res) => {
+router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT', 'MANAGER', 'FIN_EXEC']), verify2FAMiddleware, asyncRoute(async (req, res) => {
     try {
         const {
             id, accountCode, accountName, accountType, openingBalance, group, description, status,
@@ -198,7 +208,7 @@ router.post('/chart-of-accounts', verifyTokenMiddleware, verifyRoleMiddleware(['
     }
 }));
 
-router.put('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT']), verify2FAMiddleware, asyncRoute(async (req, res) => {
+router.put('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT', 'MANAGER', 'FIN_EXEC']), verify2FAMiddleware, asyncRoute(async (req, res) => {
     try {
         const {
             accountName, accountType, costCenter, parentAccountId,
@@ -268,11 +278,22 @@ router.put('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware
 
 router.delete('/chart-of-accounts/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT']), asyncRoute(async (req, res) => {
     try {
-        const { rows } = await db.query(
-            `UPDATE chart_of_accounts SET status = 'Inactive' WHERE id = $1 RETURNING id`,
+        const existing = await db.query(
+            `SELECT account_code FROM chart_of_accounts WHERE id = $1`,
             [req.params.id]
         );
-        if (rows.length === 0) return res.status(404).json({ error: 'Account not found' });
+        if (existing.rows.length === 0) return res.status(404).json({ error: 'Account not found' });
+
+        // Protect system accounts (SYS-* codes) — used by accountingSync.js
+        // to auto-post GL from sales/purchase/POS/expenses. Deleting breaks sync.
+        if ((existing.rows[0].account_code || '').startsWith('SYS-')) {
+            return res.status(400).json({ error: 'System account cannot be deleted — used by automated GL posting' });
+        }
+
+        const { rows } = await db.query(
+            `UPDATE chart_of_accounts SET status = 'Inactive', updated_at = NOW() WHERE id = $1 RETURNING id`,
+            [req.params.id]
+        );
         res.json({ success: true, message: 'Account deactivated successfully' });
     } catch (error) {
         logger.error('Failed to deactivate account', { error: error.message });
@@ -320,7 +341,7 @@ router.get('/journal-vouchers', verifyTokenMiddleware, verify2FAMiddleware, asyn
     }
 }));
 
-router.post('/journal-vouchers', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'ACCOUNTANT']), verify2FAMiddleware, asyncRoute(async (req, res) => {
+router.post('/journal-vouchers', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'ACCOUNTANT', 'MANAGER', 'FIN_EXEC']), verify2FAMiddleware, asyncRoute(async (req, res) => {
     let { voucherNo, date, narration, entries, totalDebit, totalCredit } = req.body;
 
     const companyId = req.user.companyId || 1;
@@ -436,7 +457,7 @@ router.post('/journal-vouchers', verifyTokenMiddleware, verifyRoleMiddleware(['A
     }
 }));
 
-router.put('/journal-vouchers/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'ACCOUNTANT']), verify2FAMiddleware, asyncRoute(async (req, res) => {
+router.put('/journal-vouchers/:id', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'ACCOUNTANT', 'MANAGER', 'FIN_EXEC']), verify2FAMiddleware, asyncRoute(async (req, res) => {
     const { voucherNo, date, narration, entries, totalDebit, totalCredit, voucherType } = req.body;
     const companyId = req.user.companyId || 1;
     const client = await db.getClient();
@@ -988,14 +1009,15 @@ router.post('/cash-flow', verifyTokenMiddleware, verify2FAMiddleware, asyncRoute
             `SELECT
                 gl.transaction_date as date,
                 gl.narration as category,
-                COALESCE(gl.debit, 0) as in,
-                COALESCE(gl.credit, 0) as out,
-                v.voucher_type as voucherType
+                COALESCE(gl.debit, 0) as "in",
+                COALESCE(gl.credit, 0) as "out",
+                v.voucher_type as "voucherType"
             FROM general_ledger gl
             JOIN chart_of_accounts coa ON gl.account_id = coa.id
             LEFT JOIN journal_vouchers v ON gl.voucher_id = v.id
             WHERE coa.company_id = $1
-              AND coa.account_group IN ('Cash-in-hand', 'Bank Accounts')
+              AND (coa.account_group ILIKE '%cash%' OR coa.account_group ILIKE '%bank%'
+                   OR coa.account_name ILIKE '%cash%' OR coa.account_name ILIKE '%bank%')
               AND gl.transaction_date BETWEEN $2 AND $3
             ORDER BY gl.transaction_date`,
             [companyId, sDate, eDate]
@@ -1028,21 +1050,25 @@ router.post('/aging-analysis', verifyTokenMiddleware, verify2FAMiddleware, async
         const { asOnDate, type } = req.body; // type: 'Debtor' | 'Creditor'
         const date = asOnDate || new Date().toISOString().split('T')[0];
         const companyId = req.user.companyId || req.user.company_id || 1;
-        const targetGroup = type === 'Debtor' ? 'Sundry Debtors' : 'Sundry Creditors';
+        const targetGroup = type === 'Creditor' ? 'Sundry Creditors' : 'Sundry Debtors';
 
-        // Calculate days overdue based on transaction date
+        // Per-party outstanding, bucketed by age of the OLDEST unpaid transaction.
+        // GL entries carry party_id (set by accountingSync.js on the receivable/
+        // payable leg) so this correctly breaks down by individual customer/
+        // supplier instead of lumping everyone into one Sundry Debtors account.
         const { rows } = await db.query(
-            `SELECT 
-                coa.account_name as party_name,
-                coa.id as account_id,
+            `SELECT
+                COALESCE(p.name, coa.account_name) as party_name,
+                gl.party_id,
                 SUM(gl.debit - gl.credit) as balance_amount,
-                ($1::date - gl.transaction_date::date) as days_overdue
-            FROM chart_of_accounts coa
-            JOIN general_ledger gl ON coa.id = gl.account_id
+                ($1::date - MIN(gl.transaction_date)::date) as days_overdue
+            FROM general_ledger gl
+            JOIN chart_of_accounts coa ON coa.id = gl.account_id
+            LEFT JOIN parties p ON p.id = gl.party_id
             WHERE coa.company_id = $2
               AND coa.account_group = $3
               AND gl.transaction_date <= $1
-            GROUP BY coa.account_name, coa.id, gl.transaction_date
+            GROUP BY COALESCE(p.name, coa.account_name), gl.party_id
             HAVING SUM(gl.debit - gl.credit) != 0`,
             [date, companyId, targetGroup]
         );
@@ -1053,7 +1079,7 @@ router.post('/aging-analysis', verifyTokenMiddleware, verify2FAMiddleware, async
             const balance = parseFloat(r.balance_amount || 0);
             // Flip sign for creditors so balances appear positive
             const finalBalance = type === 'Creditor' ? -balance : balance;
-            
+
             let bucket = 'current_balance';
             if (days > 0 && days <= 30) bucket = 'bucket_0_30';
             else if (days > 30 && days <= 60) bucket = 'bucket_31_60';
@@ -1062,6 +1088,7 @@ router.post('/aging-analysis', verifyTokenMiddleware, verify2FAMiddleware, async
 
             return {
                 party_name: r.party_name,
+                party_id: r.party_id,
                 balance_amount: finalBalance,
                 bucket
             };
@@ -1086,7 +1113,7 @@ router.get('/cost-center', verifyTokenMiddleware, verify2FAMiddleware, asyncRout
     }
 }));
 
-router.post('/cost-center', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER']), verify2FAMiddleware, asyncRoute(async (req, res) => {
+router.post('/cost-center', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'MANAGER', 'FIN_EXEC']), verify2FAMiddleware, asyncRoute(async (req, res) => {
     try {
         const { name, type, manager } = req.body;
         const { rows } = await db.query(
@@ -1186,34 +1213,6 @@ router.get('/daybook', verifyTokenMiddleware, verify2FAMiddleware, asyncRoute(as
     } catch (error) {
         logger.error('Failed to fetch day book', { error: error.message });
         res.status(500).json({ error: 'Failed to fetch day book' });
-    }
-}));
-
-// ============================================
-// AGING ANALYSIS
-// ============================================
-router.post('/aging-analysis', verifyTokenMiddleware, verify2FAMiddleware, asyncRoute(async (req, res) => {
-    try {
-        const { asOnDate, partyType } = req.body;
-        const companyId = req.user.companyId || 1;
-        const { rows } = await db.query(
-            `SELECT 
-                p.id, p.name, p.current_balance,
-                COALESCE(SUM(CASE WHEN (CURRENT_DATE - jv.voucher_date) <= 30 THEN jv.total_debit ELSE 0 END), 0) as bucket_0_30,
-                COALESCE(SUM(CASE WHEN (CURRENT_DATE - jv.voucher_date) BETWEEN 31 AND 60 THEN jv.total_debit ELSE 0 END), 0) as bucket_31_60,
-                COALESCE(SUM(CASE WHEN (CURRENT_DATE - jv.voucher_date) BETWEEN 61 AND 90 THEN jv.total_debit ELSE 0 END), 0) as bucket_61_90,
-                COALESCE(SUM(CASE WHEN (CURRENT_DATE - jv.voucher_date) > 90 THEN jv.total_debit ELSE 0 END), 0) as bucket_90_plus
-             FROM parties p
-             LEFT JOIN journal_vouchers jv ON p.id = jv.party_id
-             WHERE p.company_id = $1 AND (p.type = $2 OR $2 IS NULL)
-             GROUP BY p.id, p.name, p.current_balance
-             HAVING p.current_balance != 0`,
-            [companyId, partyType || 'Debtor']
-        );
-        res.json(rows || []);
-    } catch (error) {
-        console.error('Aging Analysis Error:', error);
-        res.status(500).json({ error: 'Failed' });
     }
 }));
 
@@ -1344,56 +1343,49 @@ router.post('/aging-analysis-detail', verifyTokenMiddleware, verify2FAMiddleware
     }
 }));
 
-// ============================================
-// CASH FLOW SUMMARY
-// ============================================
-router.post('/cash-flow', verifyTokenMiddleware, verify2FAMiddleware, asyncRoute(async (req, res) => {
-    try {
-        const { startDate, endDate } = req.body;
-        const sDate = startDate || '2000-01-01';
-        const eDate = endDate || new Date().toISOString().split('T')[0];
-        const companyId = req.user.companyId || 1;
+// ── ACCOUNTING SYNC — auto-post GL from all modules ──────────────────────────
+const accountingSync = require('../services/accountingSync');
 
-        const { rows } = await db.query(
-            `SELECT 
-                gl.voucher_type,
-                gl.narration,
-                gl.transaction_date,
-                gl.debit as "in",
-                gl.credit as "out"
-            FROM general_ledger gl
-            JOIN chart_of_accounts coa ON gl.account_id = coa.id
-            WHERE (
-                coa.account_group IN ('Cash', 'Bank', 'Cash in Hand', 'Bank Accounts')
-                OR coa.account_name ILIKE '%Cash%'
-                OR coa.account_name ILIKE '%Bank%'
-            )
-              AND gl.transaction_date BETWEEN $1 AND $2
-              AND coa.company_id = $3
-            ORDER BY gl.transaction_date ASC`,
-            [sDate, eDate, companyId]
-        );
+// POST /api/accounting/sync-all — full historical catch-up
+router.post('/sync-all', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'FINANCE_MANAGER', 'ACCOUNTANT', 'MANAGER', 'FIN_EXEC']), asyncRoute(async (req, res) => {
+  const companyId = req.user.companyId || req.user.company_id || 1;
+  const result = await accountingSync.syncAll(companyId);
+  res.json({ success: true, message: 'Sync complete', data: result });
+}));
 
-        let totalIn = 0;
-        let totalOut = 0;
-        rows.forEach(r => {
-            totalIn += parseFloat(r.in || 0);
-            totalOut += parseFloat(r.out || 0);
-        });
+// POST /api/accounting/sync-document — sync single document (used by Kafka consumer)
+router.post('/sync-document', verifyTokenMiddleware, asyncRoute(async (req, res) => {
+  const companyId = req.user.companyId || req.user.company_id || 1;
+  const { sourceTable, documentId } = req.body;
+  if (!sourceTable || !documentId) return res.status(400).json({ success: false, error: 'sourceTable and documentId required' });
+  const result = await accountingSync.syncDocument(companyId, sourceTable, documentId);
+  res.json({ success: true, data: result });
+}));
 
-        res.json({
-            success: true,
-            summary: {
-                totalInflow: totalIn,
-                totalOutflow: totalOut,
-                netCashFlow: totalIn - totalOut
-            },
-            data: rows
-        });
-    } catch (error) {
-        console.error('Cash Flow Error:', error);
-        res.status(500).json({ error: 'Failed to generate cash flow summary' });
-    }
+// GET /api/accounting/sync-status — how many unsynced docs per module
+router.get('/sync-status', verifyTokenMiddleware, asyncRoute(async (req, res) => {
+  const companyId = req.user.companyId || req.user.company_id || 1;
+  const { rows } = await db.query(`
+    SELECT
+      (SELECT COUNT(*) FROM sales_invoices si
+       WHERE si.company_id=$1 AND si.status IN ('Completed','Posted')
+       AND NOT EXISTS (SELECT 1 FROM general_ledger gl WHERE gl.voucher_id=si.id AND gl.company_id=$1)
+      ) as unsynced_sales,
+      (SELECT COUNT(*) FROM pos_bills pb
+       WHERE pb.company_id=$1 AND pb.status NOT IN ('Cancelled','Void')
+       AND NOT EXISTS (SELECT 1 FROM general_ledger gl WHERE gl.voucher_id=pb.id AND gl.company_id=$1)
+      ) as unsynced_pos,
+      (SELECT COUNT(*) FROM payment_vouchers pv
+       WHERE pv.company_id=$1
+       AND NOT EXISTS (SELECT 1 FROM general_ledger gl WHERE gl.voucher_id=pv.id AND gl.company_id=$1)
+      ) as unsynced_payments,
+      (SELECT COUNT(*) FROM receipt_vouchers rv
+       WHERE rv.company_id=$1
+       AND NOT EXISTS (SELECT 1 FROM general_ledger gl WHERE gl.voucher_id=rv.id AND gl.company_id=$1)
+      ) as unsynced_receipts,
+      (SELECT COUNT(*) FROM general_ledger WHERE company_id=$1) as total_gl_entries
+  `, [companyId]);
+  res.json({ success: true, data: rows[0] });
 }));
 
 module.exports = router;

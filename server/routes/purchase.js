@@ -7,7 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 
 // Middleware
 router.use(verifyTokenMiddleware);
-router.use(verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'PURCHASE_MANAGER']));
+router.use(verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'PURCHASE_MANAGER', 'MANAGER', 'STAFF', 'SCM_EXEC']));
 
 /**
  * GET /api/purchase
@@ -111,7 +111,7 @@ router.get('/', async (req, res) => {
 router.get('/lists/dropdown', async (req, res) => {
   try {
     const { rows: suppliers } = await db.query(
-      "SELECT id, name, COALESCE(type,'Debtor') as type, NULL as code FROM parties WHERE status = 'Active' ORDER BY name"
+      "SELECT id, name, COALESCE(type,'Debtor') as type, NULL as code FROM parties WHERE status = 'Active' AND type IN ('Creditor','Both') ORDER BY name"
     );
 
     const { rows: products } = await db.query(

@@ -303,7 +303,7 @@ router.get('/:id/batches', async (req, res, next) => {
  * POST /api/inventory
  * Create a new product
  */
-router.post('/', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER']), async (req, res) => {
+router.post('/', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER', 'MANAGER', 'STAFF', 'SCM_EXEC', 'MFG_EXEC']), async (req, res) => {
   const client = await db.pool.connect();
   try {
     const { 
@@ -429,6 +429,10 @@ router.post('/', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER
     });
   } catch (error) {
     await client.query('ROLLBACK');
+    if (error.code === '23505') {
+      logger.error('Failed to create product (duplicate code)', { error: error.message, userId: req.user.userId });
+      return res.status(400).json({ success: false, error: 'Item Code is already in use by another product.' });
+    }
     logger.error('Failed to create product', { error: error.message, userId: req.user.userId });
     return res.status(500).json({ success: false, error: error.message });
   } finally {
@@ -441,7 +445,7 @@ router.post('/', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER
  * PUT /api/inventory/:id
  * Update an existing product
  */
-router.put('/:id', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER']), async (req, res) => {
+router.put('/:id', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER', 'MANAGER', 'STAFF', 'SCM_EXEC', 'MFG_EXEC']), async (req, res) => {
   try {
     const { id } = req.params;
     const { 
@@ -568,7 +572,7 @@ router.delete('/:id', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MA
  * POST /api/inventory/batch
  * Add a new batch to a product
  */
-router.post('/batch', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER']), async (req, res) => {
+router.post('/batch', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER', 'MANAGER', 'STAFF', 'SCM_EXEC', 'MFG_EXEC']), async (req, res) => {
   try {
     const { productId, batchNo, quantity, expiryDate, mrp, ptr, sellingRate, purchaseRate } = req.body;
 
@@ -618,7 +622,7 @@ router.post('/batch', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MA
  * POST /api/inventory/adjust
  * Adjust stock (add or remove)
  */
-router.post('/adjust', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER']), async (req, res) => {
+router.post('/adjust', verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'INVENTORY_MANAGER', 'MANAGER', 'STAFF', 'SCM_EXEC', 'MFG_EXEC']), async (req, res) => {
   try {
     const { productId, quantity, reason, notes } = req.body;
 

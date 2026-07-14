@@ -12,11 +12,17 @@
  *   /api/pos (non-party)               → erp.invoices  (POS sale)
  *   /api/crm                           → erp.party.events
  *   /api/accounting, /api/vouchers     → erp.audit
- *   /api/hr                            → erp.audit
+ *   /api/hr                            → erp.hr
+ *   /api/invoices                      → erp.invoices (wholesale/sales register)
+ *   /api/godowns, /api/stock-ledger    → erp.inventory
+ *   /api/boms, /api/raw-materials      → erp.inventory (manufacturing)
+ *   /api/dms                           → erp.documents
+ *   /api/settings, /api/audit          → erp.audit
  *   everything else                    → erp.audit
  */
 const kafka = require('../services/kafka');
 const metrics = require('../services/metrics');
+const db = require('../db');
 
 // Map URL prefix → { topic, module }
 const ROUTE_MAP = [
@@ -36,13 +42,22 @@ const ROUTE_MAP = [
   { prefix: '/api/logistics',       topic: 'erp.orders',       module: 'LOGISTICS' },
   { prefix: '/api/accounting',      topic: 'erp.audit',        module: 'ACCOUNTS' },
   { prefix: '/api/vouchers',        topic: 'erp.audit',        module: 'ACCOUNTS' },
-  { prefix: '/api/hr',              topic: 'erp.audit',        module: 'HR' },
+  { prefix: '/api/hr',              topic: 'erp.hr',           module: 'HR' },
   { prefix: '/api/assets',          topic: 'erp.audit',        module: 'ASSETS' },
   { prefix: '/api/compliance',      topic: 'erp.audit',        module: 'COMPLIANCE' },
   { prefix: '/api/qc',              topic: 'erp.audit',        module: 'QC' },
   { prefix: '/api/rnd',             topic: 'erp.audit',        module: 'RND' },
   { prefix: '/api/tds',             topic: 'erp.audit',        module: 'TDS' },
   { prefix: '/api/gst',             topic: 'erp.audit',        module: 'GST' },
+  { prefix: '/api/invoices',        topic: 'erp.invoices',     module: 'SALES' },
+  { prefix: '/api/godowns',         topic: 'erp.inventory',    module: 'GODOWN' },
+  { prefix: '/api/stock-ledger',    topic: 'erp.inventory',    module: 'INVENTORY' },
+  { prefix: '/api/boms',            topic: 'erp.inventory',    module: 'MANUFACTURING' },
+  { prefix: '/api/raw-materials',   topic: 'erp.inventory',    module: 'MANUFACTURING' },
+  { prefix: '/api/dms',             topic: 'erp.documents',    module: 'DMS' },
+  { prefix: '/api/settings',        topic: 'erp.audit',        module: 'SETTINGS' },
+  { prefix: '/api/audit',           topic: 'erp.audit',        module: 'AUDIT' },
+  { prefix: '/api/admin',           topic: 'erp.users',        module: 'USER_MANAGEMENT' },
 ];
 
 function resolveRoute(path) {
@@ -115,6 +130,13 @@ function universalEventMiddleware(app) {
             const dur = (Date.now() - start) / 1000;
             metrics.recordProduced(topic, eventType, module, 'PRODUCED', dur);
 
+            // Track which table/segment this event touched (audit trail)
+            db.query(
+              `INSERT INTO kafka_event_log (topic, event_type, module, entity_type, entity_id, path, method, actor_username, status)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'PRODUCED')`,
+              [topic, eventType, module, entityType, entityId, req.path, method, req.user?.username || 'system']
+            ).catch(() => {});
+
             // Push CACHE_INVALIDATE via WebSocket so all frontends refresh
             const broadcastAll = app.get('broadcastAll');
             if (broadcastAll) {
@@ -161,13 +183,18 @@ function resolveInvalidateKeys(module, path, method) {
     MANUFACTURING: ['/api/manufacturing', '/api/inventory'],
     LOGISTICS:     ['/api/logistics', '/api/oms'],
     ACCOUNTS:      ['/api/accounting', '/api/reports', '/api/analytics'],
-    HR:            ['/api/hr'],
+    HR:            ['/api/hr', '/api/pcd', '/api/assets', '/api/accounting', '/api/admin'],
     ASSETS:        ['/api/assets'],
     COMPLIANCE:    ['/api/compliance', '/api/customers'],
     QC:            ['/api/qc', '/api/inventory'],
     RND:           ['/api/rnd'],
     TDS:           ['/api/tds', '/api/accounting'],
     GST:           ['/api/gst', '/api/accounting'],
+    GODOWN:        ['/api/godowns', '/api/inventory', '/api/stock-ledger'],
+    DMS:           ['/api/dms'],
+    SETTINGS:      ['/api/settings'],
+    AUDIT:         ['/api/audit'],
+    USER_MANAGEMENT: ['/api/admin', '/api/auth/me'],
     SYSTEM:        [],
   };
   return MAP[module] || [];

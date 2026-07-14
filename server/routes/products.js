@@ -58,7 +58,7 @@ router.get('/', verifyTokenMiddleware, verify2FAMiddleware, asyncRoute(async (re
     }
 }));
 
-router.post('/', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'PHARMACIST']), verify2FAMiddleware, asyncRoute(async (req, res) => {
+router.post('/', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'MANAGER', 'SCM_EXEC']), verify2FAMiddleware, asyncRoute(async (req, res) => {
     try {
         const { name, genericName, manufacturer, packing, uom, hsn, gst, minStockLevel, reorderLevel, rack, scheduleType, source } = req.body;
 

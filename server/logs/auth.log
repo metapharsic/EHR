@@ -1692,3 +1692,122 @@
 {"timestamp":"2026-06-07T19:48:38.811Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::1","device":"87da89131acc05cb861c80340d3d7610f6b74ee9991b0ccc2c3e88e06949c659"}
 {"timestamp":"2026-06-07T19:50:56.108Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::1","device":"87da89131acc05cb861c80340d3d7610f6b74ee9991b0ccc2c3e88e06949c659"}
 {"timestamp":"2026-06-07T20:00:09.343Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"b23a6a8439c0dde5515893e7c90c1e3233b8616e634470f20dc4928bcf3609bc"}
+{"timestamp":"2026-07-01T08:55:03.913Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_1266630382"}
+{"timestamp":"2026-07-06T11:14:29.024Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"07d1d539047ef01990ffd8266d015775201aa150a054c0933cf358dd3c032775"}
+{"timestamp":"2026-07-06T11:15:38.470Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"07d1d539047ef01990ffd8266d015775201aa150a054c0933cf358dd3c032775"}
+{"timestamp":"2026-07-06T11:21:36.716Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-06T11:21:54.624Z","level":"AUTH","message":"User logged in successfully","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-06T11:29:12.180Z","level":"AUTH","message":"User logged out","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-06T11:29:14.229Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-06T11:49:52.411Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"07d1d539047ef01990ffd8266d015775201aa150a054c0933cf358dd3c032775"}
+{"timestamp":"2026-07-06T12:00:53.703Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-06T12:01:04.856Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-06T12:03:00.382Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"07d1d539047ef01990ffd8266d015775201aa150a054c0933cf358dd3c032775"}
+{"timestamp":"2026-07-06T12:04:52.820Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-06T12:05:03.713Z","level":"AUTH","message":"User logged in successfully","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-06T12:40:22.301Z","level":"AUTH","message":"User logged out","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-06T12:40:24.879Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-06T13:15:25.774Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_1838006345"}
+{"timestamp":"2026-07-07T04:10:54.288Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:11:38.114Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T04:12:00.621Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:12:11.076Z","level":"AUTH","message":"User logged in successfully","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T04:30:35.152Z","level":"AUTH","message":"User logged out","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:30:44.922Z","level":"AUTH","message":"User logged in successfully","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T04:30:56.065Z","level":"AUTH","message":"User logged out","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:30:58.568Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T04:39:38.445Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:40:05.266Z","level":"AUTH","message":"User logged in successfully","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T04:41:36.225Z","level":"AUTH","message":"User logged out","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:41:48.474Z","level":"AUTH","message":"User logged in successfully","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T04:54:13.218Z","level":"AUTH","message":"User logged in successfully","userId":"536cecec-5988-4bf4-80b7-e7df3bb3ce21","username":"qa_admin","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T04:54:17.625Z","level":"AUTH","message":"User logged in successfully","userId":"ca6edf3b-6dbe-4831-80e5-35d89432ebc2","username":"qa_manager","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T04:54:22.583Z","level":"AUTH","message":"User logged in successfully","userId":"06002c05-a8d1-4503-9c98-a2c36915ed66","username":"qa_staff","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T04:54:27.056Z","level":"AUTH","message":"User logged in successfully","userId":"d19a2726-9b24-46ac-8008-0921e4f4763b","username":"qa_viewer","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T04:54:31.630Z","level":"AUTH","message":"User logged in successfully","userId":"ed167774-6670-49d4-a6bb-fa6328a485d7","username":"qa_sales_exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T04:54:36.478Z","level":"AUTH","message":"User logged in successfully","userId":"8798d904-01bb-4f82-a55f-b83333731440","username":"qa_scm_exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T04:54:42.064Z","level":"AUTH","message":"User logged in successfully","userId":"df23247e-4de0-4f9e-a266-913d9beb2a3e","username":"qa_mfg_exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T04:54:46.690Z","level":"AUTH","message":"User logged in successfully","userId":"73376626-f73f-482c-adc6-f356e10d060e","username":"qa_hr_exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T04:54:51.212Z","level":"AUTH","message":"User logged in successfully","userId":"55306634-aca8-4c46-b6f6-dd4989d0b6b1","username":"qa_fin_exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T04:54:55.743Z","level":"AUTH","message":"User logged in successfully","userId":"71df0257-e8ac-4613-bd3f-e913cb6a8989","username":"qa_admin_exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T05:05:37.309Z","level":"AUTH","message":"User logged out","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T05:05:39.935Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T05:09:59.560Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T05:10:46.558Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T05:11:52.970Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T05:23:25.279Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T05:24:43.745Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T05:25:02.318Z","level":"AUTH","message":"User logged in successfully","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"Account@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T06:33:23.395Z","level":"AUTH","message":"User logged out","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T06:33:25.999Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T06:35:40.242Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T06:35:42.625Z","level":"AUTH","message":"User logged in successfully","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"Account@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T06:49:11.470Z","level":"AUTH","message":"User logged in successfully","userId":"a297ed5d-1daa-4d03-8cee-da6fd1c7a29d","username":"qa_sales_exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T06:55:24.402Z","level":"AUTH","message":"User logged in successfully","userId":"d3374727-9dd1-404d-a886-302593558d7a","username":"scm.exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T06:55:34.440Z","level":"AUTH","message":"User logged in successfully","userId":"51fe594c-d5b6-48bb-817c-630499845888","username":"mfg.exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T06:55:40.426Z","level":"AUTH","message":"User logged in successfully","userId":"3e1a6ee0-5ba8-4377-be2c-d53268668627","username":"hr.exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T06:55:46.525Z","level":"AUTH","message":"User logged in successfully","userId":"6a720142-3805-4597-a1de-e851754cf5e1","username":"admin.exec","ip":"::ffff:127.0.0.1","device":"fp_1320430851"}
+{"timestamp":"2026-07-07T07:00:05.404Z","level":"AUTH","message":"User logged out","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T07:00:17.937Z","level":"AUTH","message":"User logged in successfully","userId":"3e1a6ee0-5ba8-4377-be2c-d53268668627","username":"hr.exec","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T07:01:03.874Z","level":"AUTH","message":"User logged out","userId":"3e1a6ee0-5ba8-4377-be2c-d53268668627","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T07:01:08.657Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T07:03:34.743Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T07:03:40.127Z","level":"AUTH","message":"User logged in successfully","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"Account@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T11:03:06.758Z","level":"AUTH","message":"User logged out","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T11:03:08.614Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T11:11:45.896Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T11:11:49.070Z","level":"AUTH","message":"User logged in successfully","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"Account@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T11:47:38.564Z","level":"AUTH","message":"User logged out","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T11:47:40.763Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T12:08:25.949Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T12:08:27.930Z","level":"AUTH","message":"User logged in successfully","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"Account@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T12:22:34.626Z","level":"AUTH","message":"User logged out","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T12:22:36.277Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T12:31:02.007Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T12:31:03.336Z","level":"AUTH","message":"User logged in successfully","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"Account@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T12:55:26.896Z","level":"AUTH","message":"User logged out","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T12:55:29.916Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T12:56:49.193Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T12:56:56.733Z","level":"AUTH","message":"User logged in successfully","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"Account@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T16:48:15.396Z","level":"AUTH","message":"User logged out","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T16:48:18.094Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T16:48:54.061Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T16:49:18.098Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T16:49:30.693Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T16:49:45.952Z","level":"AUTH","message":"User logged in successfully","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"Account@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T16:49:52.695Z","level":"AUTH","message":"User logged out","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T16:49:55.823Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T16:59:21.632Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T16:59:25.512Z","level":"AUTH","message":"User logged in successfully","userId":"581f1403-4f22-4531-9343-6971e179e07b","username":"finance@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T17:04:19.901Z","level":"AUTH","message":"User logged out","userId":"581f1403-4f22-4531-9343-6971e179e07b","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T17:04:22.533Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T17:17:44.599Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T17:19:07.327Z","level":"AUTH","message":"User logged in successfully","userId":"581f1403-4f22-4531-9343-6971e179e07b","username":"finance@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005810665"}
+{"timestamp":"2026-07-07T17:19:17.305Z","level":"AUTH","message":"User logged out","userId":"581f1403-4f22-4531-9343-6971e179e07b","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T17:19:39.244Z","level":"AUTH","message":"User logged in successfully","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"Account@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005810665"}
+{"timestamp":"2026-07-07T18:12:21.568Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_1319621854"}
+{"timestamp":"2026-07-07T18:24:28.277Z","level":"AUTH","message":"User logged out","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T18:25:48.672Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T18:25:51.130Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-07T18:25:54.832Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T18:26:01.803Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_1319621854"}
+{"timestamp":"2026-07-07T18:26:38.781Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005810665"}
+{"timestamp":"2026-07-07T18:26:41.876Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T18:26:43.075Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T18:27:09.991Z","level":"AUTH","message":"User logged in successfully","userId":"581f1403-4f22-4531-9343-6971e179e07b","username":"finance@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005810665"}
+{"timestamp":"2026-07-07T18:27:42.521Z","level":"AUTH","message":"User logged out","userId":"581f1403-4f22-4531-9343-6971e179e07b","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T18:27:45.591Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005810665"}
+{"timestamp":"2026-07-08T06:17:50.650Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-08T06:18:04.364Z","level":"AUTH","message":"User logged in successfully","userId":"581f1403-4f22-4531-9343-6971e179e07b","username":"finance@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005810665"}
+{"timestamp":"2026-07-08T07:37:23.440Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-08T07:37:25.209Z","level":"AUTH","message":"User logged in successfully","userId":"581f1403-4f22-4531-9343-6971e179e07b","username":"finance@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-08T07:37:33.748Z","level":"AUTH","message":"User logged out","userId":"581f1403-4f22-4531-9343-6971e179e07b","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-08T07:37:41.725Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-08T08:42:24.698Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-08T08:42:28.593Z","level":"AUTH","message":"User logged in successfully","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"Account@metapharsic.com","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-08T08:59:30.989Z","level":"AUTH","message":"User logged out","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-08T09:01:15.091Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-08T09:01:19.070Z","level":"AUTH","message":"User logged out","userId":"11111111-1111-1111-1111-111111111111","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-08T09:01:39.046Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_2005812339"}
+{"timestamp":"2026-07-08T09:11:07.860Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_70908866"}
+{"timestamp":"2026-07-11T12:47:10.541Z","level":"AUTH","message":"User logged in successfully","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::ffff:127.0.0.1","device":"fp_1838006345"}

@@ -215,6 +215,7 @@ const dmsRoutes = require('./routes/dms');
 const inventoryEnterpriseRoutes = require('./routes/inventory-enterprise');
 const voucherRoutes = require('./routes/vouchers');
 const settingsRoutes = require('./routes/settings');
+const userManagementRoutes = require('./routes/userManagement');
 const geospatialRoutes = require('./routes/geospatial');
 const gstRoutes = require('./routes/gst');
 const tdsRoutes = require('./routes/tds');
@@ -296,6 +297,7 @@ app.use('/api/dms', dmsRoutes);
 app.use('/api/inventory-enterprise', inventoryEnterpriseRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/admin', userManagementRoutes);
 const aiRoutes = require('./routes/ai');
 app.use('/api/ai', aiRoutes);
 

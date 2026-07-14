@@ -28,7 +28,7 @@ router.get(['/bom', '/boms'], verifyTokenMiddleware, async (req, res) => {
  * POST /bom and /boms
  * Create a new Bill of Materials
  */
-router.post(['/bom', '/boms'], verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'PRODUCTION_MANAGER']), async (req, res) => {
+router.post(['/bom', '/boms'], verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'PRODUCTION_MANAGER', 'MANAGER', 'MFG_EXEC']), async (req, res) => {
   try {
     const { 
       product_id, product_name, productId, productName, targetItem,
@@ -93,7 +93,7 @@ router.post(['/bom', '/boms'], verifyTokenMiddleware, verifyRoleMiddleware(['ADM
  * PUT /bom/:id and /boms/:id
  * Update an existing Bill of Materials
  */
-router.put(['/bom/:id', '/boms/:id'], verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'PRODUCTION_MANAGER']), async (req, res) => {
+router.put(['/bom/:id', '/boms/:id'], verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'PRODUCTION_MANAGER', 'MANAGER', 'MFG_EXEC']), async (req, res) => {
   try {
     const { id } = req.params;
     const { 
@@ -223,7 +223,7 @@ router.get('/production-orders', verifyTokenMiddleware, async (req, res) => {
  * POST /api/manufacturing/production-orders
  * Accept both camelCase and snake_case field names
  */
-router.post('/production-orders', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'PRODUCTION_MANAGER']), async (req, res) => {
+router.post('/production-orders', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'PRODUCTION_MANAGER', 'MANAGER', 'MFG_EXEC']), async (req, res) => {
   try {
     const {
       batchNumber, batch_number,

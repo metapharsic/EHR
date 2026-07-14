@@ -8,7 +8,7 @@ const ledgerHelper = require('../utils/ledgerHelper');
 
 // Middleware
 router.use(verifyTokenMiddleware);
-router.use(verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'SALES_MANAGER', 'ACCOUNTANT']));
+router.use(verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'SALES_MANAGER', 'ACCOUNTANT', 'CASHIER', 'MANAGER', 'STAFF', 'SALES_EXEC', 'SCM_EXEC']));
 
 /**
  * GET /api/pos/parties
@@ -17,7 +17,8 @@ router.use(verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'SALES_MANAGER', 'ACCOUN
 router.get('/parties', async (req, res) => {
     try {
         const { search = '', status = 'Active', type = 'Debtor' } = req.query;
-        const params = [];
+        const companyId = req.user?.companyId || 1;
+        const params = [companyId];
         let query = `
             SELECT
               id, name, type, gstin, mobile, email, address, city, state, pin_code as "pinCode",
@@ -27,7 +28,8 @@ router.get('/parties', async (req, res) => {
               account_number as "accountNumber", ifsc_code as "ifscCode",
               drug_license_no as "drugLicenseNo", created_at as "createdAt", updated_at as "updatedAt"
             FROM parties
-            WHERE type IN ('Debtor', 'Customer', 'Both')
+            WHERE (company_id = $1 OR company_id IS NULL)
+              AND type IN ('Debtor', 'Customer', 'Both')
         `;
 
         // Status filter ('All' = no filter, else filter by status)
@@ -72,18 +74,29 @@ router.post('/parties', async (req, res) => {
             drugLicenseNo = null, status = 'Active'
         } = req.body;
         const partyType = ['Debtor','Creditor','Both'].includes(rawType) ? rawType : 'Debtor';
+        const companyId = req.user?.companyId || 1;
 
         if (!name || !mobile) {
             return res.status(400).json({ success: false, error: 'Customer name and mobile are required' });
+        }
+
+        // Duplicate guard — same name+mobile already exists for this company
+        const dup = await db.query(
+            `SELECT id, name FROM parties WHERE company_id = $1 AND mobile = $2 AND status != 'Deleted' LIMIT 1`,
+            [companyId, mobile]
+        );
+        if (dup.rows.length > 0) {
+            return res.status(409).json({ success: false, error: `Party already exists with this mobile: ${dup.rows[0].name}`, existingId: dup.rows[0].id });
         }
 
         const { rows } = await db.query(
             `INSERT INTO parties (
                 name, type, gstin, mobile, email, address, city, state, pin_code, status,
                 credit_limit, current_balance, credit_days, category, contact_person,
-                pan, route, territory, remarks, bank_name, account_number, ifsc_code, drug_license_no
+                pan, route, territory, remarks, bank_name, account_number, ifsc_code, drug_license_no,
+                company_id
              ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23
+                $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24
              ) RETURNING
                 id, name, type, gstin, mobile, email, address, city, state, pin_code as "pinCode",
                 status, credit_limit as "creditLimit", current_balance as "currentBalance",
@@ -93,7 +106,8 @@ router.post('/parties', async (req, res) => {
                 drug_license_no as "drugLicenseNo", created_at as "createdAt"`,
             [name, partyType, gstin, mobile, email, address, city, state, pinCode, status,
              creditLimit, currentBalance, creditDays, category, contactPerson,
-             pan, route, territory, remarks, bankName, accountNumber, ifscCode, drugLicenseNo]
+             pan, route, territory, remarks, bankName, accountNumber, ifscCode, drugLicenseNo,
+             companyId]
         );
 
         res.status(201).json({ success: true, data: { ...rows[0], ledger: [] } });
@@ -571,18 +585,51 @@ router.post('/invoices', async (req, res) => {
         const customer_mobile = req.body.customer_mobile || '';
         const doctor_name = req.body.doctor_name || '';
         const payment_mode = req.body.payment_mode || 'Cash';
-        const sub_total = Number(req.body.sub_total || req.body.net_payable || req.body.net_amount || 0);
-        const taxable_value = Number(req.body.taxable_value || req.body.total_taxable || sub_total);
-        const total_gst = Number(req.body.total_gst || (sub_total - taxable_value) || 0);
-        const total_discount = Number(req.body.total_discount || 0);
-        const round_off = Number(req.body.round_off || 0);
-        const net_amount = Number(req.body.net_amount || req.body.net_payable || sub_total);
+        // Split payment support: frontend (TallyVoucherEntry) sends payments: [{ method, amount }].
+        // Falls back to single payment_mode/net_amount when only one mode used.
+        const paymentModes = Array.isArray(req.body.payments) && req.body.payments.length > 1
+            ? req.body.payments.map(p => ({ mode: p.method, amount: p.amount }))
+            : null;
         const items = req.body.items || [];
         const party_id = req.body.party_id || null;
 
         if (!items || items.length === 0) {
             return res.status(400).json({ success: false, error: 'No items provided' });
         }
+
+        // Server-side recompute of all financial totals from the item lines.
+        // Client-sent totals are NEVER trusted directly (tampering risk) — recomputed figures below
+        // are what actually get written to the invoice header and posted to the GL.
+        let taxable_value = 0;
+        let total_gst = 0;
+        let total_discount = 0;
+        let total_free_value = 0;
+        for (const item of items) {
+            const qty = Number(item.quantity || 0);
+            const rate = Number(item.rate || item.selling_rate || 0);
+            const mrp = Number(item.mrp || rate);
+            const disc = Number(item.discount_percent || 0);
+            const gstP = Number(item.gst_percent || item.gstPercent || 0);
+            const freeQty = Number(item.free_quantity || 0);
+
+            const itemTaxable = qty * rate * (1 - disc / 100);
+            const itemGrossMrp = qty * mrp;
+            const itemFreeValue = +(freeQty * mrp * (1 - disc / 100)).toFixed(2);
+
+            taxable_value += itemTaxable;
+            total_gst += itemTaxable * gstP / 100;
+            total_discount += Math.max(0, itemGrossMrp - itemTaxable);
+            total_free_value += itemFreeValue;
+        }
+        taxable_value = +taxable_value.toFixed(2);
+        total_gst = +total_gst.toFixed(2);
+        total_discount = +total_discount.toFixed(2);
+        total_free_value = +total_free_value.toFixed(2);
+
+        const netBeforeRound = taxable_value + total_gst - total_free_value;
+        const net_amount = Math.round(netBeforeRound);
+        const round_off = +(net_amount - netBeforeRound).toFixed(2);
+        const sub_total = taxable_value;
 
         await client.query('BEGIN');
         
@@ -637,23 +684,29 @@ router.post('/invoices', async (req, res) => {
             const itemGst = Number(item.gst_percent || item.gstPercent || 0);
             const dbProductId = (item.product_id && item.product_id !== 'manual' && item.product_id !== 'undefined') ? item.product_id : null;
             const dbBatchId = (item.batch_id && item.batch_id !== 'undefined') ? item.batch_id : null;
+            const itemMrp = Number(item.mrp || itemRate);
+            const itemFreeQty = Number(item.free_quantity || 0);
+            const itemDisc = Number(item.discount_percent || 0);
+            const itemFreeValue = +(itemFreeQty * itemMrp * (1 - itemDisc/100)).toFixed(2);
 
             await client.query(
                 `INSERT INTO sales_invoice_items (
-                    invoice_id, product_id, batch_id, quantity, mrp, rate, 
+                    invoice_id, product_id, batch_id, quantity, free_quantity, free_value, mrp, rate,
                     discount_percent, discount_amount, taxable_value, gst_percent, total_amount
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
                 [
-                    invoiceId, 
-                    dbProductId, 
-                    dbBatchId, 
-                    Number(item.quantity || 0), 
-                    Number(item.mrp || itemRate), 
+                    invoiceId,
+                    dbProductId,
+                    dbBatchId,
+                    Number(item.quantity || 0),
+                    itemFreeQty,
+                    itemFreeValue,
+                    itemMrp,
                     itemRate,
-                    Number(item.discount_percent || 0), 
-                    Number(item.discount_amount || item.discount || 0), 
-                    itemTaxable, 
-                    itemGst, 
+                    itemDisc,
+                    Number(item.discount_amount || item.discount || 0),
+                    itemTaxable,
+                    itemGst,
                     itemTotal
                 ]
             );
@@ -677,25 +730,46 @@ router.post('/invoices', async (req, res) => {
         }
 
         // 4. General Ledger Postings
-        const salesAcct = await ledgerHelper.findAccount(client, companyId, 'Sales');
-        const taxAcct = await ledgerHelper.findAccount(client, companyId, 'GST Payable');
-        let debitAcct;
-        
-        if (payment_mode === 'Cash') debitAcct = await ledgerHelper.findAccount(client, companyId, 'Cash in Hand');
-        else if (payment_mode === 'Credit') debitAcct = await ledgerHelper.findAccount(client, companyId, 'Sundry Debtors');
-        else debitAcct = await ledgerHelper.findAccount(client, companyId, 'Bank Accounts');
+        // findOrCreateAccount = safe fallback: auto-creates the account if missing instead of hard-failing the sale.
+        // POS revenue → dedicated 'POS Sales' bucket (SYS-200002), keeps counter sales
+        // separate from wholesale 'Sales Revenue' so reports/analytics can split channels.
+        const salesAcct = await ledgerHelper.findOrCreateAccount(client, companyId, 'POS Sales', 'Income', 'Direct Income');
+        const taxAcct = await ledgerHelper.findOrCreateAccount(client, companyId, 'GST Payable', 'Liability', 'Duties & Taxes');
 
-        // A. Debit Party/Cash/Bank
-        await ledgerHelper.postToGeneralLedger(client, {
-            accountId: debitAcct,
-            partyId: payment_mode === 'Credit' ? party_id : null,
-            voucherId: voucherId,
-            voucherType: 'Sales',
-            transactionDate: date,
-            debit: net_amount,
-            credit: 0,
-            narration: `Invoice ${invoice_number}`
-        });
+        const resolveDebitAccount = async (mode) => {
+            if (mode === 'Cash') return ledgerHelper.findOrCreateAccount(client, companyId, 'Cash in Hand', 'Asset', 'Current Assets');
+            if (mode === 'Credit') return ledgerHelper.findOrCreateAccount(client, companyId, 'Sundry Debtors', 'Asset', 'Current Assets');
+            return ledgerHelper.findOrCreateAccount(client, companyId, 'Bank Accounts', 'Asset', 'Current Assets');
+        };
+
+        // A. Debit Party/Cash/Bank — split across each payment mode if multiple were used (cash+card etc.)
+        if (paymentModes) {
+            for (const pm of paymentModes) {
+                const pmAccount = await resolveDebitAccount(pm.mode);
+                await ledgerHelper.postToGeneralLedger(client, {
+                    accountId: pmAccount,
+                    partyId: pm.mode === 'Credit' ? party_id : null,
+                    voucherId: voucherId,
+                    voucherType: 'Sales',
+                    transactionDate: date,
+                    debit: Number(pm.amount || 0),
+                    credit: 0,
+                    narration: `Invoice ${invoice_number} (${pm.mode})`
+                });
+            }
+        } else {
+            const debitAcct = await resolveDebitAccount(payment_mode);
+            await ledgerHelper.postToGeneralLedger(client, {
+                accountId: debitAcct,
+                partyId: payment_mode === 'Credit' ? party_id : null,
+                voucherId: voucherId,
+                voucherType: 'Sales',
+                transactionDate: date,
+                debit: net_amount,
+                credit: 0,
+                narration: `Invoice ${invoice_number}`
+            });
+        }
 
         // B. Credit Sales
         await ledgerHelper.postToGeneralLedger(client, {
@@ -746,12 +820,24 @@ router.post('/returns', async (req, res) => {
             items,
             net_payable,
             total_taxable,
-            party_id
+            party_id,
+            original_invoice_id
         } = req.body;
 
         await client.query('BEGIN');
         const companyId = req.user?.companyId || 1;
         const userId = req.user?.userId || req.user?.id;
+
+        // Look up the original invoice's payment mode so the refund reverses the SAME
+        // account that was debited at sale time (Cash/Bank/Debtors), not always Sundry Debtors.
+        let originalPaymentMode = 'Cash';
+        if (original_invoice_id) {
+            const { rows: [origInv] } = await client.query(
+                'SELECT payment_mode FROM sales_invoices WHERE id = $1',
+                [original_invoice_id]
+            );
+            if (origInv?.payment_mode) originalPaymentMode = origInv.payment_mode;
+        }
 
         const voucherId = uuidv4();
         // 1. Create Return Voucher Header
@@ -783,9 +869,16 @@ router.post('/returns', async (req, res) => {
         }
 
         // 3. Accounting Entries
-        const salesReturnAcct = await ledgerHelper.findAccount(client, companyId, 'Sales Returns') || await ledgerHelper.findAccount(client, companyId, 'Sales');
-        const taxAcct = await ledgerHelper.findAccount(client, companyId, 'GST Payable');
-        const partyAcct = await ledgerHelper.findAccount(client, companyId, 'Sundry Debtors');
+        const salesReturnAcct = await ledgerHelper.findOrCreateAccount(client, companyId, 'Sales Returns', 'Expense', 'Direct Expenses');
+        const taxAcct = await ledgerHelper.findOrCreateAccount(client, companyId, 'GST Payable', 'Liability', 'Duties & Taxes');
+
+        // Reverse the same side that was debited on the original sale: Cash/Bank refunded in hand,
+        // or Sundry Debtors reduced if it was a credit sale. Previously this always credited
+        // Sundry Debtors even for Cash sales, so cash-in-hand was never actually reduced.
+        let refundAcct;
+        if (originalPaymentMode === 'Cash') refundAcct = await ledgerHelper.findOrCreateAccount(client, companyId, 'Cash in Hand', 'Asset', 'Current Assets');
+        else if (originalPaymentMode === 'Credit') refundAcct = await ledgerHelper.findOrCreateAccount(client, companyId, 'Sundry Debtors', 'Asset', 'Current Assets');
+        else refundAcct = await ledgerHelper.findOrCreateAccount(client, companyId, 'Bank Accounts', 'Asset', 'Current Assets');
 
         // A. Debit Sales Return
         await ledgerHelper.postToGeneralLedger(client, {
@@ -812,16 +905,16 @@ router.post('/returns', async (req, res) => {
             });
         }
 
-        // C. Credit Party
+        // C. Credit Cash/Bank/Debtors — reverses the original sale's debit side
         await ledgerHelper.postToGeneralLedger(client, {
-            accountId: partyAcct,
-            partyId: party_id,
+            accountId: refundAcct,
+            partyId: originalPaymentMode === 'Credit' ? party_id : null,
             voucherId: voucherId,
             voucherType: 'Sales Return',
             transactionDate: invoice_date,
             debit: 0,
             credit: net_payable,
-            narration: `Return to Party: ${invoice_no}`
+            narration: `Return refund (${originalPaymentMode}): ${invoice_no}`
         });
 
         await client.query('COMMIT');

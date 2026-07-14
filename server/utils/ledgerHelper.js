@@ -155,6 +155,23 @@ async function findAccount(client, companyId, search) {
 }
 
 /**
+ * Finds an account by name, creating a minimal fallback account if none exists.
+ * Prevents hard-fail on GL posting when a lookup account (e.g. "GST Payable") is missing.
+ */
+async function findOrCreateAccount(client, companyId, search, accountType = 'Liability', group = 'Duties & Taxes') {
+    const existing = await findAccount(client, companyId, search);
+    if (existing) return existing;
+
+    const { rows } = await client.query(
+        `INSERT INTO chart_of_accounts (company_id, account_code, account_name, account_type, account_group, current_balance, status)
+         VALUES ($1, $2, $3, $4, $5, 0, 'Active')
+         RETURNING id`,
+        [companyId, `AUTO-${Date.now()}`, search, accountType, group]
+    );
+    return rows[0].id;
+}
+
+/**
  * Unified helper to process standard business vouchers (Receipt, Payment, Contra, Return)
  */
 async function processVoucher(client, {
@@ -278,6 +295,7 @@ module.exports = {
     postToGeneralLedger,
     postToStockLedger,
     findAccount,
+    findOrCreateAccount,
     processVoucher,
     clearLedgerEntries
 };

@@ -11,6 +11,7 @@ const db = require('../db');
 const { verifyTokenMiddleware } = require('../utils/jwt');
 const { sendExpiryAlerts } = require('../services/complianceNotificationService');
 const logger = require('../utils/logger');
+const kafka = require('../services/kafka');
 
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'uploads', 'customer-docs');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -99,7 +100,7 @@ router.get('/', async (req, res) => {
 
     const { rows } = await db.query(`
       SELECT p.id, p.name, p.type, p.entity_type, p.mobile, p.email, p.whatsapp_number,
-             p.city, p.state, p.gstin, p.drug_license_no,
+             p.party_code, p.city, p.state, p.gstin, p.drug_license_no,
              p.dl_20a, p.dl_20a_expiry, p.dl_20b, p.dl_20b_expiry,
              p.dl_20c, p.dl_20c_expiry, p.dl_20d, p.dl_20d_expiry,
              p.dl_expiry_date, p.pharmacist_name, p.pharmacist_reg_no, p.pharmacist_reg_expiry,
@@ -189,9 +190,21 @@ router.post('/', async (req, res) => {
     const companyId = req.user?.companyId || 1;
     const { name, entity_type = null, mobile = null, email = null, city = null, type = 'Debtor', status = 'Active' } = req.body;
     if (!name) return res.status(400).json({ success: false, error: 'Name required' });
+
+    // Duplicate guard — same name+mobile already active for this company
+    if (mobile) {
+      const dup = await db.query(
+        `SELECT id, name FROM parties WHERE company_id = $1 AND mobile = $2 AND status != 'Deleted' LIMIT 1`,
+        [companyId, mobile]
+      );
+      if (dup.rows.length > 0) {
+        return res.status(409).json({ success: false, error: `Party already exists with this mobile: ${dup.rows[0].name}`, existingId: dup.rows[0].id });
+      }
+    }
+
     const { rows } = await db.query(
-      `INSERT INTO parties (company_id, name, entity_type, mobile, email, city, type, status, compliance_status, compliance_score)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'INCOMPLETE',0) RETURNING id, name`,
+      `INSERT INTO parties (company_id, name, entity_type, mobile, email, city, type, status, compliance_status, compliance_score, party_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'INCOMPLETE',0, nextval('party_code_seq')::text) RETURNING id, name, party_code`,
       [companyId, name, entity_type, mobile, email, city, type, status]
     );
     res.status(201).json({ success: true, data: rows[0] });
@@ -199,6 +212,9 @@ router.post('/', async (req, res) => {
     res.status(500).json({ success: false, error: e.message });
   }
 });
+
+// Fields whose changes are logged to audit_logs for credit-history tracking (see docs/workflows/credit-tracking-flow.md)
+const CREDIT_TRACKED_FIELDS = ['credit_limit', 'credit_days', 'status'];
 
 router.put('/:id', async (req, res) => {
   try {
@@ -214,6 +230,13 @@ router.put('/:id', async (req, res) => {
       'credit_limit','credit_days','category','contact_person',
       'bank_name','account_number','ifsc_code','remarks','territory','route','status',
     ];
+
+    // Snapshot old values for the tracked fields before overwriting them.
+    const { rows: [before] } = await db.query(
+      `SELECT ${CREDIT_TRACKED_FIELDS.join(', ')} FROM parties WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!before) return res.status(404).json({ success: false, error: 'Not found' });
 
     const sets = []; const vals = [];
     fields.forEach(f => {
@@ -231,9 +254,51 @@ router.put('/:id', async (req, res) => {
       vals
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Not found' });
+
+    // Log credit-relevant field changes as recognizable audit_logs rows (module=CREDIT_TRACKING).
+    for (const f of CREDIT_TRACKED_FIELDS) {
+      if (f in req.body) {
+        const oldVal = before[f];
+        const newVal = req.body[f] || null;
+        if (String(oldVal ?? '') !== String(newVal ?? '')) {
+          await db.query(
+            `INSERT INTO audit_logs (user_id, action, module, table_name, record_id, entity_type, entity_id, changes, status)
+             VALUES ($1, $2, 'CREDIT_TRACKING', 'parties', $3, 'party', $3, $4, 'success')`,
+            [
+              req.user?.id || req.user?.userId || null,
+              `${f.toUpperCase()}_CHANGED`,
+              req.params.id,
+              JSON.stringify({ field: f, old_value: oldVal, new_value: newVal, party_name: rows[0].name })
+            ]
+          ).catch(e => logger.error('Credit history audit log failed', { error: e.message }));
+        }
+      }
+    }
+
+    // Broadcast to Kafka (erp.party.events) so the WebSocket layer live-refreshes
+    // POS/Wholesale/OMS party pickers and Customer DB on other logged-in screens.
+    kafka.events.party.updated(rows[0], req.user?.username).catch(() => {});
+
     res.json({ success: true, data: rows[0] });
   } catch (err) {
     logger.error('PUT /customers/:id failed', { error: err.message });
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ── GET /api/customers/:id/credit-history — credit_limit/credit_days/status change log ──
+router.get('/:id/credit-history', async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT al.*, u.name as changed_by_name
+       FROM audit_logs al
+       LEFT JOIN users u ON al.user_id = u.id
+       WHERE al.entity_type = 'party' AND al.entity_id = $1 AND al.module = 'CREDIT_TRACKING'
+       ORDER BY al.created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });

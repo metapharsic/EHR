@@ -293,16 +293,16 @@ router.get("/notification-settings", async (req, res) => {
 
 router.post("/notification-settings", async (req, res) => {
   try {
-    const { email_enabled, email_address, whatsapp_enabled, whatsapp_number, whatsapp_apikey,
+    const { email_enabled, email_address, escalation_email, whatsapp_enabled, whatsapp_number, whatsapp_apikey,
             alert_days_30, alert_days_15, alert_days_7, alert_days_1 } = req.body;
     await db.query(
       `UPDATE compliance_notification_settings SET
-        email_enabled=$1, email_address=$2,
+        email_enabled=$1, email_address=$2, escalation_email=$10,
         whatsapp_enabled=$3, whatsapp_number=$4, whatsapp_apikey=$5,
         alert_days_30=$6, alert_days_15=$7, alert_days_7=$8, alert_days_1=$9,
         updated_at=CURRENT_TIMESTAMP`,
       [email_enabled, email_address, whatsapp_enabled, whatsapp_number, whatsapp_apikey,
-       alert_days_30, alert_days_15, alert_days_7, alert_days_1]
+       alert_days_30, alert_days_15, alert_days_7, alert_days_1, escalation_email || null]
     );
     const { rows } = await db.query("SELECT * FROM compliance_notification_settings LIMIT 1");
     res.json({ success: true, data: rows[0] });

@@ -29,6 +29,7 @@ function generateAccessToken(user) {
       username: user.username,
       email: user.email,
       role: user.role,
+      roleId: user.role_id || null,
       companyId: user.company_id || 1,
       permissions: user.permissions || [],
       iat: Math.floor(Date.now() / 1000)

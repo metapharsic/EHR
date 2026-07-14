@@ -19,6 +19,7 @@ const buildUserResponse = (user) => ({
   email: user.email,
   name: user.name,
   role: user.role,
+  roleId: user.role_id || null,
   companyId: user.company_id || 1
 });
 
@@ -403,8 +404,18 @@ async function getCurrentUser(req, res) {
     }
 
     const user = rows[0];
+    let permissions = [];
+    if (user.role_id) {
+      const { rows: permRows } = await db.query(
+        `SELECT p.module_key, p.action FROM role_permissions rp
+         JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = $1`,
+        [user.role_id]
+      );
+      permissions = permRows.map(r => `${r.module_key}:${r.action}`);
+    }
     res.json({
-      user: buildUserResponse(user)
+      user: buildUserResponse(user),
+      permissions
     });
   } catch (error) {
     logger.error('Get current user error', { error: error.message, userId: req.user?.userId });

@@ -6,6 +6,7 @@
 const kafka = require('./kafka');
 const db = require('../db');
 const metrics = require('./metrics');
+const accountingSync = require('./accountingSync');
 
 async function startAllConsumers(app) {
   const broadcastAll = app.get('broadcastAll');
@@ -52,10 +53,11 @@ async function startAllConsumers(app) {
 
       const partyId = payload.request_body?.party_id;
       const netAmount = parseFloat(payload.request_body?.net_amount || payload.response_summary?.net_amount || 0);
+      const companyId = payload.company_id || 1;
+      const documentId = payload.entity_id || payload.response_summary?.id;
 
       if (partyId && netAmount) {
         if (eventType.includes('CREATED')) {
-          // Add to party outstanding
           await db.query(
             `UPDATE parties SET current_balance = COALESCE(current_balance,0) + $1, updated_at=NOW() WHERE id=$2`,
             [netAmount, partyId]
@@ -63,12 +65,20 @@ async function startAllConsumers(app) {
           metrics.recordInvoice(payload.module || 'SALES', payload.request_body?.payment_mode || 'Credit', netAmount);
         }
         if (eventType.includes('CANCELLED')) {
-          // Reverse outstanding
           await db.query(
             `UPDATE parties SET current_balance = GREATEST(0, COALESCE(current_balance,0) - $1), updated_at=NOW() WHERE id=$2`,
             [netAmount, partyId]
           ).catch(() => {});
         }
+      }
+
+      // Auto-post GL entry for this invoice
+      if (documentId && eventType.includes('CREATED')) {
+        // POS invoices live in sales_invoices too (not pos_bills) and already post GL
+        // in real time, so syncing them is a safe no-op guarded by the INV-* skip in accountingSync.
+        const sourceTable = 'sales_invoices';
+        accountingSync.syncDocument(companyId, sourceTable, documentId)
+          .catch(e => console.error(`[EventConsumers] GL sync failed for ${sourceTable} ${documentId}:`, e.message));
       }
 
       broadcastAll?.({
@@ -91,6 +101,13 @@ async function startAllConsumers(app) {
 
       if (eventType.includes('RECEIVED') || eventType.includes('CREATED')) {
         metrics.recordPurchaseOrder('CREATED');
+        // Auto-post GL for purchase
+        const companyId = payload.company_id || 1;
+        const documentId = payload.entity_id || payload.response_summary?.id;
+        if (documentId) {
+          accountingSync.syncDocument(companyId, 'purchase_orders', documentId)
+            .catch(e => console.error(`[EventConsumers] GL sync failed for purchase_orders ${documentId}:`, e.message));
+        }
       }
 
       broadcastAll?.({
@@ -168,11 +185,11 @@ async function startAllConsumers(app) {
     }
   );
 
-  // ── 6. AUDIT / BROADCAST consumer ────────────────────────────────────────
-  // Generic audit events + broadcasts forwarded to all WebSocket clients
+  // ── 6. AUDIT / BROADCAST / DMS consumer ─────────────────────────────────────
+  // Generic audit events + broadcasts + document changes forwarded to clients
   await kafka.startConsumer(
     'erp-audit-logger',
-    ['erp.audit', 'erp.notifications'],
+    ['erp.audit', 'erp.notifications', 'erp.documents'],
     async (topic, eventType, payload) => {
       metrics.recordConsumed(topic, eventType, 'erp-audit-logger', 'PROCESSED');
 
@@ -184,10 +201,73 @@ async function startAllConsumers(app) {
           timestamp: Date.now(),
         });
       }
+
+      if (topic === 'erp.documents') {
+        broadcastAll?.({
+          type: 'CACHE_INVALIDATE',
+          module: 'DMS',
+          event_type: eventType,
+          invalidate_keys: ['/api/dms'],
+          timestamp: Date.now(),
+        });
+      }
     }
   );
 
-  console.log('[EventConsumers] All 6 cross-module consumers started');
+  // ── 7. HR EVENTS consumer ─────────────────────────────────────────────────
+  // Employee/attendance/leave/payroll changes → refresh HR views + notify
+  // dependent modules (PCD medical reps derive from employees, Assets track
+  // employee allocations, Accounting reflects payroll GL).
+  await kafka.startConsumer(
+    'erp-hr-sync',
+    ['erp.hr'],
+    async (topic, eventType, payload) => {
+      metrics.recordConsumed(topic, eventType, 'erp-hr-sync', 'PROCESSED');
+
+      if (eventType.includes('payroll')) {
+        // Payroll run changes salary_slips + GL — refresh accounting too
+        broadcastAll?.({
+          type: 'CACHE_INVALIDATE',
+          module: 'HR',
+          event_type: eventType,
+          invalidate_keys: ['/api/hr', '/api/accounting', '/api/reports'],
+          timestamp: Date.now(),
+        });
+      } else {
+        broadcastAll?.({
+          type: 'CACHE_INVALIDATE',
+          module: 'HR',
+          event_type: eventType,
+          invalidate_keys: ['/api/hr', '/api/pcd', '/api/assets'],
+          timestamp: Date.now(),
+        });
+      }
+    }
+  );
+
+  // ── 8. USER MANAGEMENT / RBAC consumer ──────────────────────────────────
+  // Role/permission edits invalidate the in-process permission cache and push
+  // a live CACHE_INVALIDATE so an affected user's sidebar/permissions refresh
+  // without forcing a full logout.
+  await kafka.startConsumer(
+    'erp-user-sync',
+    ['erp.users'],
+    async (topic, eventType, payload) => {
+      metrics.recordConsumed(topic, eventType, 'erp-user-sync', 'PROCESSED');
+      const { invalidateRole } = require('../middleware/rbac');
+      if (payload?.roleId) invalidateRole(payload.roleId);
+
+      broadcastAll?.({
+        type: 'CACHE_INVALIDATE',
+        module: 'USER_MANAGEMENT',
+        event_type: eventType,
+        invalidate_keys: ['/api/admin', '/api/auth/me'],
+        timestamp: Date.now(),
+      });
+    }
+  );
+
+  console.log('[EventConsumers] All 8 cross-module consumers started');
 }
 
 module.exports = { startAllConsumers };

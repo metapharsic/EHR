@@ -156,4 +156,4 @@ async function sendTestNotification(settings, channel) {
   throw new Error("Channel not configured");
 }
 
-module.exports = { sendExpiryAlerts, sendTestNotification };
+module.exports = { sendExpiryAlerts, sendTestNotification, sendEmail };

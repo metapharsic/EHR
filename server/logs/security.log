@@ -165,3 +165,22 @@
 {"timestamp":"2026-06-04T05:34:02.861Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::1"}
 {"timestamp":"2026-06-04T05:34:30.559Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"11111111-1111-1111-1111-111111111111","username":"admin","ip":"::1"}
 {"timestamp":"2026-06-07T19:40:05.049Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"22222222-2222-2222-2222-222222222223","username":"accountant","ip":"::1"}
+{"timestamp":"2026-07-01T08:54:57.012Z","level":"SECURITY","message":"Invalid refresh token attempt","error":"jwt expired","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-06T11:49:52.545Z","level":"SECURITY","message":"Auto-provisioned ERP login for new employee","employeeId":"c6a32139-553c-48ed-a7ee-a13bbe967eb7","userId":"502a8e48-5572-4380-8f46-3d558ef84057","username":"test.rbac.emp-0001","role":"FIN_EXEC"}
+{"timestamp":"2026-07-06T12:01:00.709Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:11:03.814Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:11:09.474Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"admin@metapharsic.io","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:11:15.480Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"admin@metapharsic.io","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:11:29.538Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:39:42.924Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T04:39:50.214Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"admin@metapharsic.io","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T05:10:20.732Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"accounts@metapharsic.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T05:10:42.396Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"Accounts@metapharsic.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T05:23:21.393Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"accounts@metapharsic.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T16:48:59.260Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T16:49:04.677Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"91a18fe5-1820-4eac-babf-ae88a7f4aa89","username":"account@metapharsic.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T16:49:15.262Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T16:49:39.589Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"0d0dc5ac-5670-486e-843a-1c89129ae7df","username":"abdulmannanmohammed240@gmail.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T17:18:19.177Z","level":"SECURITY","message":"Failed login attempt - invalid password","userId":"581f1403-4f22-4531-9343-6971e179e07b","username":"finance@metapharsic.com","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T18:12:10.616Z","level":"SECURITY","message":"Invalid refresh token attempt","error":"invalid signature","ip":"::ffff:127.0.0.1"}
+{"timestamp":"2026-07-07T18:12:18.967Z","level":"SECURITY","message":"Login attempt with non-existent username","username":"mohammedsameerpasha128@gmail.com","ip":"::ffff:127.0.0.1"}

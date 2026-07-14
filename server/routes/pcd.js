@@ -248,20 +248,12 @@ router.post("/partners/:id/sync", async (req, res) => {
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
-    const pRes = await client.query("SELECT * FROM pcd_partners WHERE id=$1", [req.params.id]);
-    if (!pRes.rows.length) throw new Error("Partner not found");
-    const p = pRes.rows[0];
-
-    // Create Party record
-    const partyRes = await client.query(
-      `INSERT INTO parties (name, type, email, mobile, address, city, state, drug_license_no, status, company_id)
-       VALUES ($1, 'Debtor', $2, $3, $4, $5, $6, $7, 'Active', $8) RETURNING id`,
-      [p.name, p.email, p.contact_number, p.territory, p.district, p.state, p.drug_license_no, p.company_id || 1]
-    );
-    const partyId = partyRes.rows[0].id;
-
-    // Update PCD Partner with party reference
-    await client.query("UPDATE pcd_partners SET converted_party_id=$1, status='ACTIVE' WHERE id=$2", [partyId, p.id]);
+    // Delegate to the idempotent helper — checks converted_party_id first
+    // and UPDATEs the existing party instead of always INSERTing a new one.
+    // (Previously this route had its own raw INSERT, creating a duplicate
+    // party row every time "Sync to ERP" was clicked twice on one partner.)
+    const partyId = await syncPartnerToParty(client, req.params.id);
+    if (!partyId) throw new Error("Partner is not ACTIVE/APPROVED — cannot sync to parties");
 
     await client.query('COMMIT');
     res.json({ success: true, partyId, message: "PCD Partner synchronized with ERP Parties (Debtors)" });
@@ -793,9 +785,12 @@ router.post("/transactions", async (req, res) => {
 router.get("/dashboard/summary", async (req, res) => {
   try {
     const companyId = req.user?.companyId || 1;
-    const [partners, revenue, schemes, approvals, targets, receivables, aging] = await Promise.all([
-      db.query("SELECT COUNT(*) FROM pcd_partners WHERE company_id = $1 AND status='ACTIVE'", [companyId]),
-      db.query("SELECT COALESCE(SUM(order_amount),0) AS total FROM pcd_transactions WHERE company_id = $1", [companyId]),
+    const [partners, revenue, schemes, approvals, targets, receivables, aging, partnersNew, salesTrend] = await Promise.all([
+      // FIX: status stored inconsistently ('Active' vs 'ACTIVE') — match case-insensitively
+      db.query("SELECT COUNT(*) FROM pcd_partners WHERE company_id = $1 AND UPPER(status)='ACTIVE'", [companyId]),
+      // FIX: was summing ALL transactions including Cancelled/Rejected — inflated revenue.
+      // Match the NOT IN ('CANCELLED','REJECTED') convention already used elsewhere in this file.
+      db.query("SELECT COALESCE(SUM(order_amount),0) AS total FROM pcd_transactions WHERE company_id = $1 AND order_status NOT IN ('CANCELLED','REJECTED')", [companyId]),
       db.query("SELECT COUNT(*) FROM pcd_schemes WHERE company_id = $1 AND status='ACTIVE'", [companyId]),
       db.query("SELECT COUNT(*) FROM pcd_partner_documents pd JOIN pcd_partners pp ON pp.id = pd.partner_id WHERE pd.status='PENDING' AND pp.company_id = $1", [companyId]),
       db.query("SELECT COALESCE(AVG(CASE WHEN target_amount>0 THEN achieved_amount/target_amount*100 ELSE 0 END),0) AS avg_achievement FROM pcd_targets WHERE company_id = $1 AND status IN ('IN_PROGRESS','ACHIEVED','EXCEEDED')", [companyId]),
@@ -805,9 +800,25 @@ router.get("/dashboard/summary", async (req, res) => {
         COALESCE(SUM(CASE WHEN CURRENT_DATE - due_date BETWEEN 31 AND 60 THEN outstanding_amount ELSE 0 END),0) AS bucket_31_60,
         COALESCE(SUM(CASE WHEN CURRENT_DATE - due_date > 60 THEN outstanding_amount ELSE 0 END),0) AS bucket_61_plus
         FROM pcd_receivables WHERE company_id=$1 AND status NOT IN ('CLOSED','CLEARED') AND due_date < CURRENT_DATE`, [companyId]),
+      // Real "new partners this month" — replaces a hardcoded "+2 from last month" UI string.
+      db.query("SELECT COUNT(*) FROM pcd_partners WHERE company_id = $1 AND created_at >= NOW() - INTERVAL '30 days'", [companyId]),
+      // Real quarter-over-quarter sales trend — replaces a hardcoded "+15% from Q2" UI string.
+      db.query(`
+        SELECT
+          COALESCE(SUM(CASE WHEN order_date >= date_trunc('quarter', CURRENT_DATE) THEN order_amount ELSE 0 END),0) AS this_quarter,
+          COALESCE(SUM(CASE WHEN order_date >= date_trunc('quarter', CURRENT_DATE) - INTERVAL '3 months'
+                             AND order_date < date_trunc('quarter', CURRENT_DATE) THEN order_amount ELSE 0 END),0) AS last_quarter
+        FROM pcd_transactions
+        WHERE company_id = $1 AND order_status NOT IN ('CANCELLED','REJECTED')
+      `, [companyId]),
     ]);
 
     const ag = aging.rows[0];
+    const st = salesTrend.rows[0];
+    const thisQ = parseFloat(st.this_quarter);
+    const lastQ = parseFloat(st.last_quarter);
+    const salesQoQChangePct = lastQ > 0 ? parseFloat((((thisQ - lastQ) / lastQ) * 100).toFixed(1)) : null;
+
     res.json({
       success: true,
       data: {
@@ -817,6 +828,8 @@ router.get("/dashboard/summary", async (req, res) => {
         pendingApprovals: parseInt(approvals.rows[0].count),
         avgTargetAchievement: parseFloat(parseFloat(targets.rows[0].avg_achievement).toFixed(1)),
         outstandingReceivables: parseFloat(receivables.rows[0].total),
+        partnersAddedThisMonth: parseInt(partnersNew.rows[0].count),
+        salesQoQChangePct,
         agingBuckets: {
           bucket_0_30: parseFloat(ag.bucket_0_30),
           bucket_31_60: parseFloat(ag.bucket_31_60),

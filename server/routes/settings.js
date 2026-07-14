@@ -17,7 +17,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const logger = require('../utils/logger');
-const { verifyTokenMiddleware } = require('../utils/jwt');
+const { verifyTokenMiddleware, verifyRoleMiddleware } = require('../utils/jwt');
 
 // All settings routes require authentication
 router.use(verifyTokenMiddleware);
@@ -82,13 +82,14 @@ router.get('/company', asyncRoute(async (req, res) => {
   res.json({ success: true, data: company });
 }));
 
-router.put('/company', asyncRoute(async (req, res) => {
+router.put('/company', verifyRoleMiddleware(['ADMIN', 'ADMIN_EXEC']), asyncRoute(async (req, res) => {
   const {
     name, businessType, taxStructure, valuationMethod,
     financialYearStart, financialYearEnd,
     gstin, vatNumber, drugLicenseNo, foodLicenseNo,
     address, city, state, pinCode, country,
     phone, email, website, logoUrl,
+    pan, cin, bankName, bankBranch, bankAccount, bankIfsc,
   } = req.body;
 
   // Required field validation
@@ -133,6 +134,12 @@ router.put('/company', asyncRoute(async (req, res) => {
     email: email.trim().toLowerCase(),
     website: website?.trim() || null,
     logoUrl: logoUrl || null,
+    pan: pan?.trim().toUpperCase() || null,
+    cin: cin?.trim().toUpperCase() || null,
+    bankName: bankName?.trim() || null,
+    bankBranch: bankBranch?.trim() || null,
+    bankAccount: bankAccount?.trim() || null,
+    bankIfsc: bankIfsc?.trim().toUpperCase() || null,
   };
 
   await upsertSetting('company_profile', company);

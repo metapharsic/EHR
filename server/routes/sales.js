@@ -5,10 +5,16 @@ const { verifyTokenMiddleware, verifyRoleMiddleware } = require('../utils/jwt');
 const logger = require('../utils/logger');
 const kafka = require('../services/kafka');
 const metrics = require('../services/metrics');
+const ledgerHelper = require('../utils/ledgerHelper');
 
 // Middleware
 router.use(verifyTokenMiddleware);
-router.use(verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'SALES_MANAGER']));
+router.use(verifyRoleMiddleware(['ADMIN', 'PHARMACIST', 'SALES_MANAGER', 'MANAGER', 'STAFF', 'SALES_EXEC']));
+
+// bill_type 'RETAIL' -> RET-% invoices only; 'WHOLESALE' or unset -> existing PCD-%/WHO-% set
+function invoicePrefixClause(type) {
+  return type === 'RETAIL' ? "si.invoice_number LIKE 'RET-%'" : "(si.invoice_number LIKE 'PCD-%' OR si.invoice_number LIKE 'WHO-%')";
+}
 
 /**
  * GET /api/sales
@@ -24,9 +30,10 @@ router.get('/', async (req, res) => {
       dateFrom = '', 
       dateTo = '',
       sortBy = 'created_at',
-      sortOrder = 'DESC'
+      sortOrder = 'DESC',
+      type = ''
     } = req.query;
-    
+
     const offset = (page - 1) * limit;
 
     let query = `
@@ -41,7 +48,7 @@ router.get('/', async (req, res) => {
              (SELECT COUNT(*) FROM sales_invoice_items WHERE invoice_id = si.id OR sales_invoice_id = si.id) as item_count
       FROM sales_invoices si
       LEFT JOIN parties p ON p.id = si.party_id
-      WHERE (si.invoice_number LIKE 'PCD-%' OR si.invoice_number LIKE 'WHO-%')
+      WHERE ${invoicePrefixClause(type)}
     `;
     const params = [];
 
@@ -74,7 +81,7 @@ router.get('/', async (req, res) => {
     const { rows } = await db.query(query, params);
 
     // Get total count
-    let countQuery = "SELECT COUNT(*) as count FROM sales_invoices si LEFT JOIN parties p ON p.id=si.party_id WHERE (si.invoice_number LIKE 'PCD-%' OR si.invoice_number LIKE 'WHO-%')";
+    let countQuery = `SELECT COUNT(*) as count FROM sales_invoices si LEFT JOIN parties p ON p.id=si.party_id WHERE ${invoicePrefixClause(type)}`;
     const countParams = [];
     if (search) {
       countQuery += ` AND (si.invoice_number ILIKE $${countParams.length + 1} OR si.customer_name ILIKE $${countParams.length + 1} OR p.name ILIKE $${countParams.length + 1})`;
@@ -107,9 +114,10 @@ router.get('/', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
-    const totalQuery = "SELECT COUNT(*) FROM sales_invoices WHERE (invoice_number LIKE 'PCD-%' OR invoice_number LIKE 'WHO-%')";
-    const revenueQuery = "SELECT SUM(net_amount) FROM sales_invoices WHERE (invoice_number LIKE 'PCD-%' OR invoice_number LIKE 'WHO-%')";
-    const monthQuery = "SELECT SUM(net_amount) FROM sales_invoices WHERE date >= date_trunc('month', CURRENT_DATE) AND (invoice_number LIKE 'PCD-%' OR invoice_number LIKE 'WHO-%')";
+    const clause = invoicePrefixClause(req.query.type).replace(/si\./g, '');
+    const totalQuery = `SELECT COUNT(*) FROM sales_invoices WHERE ${clause}`;
+    const revenueQuery = `SELECT SUM(net_amount) FROM sales_invoices WHERE ${clause}`;
+    const monthQuery = `SELECT SUM(net_amount) FROM sales_invoices WHERE date >= date_trunc('month', CURRENT_DATE) AND ${clause}`;
 
     const [total, revenue, month] = await Promise.all([
       db.query(totalQuery),
@@ -186,7 +194,8 @@ router.get('/products', async (req, res) => {
 router.post('/', async (req, res) => {
   const {
     party_id, party_name, invoice_date, payment_mode = 'Credit', items,
-    lr_no, lr_date, order_no, due_date, ewaybill_no, transport, weight
+    lr_no, lr_date, order_no, due_date, ewaybill_no, transport, weight,
+    bill_type = 'WHOLESALE'
   } = req.body;
 
   if (!party_id) return res.status(400).json({ success: false, error: 'Distributor is required' });
@@ -196,13 +205,14 @@ router.post('/', async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    const prefix = bill_type === 'RETAIL' ? 'RET-' : 'WHO-';
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const { rows: seqRows } = await client.query(
       "SELECT COUNT(*)+1 AS seq FROM sales_invoices WHERE invoice_number LIKE $1",
-      ['WHO-' + dateStr + '-%']
+      [prefix + dateStr + '%']
     );
     const seq = String(seqRows[0].seq).padStart(4, '0');
-    const invoiceNumber = 'WHO-' + dateStr + '-' + seq;
+    const invoiceNumber = prefix + dateStr + seq;
 
     const sub_total = items.reduce((s, i) => {
       const qty = parseFloat(i.quantity)||0; const rate = parseFloat(i.rate)||0; const disc = parseFloat(i.discount_percent)||0;
@@ -213,7 +223,11 @@ router.post('/', async (req, res) => {
       const taxable = qty * rate * (1 - disc/100);
       return s + taxable * (parseFloat(i.gst_percent) || 12) / 100;
     }, 0);
-    const net_before_round = sub_total + total_gst;
+    const free_deduction = items.reduce((s, i) => {
+      const freeQty = parseInt(i.free_quantity)||0; const mrp = parseFloat(i.mrp)||0; const disc = parseFloat(i.discount_percent)||0;
+      return s + freeQty * mrp * (1 - disc/100);
+    }, 0);
+    const net_before_round = sub_total + total_gst - free_deduction;
     const round_off = parseFloat((Math.round(net_before_round) - net_before_round).toFixed(2));
     const net_amount = Math.round(net_before_round);
 
@@ -231,30 +245,71 @@ router.post('/', async (req, res) => {
         lr_no||null, lr_date||null, order_no||null, due_date||null,
         ewaybill_no||null, transport||null, weight||null]);
 
+    // GST jurisdiction: company is state code 36. Intra-state (party GSTIN starts 36) → CGST+SGST;
+    // inter-state (any other/blank GSTIN) → IGST. Mirrors frontend Sales.tsx isIGST logic.
+    const HOME_STATE = '36';
+    let partyGstin = '';
+    if (party_id) {
+      const { rows: [pg] } = await client.query('SELECT gstin FROM parties WHERE id = $1', [party_id]);
+      partyGstin = (pg?.gstin || '').trim();
+    }
+    const isIGST = !partyGstin || !partyGstin.startsWith(HOME_STATE);
+
     for (const item of items) {
       const qty   = parseFloat(item.quantity)||0;
       const rate  = parseFloat(item.rate)||0;
+      const mrp   = parseFloat(item.mrp)||0;
       const disc  = parseFloat(item.discount_percent)||0;
       const gst_pct = parseFloat(item.gst_percent)||12;
-      const taxable = parseFloat((qty * rate * (1 - disc/100)).toFixed(2));
-      const igst_amt = parseFloat((taxable * gst_pct / 100).toFixed(2));
-      const total   = parseFloat((taxable + igst_amt).toFixed(2));
       const freeQty = parseInt(item.free_quantity)||0;
+      const taxable = parseFloat((qty * rate * (1 - disc/100)).toFixed(2));
+      const tax_amt  = parseFloat((taxable * gst_pct / 100).toFixed(2));
+      const igst_amt = isIGST ? tax_amt : 0;
+      const cgst_amt = isIGST ? 0 : parseFloat((tax_amt / 2).toFixed(2));
+      const sgst_amt = isIGST ? 0 : parseFloat((tax_amt - cgst_amt).toFixed(2));
+      const total   = parseFloat((taxable + tax_amt).toFixed(2));
+      const freeValue = parseFloat((freeQty * mrp * (1 - disc/100)).toFixed(2));
 
       await client.query(`
         INSERT INTO sales_invoice_items
           (invoice_id, sales_invoice_id, product_id, quantity, free_quantity, rate, selling_rate,
-           mrp, old_mrp, gst_percent, discount_percent, taxable_value, igst_amount, total_amount,
-           scheme_type, batch_no, hsn_code, manufacturer_code, expiry_date, pack)
-        VALUES ($1,$1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+           mrp, old_mrp, gst_percent, discount_percent, taxable_value, igst_amount, cgst_amount, sgst_amount, total_amount,
+           scheme_type, batch_no, hsn_code, manufacturer_code, expiry_date, pack, free_value)
+        VALUES ($1,$1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
       `, [inv.id, item.product_id||null, qty, freeQty, rate,
-          parseFloat(item.mrp)||0, parseFloat(item.old_mrp)||0,
-          gst_pct, disc, taxable, igst_amt, total,
+          mrp, parseFloat(item.old_mrp)||0,
+          gst_pct, disc, taxable, igst_amt, cgst_amt, sgst_amt, total,
           item.scheme_type||'none',
           item.batch_no||null, item.hsn_code||null,
           item.manufacturer_code||null,
           item.expiry_date||null,
-          item.pack||null]);
+          item.pack||null, freeValue]);
+
+      // Deduct stock: wholesale/retail sale must reduce inventory like POS does.
+      // Resolve batch by product_id + batch_number, then post OUT movement (also updates batches.stock).
+      if (item.product_id) {
+        let batchId = item.batch_id || null;
+        if (!batchId && item.batch_no) {
+          const { rows: [b] } = await client.query(
+            'SELECT id FROM batches WHERE product_id = $1 AND batch_number = $2 LIMIT 1',
+            [item.product_id, item.batch_no]
+          );
+          if (b) batchId = b.id;
+        }
+        await ledgerHelper.postToStockLedger(client, {
+          companyId: req.user?.companyId || 1,
+          productId: item.product_id,
+          batchId,
+          movementType: 'OUT',
+          referenceType: 'Sale',
+          referenceId: inv.id,
+          referenceNumber: invoiceNumber,
+          quantity: qty + freeQty,
+          movementDate: invoice_date || new Date().toISOString().split('T')[0],
+          narration: `${bill_type === 'RETAIL' ? 'Retail' : 'Wholesale'} Sale: ${invoiceNumber}`,
+          createdBy: req.user ? req.user.id : null
+        });
+      }
     }
 
     await client.query('COMMIT');
@@ -277,6 +332,7 @@ router.post('/', async (req, res) => {
  */
 router.get('/analytics', async (req, res) => {
   try {
+    const clause = invoicePrefixClause(req.query.type).replace(/si\./g, '');
     const [trendRows, topRows] = await Promise.all([
       db.query(`
         SELECT to_char(date_trunc('month', date), 'Mon YY') AS month,
@@ -285,7 +341,7 @@ router.get('/analytics', async (req, res) => {
         FROM sales_invoices
         WHERE date >= date_trunc('month', CURRENT_DATE) - INTERVAL '5 months'
           AND status != 'Cancelled'
-          AND (invoice_number LIKE 'WHO-%' OR invoice_number LIKE 'PCD-%')
+          AND ${clause}
         GROUP BY date_trunc('month', date)
         ORDER BY date_trunc('month', date)
       `),
@@ -319,7 +375,8 @@ router.get('/:id', async (req, res) => {
               si.sub_total, si.total_gst, si.net_amount as net_payable,
               si.lr_no, si.lr_date, si.order_no, si.due_date,
               si.ewaybill_no, si.transport, si.weight,
-              p.gstin, p.address as party_address, p.mobile as party_phone
+              p.gstin, p.address as party_address, p.mobile as party_phone,
+              p.party_code, p.pan as party_pan, p.drug_license_no as party_dl
        FROM sales_invoices si
        LEFT JOIN parties p ON p.id = si.party_id
        WHERE si.id = $1`,
@@ -331,7 +388,7 @@ router.get('/:id', async (req, res) => {
       `SELECT sii.id, sii.product_id, prod.name as product_name, sii.quantity, sii.free_quantity,
               sii.rate as ptr, sii.mrp, sii.old_mrp, sii.gst_percent, sii.discount_percent,
               sii.scheme_type, sii.hsn_code, sii.pack, sii.manufacturer_code,
-              sii.taxable_value, sii.total_amount,
+              sii.taxable_value, sii.total_amount, sii.free_value,
               COALESCE(NULLIF(sii.batch_no, ''),
                 (SELECT b.batch_number FROM batches b WHERE b.product_id = sii.product_id AND b.available_qty > 0 ORDER BY b.expiry_date LIMIT 1),
                 ''
@@ -359,7 +416,7 @@ router.get('/:id', async (req, res) => {
  * "Append" = client sends the full item list including the newly added lines.
  * invoice_number is immutable. Cancelled invoices cannot be edited.
  */
-router.put('/:id', verifyRoleMiddleware(['ADMIN', 'SALES_MANAGER']), async (req, res) => {
+router.put('/:id', verifyRoleMiddleware(['ADMIN', 'SALES_MANAGER', 'MANAGER', 'SALES_EXEC']), async (req, res) => {
   const { id } = req.params;
   const {
     party_id, party_name, invoice_date, payment_mode = 'Credit', items,
@@ -396,7 +453,11 @@ router.put('/:id', verifyRoleMiddleware(['ADMIN', 'SALES_MANAGER']), async (req,
       const taxable = qty * rate * (1 - disc/100);
       return s + taxable * (parseFloat(i.gst_percent) || 12) / 100;
     }, 0);
-    const net_before_round = sub_total + total_gst;
+    const free_deduction = items.reduce((s, i) => {
+      const freeQty = parseInt(i.free_quantity)||0; const mrp = parseFloat(i.mrp)||0; const disc = parseFloat(i.discount_percent)||0;
+      return s + freeQty * mrp * (1 - disc/100);
+    }, 0);
+    const net_before_round = sub_total + total_gst - free_deduction;
     const round_off = parseFloat((Math.round(net_before_round) - net_before_round).toFixed(2));
     const net_amount = Math.round(net_before_round);
 
@@ -416,30 +477,44 @@ router.put('/:id', verifyRoleMiddleware(['ADMIN', 'SALES_MANAGER']), async (req,
     // Replace line items wholesale (covers edits, removals, and appended lines)
     await client.query('DELETE FROM sales_invoice_items WHERE invoice_id=$1 OR sales_invoice_id=$1', [id]);
 
+    // Same CGST/SGST vs IGST jurisdiction split as POST (parity fix — was IGST-only here before).
+    const HOME_STATE = '36';
+    let partyGstin = '';
+    if (party_id) {
+      const { rows: [pg] } = await client.query('SELECT gstin FROM parties WHERE id = $1', [party_id]);
+      partyGstin = (pg?.gstin || '').trim();
+    }
+    const isIGST = !partyGstin || !partyGstin.startsWith(HOME_STATE);
+
     for (const item of items) {
       const qty   = parseFloat(item.quantity)||0;
       const rate  = parseFloat(item.rate)||0;
+      const mrp   = parseFloat(item.mrp)||0;
       const disc  = parseFloat(item.discount_percent)||0;
       const gst_pct = parseFloat(item.gst_percent)||12;
-      const taxable = parseFloat((qty * rate * (1 - disc/100)).toFixed(2));
-      const igst_amt = parseFloat((taxable * gst_pct / 100).toFixed(2));
-      const total   = parseFloat((taxable + igst_amt).toFixed(2));
       const freeQty = parseInt(item.free_quantity)||0;
+      const taxable = parseFloat((qty * rate * (1 - disc/100)).toFixed(2));
+      const tax_amt  = parseFloat((taxable * gst_pct / 100).toFixed(2));
+      const igst_amt = isIGST ? tax_amt : 0;
+      const cgst_amt = isIGST ? 0 : parseFloat((tax_amt / 2).toFixed(2));
+      const sgst_amt = isIGST ? 0 : parseFloat((tax_amt - cgst_amt).toFixed(2));
+      const total   = parseFloat((taxable + tax_amt).toFixed(2));
+      const freeValue = parseFloat((freeQty * mrp * (1 - disc/100)).toFixed(2));
 
       await client.query(`
         INSERT INTO sales_invoice_items
           (invoice_id, sales_invoice_id, product_id, quantity, free_quantity, rate, selling_rate,
-           mrp, old_mrp, gst_percent, discount_percent, taxable_value, igst_amount, total_amount,
-           scheme_type, batch_no, hsn_code, manufacturer_code, expiry_date, pack)
-        VALUES ($1,$1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+           mrp, old_mrp, gst_percent, discount_percent, taxable_value, igst_amount, cgst_amount, sgst_amount, total_amount,
+           scheme_type, batch_no, hsn_code, manufacturer_code, expiry_date, pack, free_value)
+        VALUES ($1,$1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
       `, [id, item.product_id||null, qty, freeQty, rate,
-          parseFloat(item.mrp)||0, parseFloat(item.old_mrp)||0,
-          gst_pct, disc, taxable, igst_amt, total,
+          mrp, parseFloat(item.old_mrp)||0,
+          gst_pct, disc, taxable, igst_amt, cgst_amt, sgst_amt, total,
           item.scheme_type||'none',
           item.batch_no||null, item.hsn_code||null,
           item.manufacturer_code||null,
           item.expiry_date||null,
-          item.pack||null]);
+          item.pack||null, freeValue]);
     }
 
     await client.query('COMMIT');

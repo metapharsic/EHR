@@ -537,6 +537,16 @@ const OMS: React.FC = () => {
             <button onClick={() => openDetail(row.id)} className="p-1.5 text-slate-500 hover:text-[#22c55e] hover:bg-slate-100 rounded-md transition-colors" title="View details">
               <Eye size={16} />
             </button>
+            {isNonTerminal(row.status) && (
+              <button
+                onClick={() => { if (window.confirm(`Cancel order ${row.orderNumber}?`)) cancelOrder(row.id); }}
+                disabled={actionBusy}
+                className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
+                title="Cancel order"
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
           </div>
         );
       },

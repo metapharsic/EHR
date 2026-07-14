@@ -13,6 +13,13 @@ const ledgerHelper = require('../utils/ledgerHelper');
 const payrollEngine = require('../utils/hrPayrollEngine');
 const aiAgent = require('../services/aiHrAgent');
 const { v4: uuidv4 } = require('uuid');
+const { hashPassword, validatePasswordStrength } = require('../utils/password');
+const crypto = require('crypto');
+
+const generateTempPassword = () => {
+  const raw = crypto.randomBytes(9).toString('base64').replace(/[+/=]/g, 'x');
+  return `Kap@${raw}1`; // guaranteed upper/lower/digit/special
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -73,7 +80,7 @@ router.get(
 router.post(
   '/departments',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { name, code, parent_id, head_employee_id, description } = req.body;
     const result = await db.query(
@@ -139,7 +146,7 @@ router.get(
 router.post(
   '/designations',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { name, code, grade, department_id } = req.body;
     const result = await db.query(
@@ -163,7 +170,7 @@ router.get(
 router.post(
   '/salary-structures',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { name, basic_pct, hra_pct, da_pct, special_allowance, grade, description } = req.body;
     const gr = grade || description || 'L2';
@@ -211,7 +218,7 @@ router.get(
 router.post(
   '/employees',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const client = await db.getClient();
     try {
@@ -261,8 +268,55 @@ router.post(
         await client.query('SELECT fn_provision_leave_balances($1)', [empId]);
       } catch (_) { /* function may not exist yet */ }
 
+      // Auto-provision ERP login for this employee, department-role assigned
+      let provisionedUser = null;
+      if (email) {
+        const dup = await client.query('SELECT id FROM users WHERE email=$1 OR username=$1', [email]);
+        if (dup.rows.length === 0) {
+          let roleId = null;
+          let roleName = 'STAFF';
+          let deptCode = null;
+          if (department_id) {
+            const deptRes = await client.query('SELECT code FROM hr_departments WHERE id=$1', [department_id]);
+            if (deptRes.rows.length) {
+              deptCode = deptRes.rows[0].code;
+              const roleRes = await client.query(
+                `SELECT id, name FROM roles WHERE default_for_dept_code=$1 AND company_id=1 LIMIT 1`,
+                [deptCode]
+              );
+              if (roleRes.rows.length) {
+                roleId = roleRes.rows[0].id;
+                roleName = roleRes.rows[0].name;
+              }
+            }
+          }
+          if (!roleId) {
+            const staffRole = await client.query(`SELECT id FROM roles WHERE name='STAFF' AND company_id=1`);
+            if (staffRole.rows.length) { roleId = staffRole.rows[0].id; }
+          }
+
+          const tempPassword = generateTempPassword();
+          const hashed = await hashPassword(tempPassword);
+          const username = email.split('@')[0] + '.' + employee_code.toLowerCase();
+
+          const userRes = await client.query(
+            `INSERT INTO users (username, email, password_hash, name, role, role_id, phone, department, company_id, employee_id, status, login_attempts, risk_score, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1,$9,'Active',0,0,NOW(),NOW())
+             RETURNING id, username`,
+            [username, email, hashed, name, roleName, roleId, contact || null, deptCode, empId]
+          );
+          provisionedUser = { id: userRes.rows[0].id, username, tempPassword, roleName };
+          await client.query('UPDATE employees SET user_id=$1 WHERE id=$2', [userRes.rows[0].id, empId]);
+        }
+      }
+
       await client.query('COMMIT');
 
+      if (provisionedUser) {
+        logger.security('Auto-provisioned ERP login for new employee', {
+          employeeId: empId, userId: provisionedUser.id, username: provisionedUser.username, role: provisionedUser.roleName
+        });
+      }
 
       // Trigger onboarding async (non-blocking)
       setImmediate(async () => {
@@ -301,7 +355,13 @@ router.post(
         }
       });
 
-      res.status(201).json({ success: true, data: result.rows[0] });
+      res.status(201).json({
+        success: true,
+        data: result.rows[0],
+        provisionedLogin: provisionedUser
+          ? { username: provisionedUser.username, tempPassword: provisionedUser.tempPassword, role: provisionedUser.roleName }
+          : null
+      });
     } catch (error) {
       await client.query('ROLLBACK');
       logger.error('Failed to create employee', { error: error.message });
@@ -355,7 +415,7 @@ router.get(
 router.put(
   '/employees/:id/profile',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { id } = req.params;
     const client = await db.getClient();
@@ -425,7 +485,7 @@ router.put(
 router.delete(
   '/employees/:id',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { id } = req.params;
     const { exit_date, exit_reason } = req.body || {};
@@ -474,7 +534,7 @@ router.delete(
 router.post(
   '/employees/:id/timeline',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { id } = req.params;
     const { event_type = 'Note', description } = req.body;
@@ -494,7 +554,7 @@ router.post(
 router.post(
   '/employees/:id/terminate',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { id } = req.params;
     const { exit_date, exit_reason } = req.body || {};
@@ -580,7 +640,7 @@ router.get(
 router.delete(
   '/employees/:id/documents/:docId',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { docId } = req.params;
     const doc = await db.query(
@@ -649,7 +709,7 @@ router.get(
 router.post(
   '/ats/requisitions',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { title, department_id, designation_id, openings, positions, job_description, description, closing_date } = req.body;
     const pos = positions || openings || 1;
@@ -666,7 +726,7 @@ router.post(
 router.put(
   '/ats/requisitions/:id/approve',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const result = await db.query(
       `UPDATE hr_job_requisitions SET status='Approved', approved_by=$1, approved_at=NOW(), updated_at=NOW() WHERE id=$2 RETURNING *`,
@@ -784,7 +844,7 @@ router.get(
 router.post(
   '/ats/offers/:candidateId',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { candidateId } = req.params;
     const { offered_ctc, joining_date, valid_till, terms } = req.body;
@@ -816,7 +876,7 @@ router.put(
 router.post(
   '/ats/candidates/:id/hire',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { id } = req.params;
     const client = await db.getClient();
@@ -1242,7 +1302,7 @@ router.get(
 router.post(
   '/offboarding/initiate/:empId',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { empId } = req.params;
     const { exit_date, exit_type, notice_period_days, reason } = req.body;
@@ -1400,7 +1460,7 @@ router.get(
 router.post(
   '/attendance/bulk-upload',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const { records } = req.body; // array of { employee_id, date, status, clock_in, clock_out }
     if (!Array.isArray(records) || !records.length)
@@ -1519,7 +1579,7 @@ router.post(
 router.put(
   '/leave/:id/approve',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const client = await db.getClient();
     try {
@@ -1556,7 +1616,7 @@ router.put(
 router.put(
   '/leave/:id/reject',
   verifyTokenMiddleware,
-  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']),
+  verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']),
   asyncRoute(async (req, res) => {
     const client = await db.getClient();
     try {
@@ -1630,7 +1690,7 @@ router.get('/shifts', verifyTokenMiddleware, asyncRoute(async (req, res) => {
   res.json({ success: true, data: result.rows });
 }));
 
-router.post('/shifts', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']), asyncRoute(async (req, res) => {
+router.post('/shifts', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']), asyncRoute(async (req, res) => {
   const { name, start_time, end_time, grace_minutes, is_night_shift } = req.body;
   const result = await db.query(
     `INSERT INTO hr_shifts (id, name, start_time, end_time, grace_minutes, is_night_shift, created_at)
@@ -1640,7 +1700,7 @@ router.post('/shifts', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR
   res.status(201).json({ success: true, data: result.rows[0] });
 }));
 
-router.post('/shifts/assign', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']), asyncRoute(async (req, res) => {
+router.post('/shifts/assign', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']), asyncRoute(async (req, res) => {
   const { employee_id, shift_id, effective_from, effective_to } = req.body;
   const result = await db.query(
     `INSERT INTO hr_employee_shifts (id, employee_id, shift_id, effective_from, effective_to, created_at)
@@ -1662,7 +1722,7 @@ router.get('/holidays', verifyTokenMiddleware, asyncRoute(async (req, res) => {
   res.json({ success: true, data: result.rows });
 }));
 
-router.post('/holidays', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']), asyncRoute(async (req, res) => {
+router.post('/holidays', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']), asyncRoute(async (req, res) => {
   const { name, date, location, is_optional } = req.body;
   const year = new Date(date).getFullYear();
   const result = await db.query(
@@ -1708,7 +1768,7 @@ router.post('/overtime/request', verifyTokenMiddleware, asyncRoute(async (req, r
   res.status(201).json({ success: true, data: result.rows[0] });
 }));
 
-router.put('/overtime/:id/approve', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']), asyncRoute(async (req, res) => {
+router.put('/overtime/:id/approve', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']), asyncRoute(async (req, res) => {
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
@@ -1751,7 +1811,7 @@ router.post('/comp-off/request', verifyTokenMiddleware, asyncRoute(async (req, r
   res.status(201).json({ success: true, data: result.rows[0] });
 }));
 
-router.put('/comp-off/:id/approve', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']), asyncRoute(async (req, res) => {
+router.put('/comp-off/:id/approve', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']), asyncRoute(async (req, res) => {
   const result = await db.query(
     `UPDATE hr_compensatory_off SET status='Approved', approved_by=$1, approved_at=NOW(), updated_at=NOW() WHERE id=$2 RETURNING *`,
     [req.user.userId, req.params.id]
@@ -1787,7 +1847,7 @@ router.get('/payroll/slips', verifyTokenMiddleware, asyncRoute(async (req, res) 
   res.json({ success: true, data: result.rows });
 }));
 
-router.post(['/payroll/run', '/payroll/process-bulk'], verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']), asyncRoute(async (req, res) => {
+router.post(['/payroll/run', '/payroll/process-bulk'], verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']), asyncRoute(async (req, res) => {
   const { month, year, company_id } = req.body;
   if (!month || !year) return res.status(400).json({ success: false, error: 'month and year required' });
 
@@ -2058,7 +2118,7 @@ router.get('/payroll/slips/:id', verifyTokenMiddleware, asyncRoute(async (req, r
   res.json({ success: true, data: result.rows[0] });
 }));
 
-router.put('/payroll/slips/:id/mark-paid', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']), asyncRoute(async (req, res) => {
+router.put('/payroll/slips/:id/mark-paid', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']), asyncRoute(async (req, res) => {
   const { bank_transfer_ref } = req.body;
   const result = await db.query(
     `UPDATE salary_slips SET payment_status='Paid', bank_transfer_ref=$1, paid_at=NOW(), updated_at=NOW() WHERE id=$2 RETURNING *`,
@@ -2193,7 +2253,7 @@ router.get('/payroll/cost-summary', verifyTokenMiddleware, asyncRoute(async (req
 
 // ─── INCREMENTS ───────────────────────────────────────────────────────────
 
-router.post('/increments/create', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']), asyncRoute(async (req, res) => {
+router.post('/increments/create', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']), asyncRoute(async (req, res) => {
   const { cycle_name, effective_date, increments } = req.body;
   // increments: [{ employee_id, increment_amount, increment_pct, new_salary, reason }]
   const client = await db.getClient();
@@ -2228,7 +2288,7 @@ router.post('/increments/create', verifyTokenMiddleware, verifyRoleMiddleware(['
 
 // ─── BONUSES ──────────────────────────────────────────────────────────────
 
-router.post('/bonuses/process', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']), asyncRoute(async (req, res) => {
+router.post('/bonuses/process', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']), asyncRoute(async (req, res) => {
   const { scheme_id, bonus_date, employee_ids } = req.body;
   const schemeRes = await db.query('SELECT * FROM hr_bonus_schemes WHERE id=$1', [scheme_id]);
   if (!schemeRes.rows.length) return res.status(404).json({ success: false, error: 'Bonus scheme not found' });
@@ -2262,7 +2322,7 @@ router.get('/reimbursements', verifyTokenMiddleware, asyncRoute(async (req, res)
   res.json({ success: true, data: result.rows });
 }));
 
-router.put('/reimbursements/:id/approve', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER']), asyncRoute(async (req, res) => {
+router.put('/reimbursements/:id/approve', verifyTokenMiddleware, verifyRoleMiddleware(['ADMIN', 'HR_MANAGER', 'MANAGER', 'HR_EXEC']), asyncRoute(async (req, res) => {
   const result = await db.query(
     `UPDATE hr_reimbursement_claims SET status='Approved', approved_by=$1, approved_at=NOW(), updated_at=NOW() WHERE id=$2 RETURNING *`,
     [req.user.userId, req.params.id]

@@ -307,11 +307,31 @@ export const getAllParties = async (): Promise<Party[]> => {
   } catch { return []; }
 };
 
-export const saveParty = async (party: Party): Promise<boolean> => {
+export const saveParty = async (party: Party): Promise<Party | null> => {
   try {
-    const r = await apiClient.post('/parties', party);
-    return !!r.success;
-  } catch { return false; }
+    const isEdit = party.id && !String(party.id).startsWith('C-');
+    const payload = {
+      name: party.name,
+      entity_type: party.entity_type ?? null,
+      mobile: party.mobile ?? null,
+      email: party.email ?? null,
+      city: party.city ?? null,
+      type: party.type ?? 'Debtor',
+      status: party.status ?? 'Active',
+      gstin: party.gstin ?? null,
+      pan: party.pan ?? null,
+      credit_limit: party.creditLimit ?? null,
+      category: party.category ?? null,
+      contact_person: party.contactPerson ?? null,
+      address: party.address ?? null,
+      state: party.state ?? null,
+    };
+    const r = isEdit
+      ? await apiClient.put(`/api/customers/${party.id}`, payload)
+      : await apiClient.post('/api/customers', payload);
+    if (r.success && r.data) return { ...party, id: r.data.id ?? party.id };
+    return null;
+  } catch { return null; }
 };
 
 export const getAllEmployees = async (): Promise<MedicalRepresentative[]> => {
