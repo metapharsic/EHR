@@ -1,0 +1,99 @@
+# AI Coding Rules — Metapharsic Lifesciences ERP + MR Tracker v10.0
+# MAXIMUM AUTOMATION | ENTERPRISE-GRADE PRECISION | AGENTIC AI STANDARDS
+# Last updated: 2026-06-11
+
+You are a lead full-stack engineer managing the Metapharsic pharmaceutical enterprise ecosystem.
+
+---
+
+## 1. Core Architectural & Functional Mandates
+
+### A. Transactional Integrity (ACID)
+- **Financial/Inventory Safety**: ALL multi-table mutations MUST use `BEGIN/COMMIT/ROLLBACK`.
+- **Side Effects**: Use `setImmediate()` or a Job Queue for non-blocking side effects (Logging, Webhooks, Notifications).
+- **Idempotency**: All `POST` operations that create critical records must include a client-generated `id` or use unique composite keys to prevent double-creation.
+
+### B. Business Logic & Date Handling
+- **Request-Time Dates**: ALWAYS compute `new Date()` inside the request handler. NEVER use module-level constants.
+- **FSN Inventory**: Velocity = `units_sold_90_days / 90`. Categorize as: Fast (>0.1), Slow (>0), Non-Moving (0).
+- **Deterministic KPIs**: ROI and Efficiency scores must use weighted linear formulas. No `Math.random()`.
+
+---
+
+## 2. Module-Specific Implementation Standards
+
+### 🛡️ PCD (Franchise & Field Force)
+- **Authoritative Data**: MR Master lives in ERP `medical_representatives`. Visit activity lives in MR Tracker `visit_schedules`.
+- **Geospatial**: `pcd_geospatial_insights` MUST be updated when MR visits are marked 'Completed' via MR Tracker.
+- **Schemes**: Quarterly bonus logic must evaluate `pcd_schemes` against `total_shipped_value` in the `orders` table.
+
+### 📦 OMS (Distribution & Fulfillment)
+- **The 3-Way Match**: Purchases require a matching PO, GRN (`goods_received_notes`), and Supplier Invoice.
+- **Reservation**: `reserved_stock` is created at 'Approved' status. Clear it and update `stock_ledger_entries` at 'Shipped'.
+- **Return Logic**: Sales returns MUST create a `status='CreditNote'` invoice and restore batch stock using `ledgerHelper.postToStockLedger(IN)`.
+
+### 👥 HRMS (Employee Lifecycle)
+- **Statutory Compliance**: Payroll engine MUST pull from `hr_statutory_config` for PF, ESIC, and PT calculations.
+- **Salary Structure**: `salary_slips` generation must cross-reference `hr_attendance` (actual vs scheduled days).
+- **Document Management**: Employee docs (PAN, Aadhaar) MUST be stored with soft-delete in `hr_employee_documents` and filtered from AI.
+
+### 📋 Compliance & Regulatory
+- **H1 Register**: Every sale of Schedule H1 drugs must be entry-logged to `h1_register` with Patient/Doctor/Batch details.
+- **QC Integration**: `batches.stock` becomes "Available" only after a `qc_records.status='Passed'` entry.
+- **DMS**: All SOPs and licenses must use `dms_versions` for change tracking. Soft-delete only (`status='Deleted'`).
+
+### 💳 POS & Billing
+- **Concurrency**: Use `SELECT FOR UPDATE` on `batches` when deducting stock during high-volume POS sessions.
+- **Tax Engine**: Auto-calculate CGST/SGST vs IGST by comparing `company_id.state` vs `party_id.state`.
+- **Payment Reconciliation**: PDC (Post-Dated Cheques) must be tracked in `pdc_cheques` and reconciled via `bank_reconciliation`.
+
+---
+
+## 3. UI/UX Functional Standards
+
+### A. Layout & Aesthetics (Tailwind v4)
+- **Glassmorphism**: Use `backdrop-blur-lg` + `bg-white/70` for modals and card overlays.
+- **Layout**: Use `ERPLayout` as the root wrapper for consistency (Sidebar + TopNav + Breadcrumbs).
+- **Responsive**: Mobile-first grid: `grid-cols-1 md:grid-cols-2 lg:grid-cols-4`.
+
+### B. Interactive Patterns
+- **Quick Actions**: Top-right "Plus" button for high-frequency tasks (Add Sale, Create Lead, Clock In).
+- **Standardized Icons**:
+  - `CheckCircle` = Success/Approved
+  - `AlertTriangle` = Pending/Review
+  - `XCircle` = Rejected/Overdue
+  - `TrendingUp` = Performance
+- **Skeleton Grids**: All `useDataFetch` components must show matching skeleton rows during `isLoading`.
+
+### C. State Management (Zustand)
+- **Persistence**: Store `activeCompanyId`, `activeFinancialYear`, and `sidebarCollapsed` in `persist` storage.
+- **Context**: Use `useAppStore` for global notifications and auth state. Avoid Prop Drilling beyond 2 levels.
+
+---
+
+## 4. Database Master Invariants
+
+- **Master Schema**: `server/schema.sql` is the source of truth.
+- **Column Integrity**:
+  - `users` MUST have `risk_score` and `two_factor_enabled`.
+  - `products` MUST have `selling_rate`, `mrp`, and `is_active`.
+  - `parties` MUST have `company_id` and `current_balance`.
+- **Naming**: Use snake_case for DB columns, camelCase for Frontend JSON. Backend translates using mapping layers.
+
+---
+
+## 5. Testing & Validation (4-Tier Model)
+
+1. **Reproduction Test**: Before fixing a bug, add a failing case to `server/__tests__/`.
+2. **Integration (Tier 2)**: Backend API endpoints must return 200/201 and valid JSON schema.
+3. **Component (Tier 3)**: RTL tests for `Loading`, `Empty`, and `Error` states.
+4. **E2E (Tier 4)**: Playwright "Happy Path" (Login -> Create Invoice -> Verify Ledger).
+
+---
+
+## 6. Environment & Troubleshooting
+
+- **VPS URL**: https://erp.metapharsic.cloud (Port 3002).
+- **Master Bypass**: `admin` / `Admin@1234`.
+- **Sync**: GitHub `master` → `git pull` on VPS → `pm2 restart metapharsic-erp`.
+- **Logs**: Monitor with `pm2 logs metapharsic-erp --lines 50`.
